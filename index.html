@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#6C5CE7">
+<meta name="description" content="A tap-to-color app for toddlers and kids">
+<title>Coloring Fun - Kids Coloring App</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<audio id="bgm" loop preload="auto">
+  <source src="audio/bgm-childrens-march.ogg" type="audio/ogg">
+  <source src="audio/bgm-childrens-march.mp3" type="audio/mpeg">
+</audio>
+
+<!-- ===================== Cover screen (title/start) ===================== -->
+<section id="cover-screen" class="screen cover-screen">
+  <div class="cover-content">
+    <h1 class="cover-title">🎨 Coloring Fun</h1>
+    <div id="cover-bosses" class="cover-bosses" aria-hidden="true"></div>
+    <button id="btn-cover-start" class="cover-start-btn">▶ Start</button>
+  </div>
+</section>
+
+<!-- ===================== Map screen (home) ===================== -->
+<section id="map-screen" class="screen" hidden>
+  <header class="gallery-header">
+    <div class="title-row">
+      <div id="mode-selector" class="mode-selector" role="group" aria-label="Difficulty mode">
+        <button class="mode-btn" data-mode="easy">Easy<span class="mode-btn-time">15m</span></button>
+        <button class="mode-btn" data-mode="normal">Normal<span class="mode-btn-time">10m</span><span class="mode-btn-lock">🔒</span></button>
+        <button class="mode-btn" data-mode="hard">Hard<span class="mode-btn-time">5m</span><span class="mode-btn-lock">🔒</span></button>
+        <button class="mode-btn" data-mode="veryhard">Very Hard<span class="mode-btn-time">3m</span><span class="mode-btn-lock">🔒</span></button>
+      </div>
+      <h1>🎨 Coloring Fun</h1>
+    </div>
+    <p class="subtitle">Pick a level to start!</p>
+    <p id="stat-line" class="stat-line" hidden></p>
+    <p id="levels-left-line" class="levels-left-line" hidden></p>
+    <button id="btn-ranking" class="ranking-btn">🏆 Ranking</button>
+    <button id="btn-reset-all" class="reset-all-btn" hidden>🔄 Reset All &amp; Play Again</button>
+  </header>
+  <div id="map-grid" class="map-grid" role="list" aria-label="Level map"></div>
+  <div id="boss-section" class="boss-section">
+    <h2 class="boss-section-title">👑 Final Boss</h2>
+    <p class="boss-section-sub">Clear all 10 levels in one mode to challenge that mode's boss!</p>
+    <div id="boss-grid" class="boss-grid" role="list" aria-label="Final bosses"></div>
+  </div>
+</section>
+
+<!-- ===================== Level gallery screen ===================== -->
+<section id="gallery-screen" class="screen" hidden>
+  <header class="coloring-header">
+    <button id="btn-map-back" class="icon-btn" aria-label="Back to map">🗺️</button>
+    <div class="level-header-mid">
+      <h1 id="level-title" class="coloring-title"></h1>
+      <p id="level-progress" class="subtitle"></p>
+    </div>
+    <button id="btn-level-reset" class="icon-btn" aria-label="Reset this level">🔄</button>
+  </header>
+  <div id="level-next-banner" class="level-next-banner" hidden>
+    <button id="btn-level-back" class="back-btn" hidden>◀ Back</button>
+    <span id="level-next-text"></span>
+    <button id="btn-level-next" class="next-btn" hidden>Next ▶</button>
+  </div>
+  <div id="gallery-grid" class="gallery-grid" role="list" aria-label="Coloring pictures list"></div>
+</section>
+
+<!-- ===================== Coloring screen ===================== -->
+<section id="coloring-screen" class="screen" hidden>
+  <header class="coloring-header">
+    <button id="btn-home" class="icon-btn" aria-label="Go home">🏠</button>
+    <div class="level-header-mid">
+      <h2 id="coloring-title" class="coloring-title"></h2>
+      <p id="coloring-timer-text" class="subtitle timer-subtitle" hidden></p>
+    </div>
+    <div class="header-right-group">
+      <button id="btn-music" class="icon-btn" aria-label="Toggle background music">🎵</button>
+      <button id="btn-sound" class="icon-btn" aria-label="Turn sound on or off">🔊</button>
+    </div>
+  </header>
+
+  <div class="goal-panel">
+    <p class="panel-label">🎯 Goal</p>
+    <div class="goal-canvas-wrap">
+      <canvas id="goal-canvas" class="goal-canvas"></canvas>
+      <span id="goal-emoji" class="goal-emoji" hidden></span>
+    </div>
+  </div>
+
+  <p class="panel-label">✏️ Color it like this</p>
+  <div id="canvas-wrap" class="canvas-wrap">
+    <canvas id="fill-canvas" class="stack-canvas"></canvas>
+    <canvas id="line-canvas" class="stack-canvas"></canvas>
+    <canvas id="mask-canvas" class="stack-canvas" hidden></canvas>
+    <div id="tap-layer" class="tap-layer" aria-label="Tap a part to color it"></div>
+  </div>
+
+  <div id="palette" class="palette" role="list" aria-label="Pick a color"></div>
+
+  <div class="toolbar">
+    <button id="btn-undo" class="tool-btn" aria-label="Undo">↩️<span>Undo</span></button>
+    <button id="btn-clear" class="tool-btn" aria-label="Clear">🧽<span>Clear</span></button>
+    <button id="btn-save" class="tool-btn tool-btn-primary" aria-label="Done, save it">✅<span>Done!</span></button>
+  </div>
+</section>
+
+<!-- ===================== Rating modal (auto score + grown-up rating) ===================== -->
+<div id="rating-modal" class="modal-overlay" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="rating-title">
+
+    <div id="auto-result-view">
+      <h2 id="rating-title">Your Score</h2>
+      <p id="auto-result-detail" class="modal-sub"></p>
+      <div id="auto-result-badge" class="auto-result-badge"></div>
+      <button id="auto-result-confirm" class="tool-btn tool-btn-primary auto-confirm-btn">✅<span>OK!</span></button>
+      <button id="btn-manual-override" class="text-link-btn">Let a grown-up rate it</button>
+    </div>
+
+    <div id="manual-select-view" hidden>
+      <h2>Grown-up, please rate it!</h2>
+      <p class="modal-sub">How well did they color it?</p>
+      <div id="rating-options" class="rating-options"></div>
+      <button id="rating-skip" class="text-link-btn">Use the auto score</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== Praise overlay ===================== -->
+<div id="praise-overlay" class="praise-overlay" hidden>
+  <div id="praise-emoji" class="praise-emoji"></div>
+  <div id="praise-text" class="praise-text"></div>
+</div>
+
+<!-- ===================== 시작 시 이름/나라 입력 모달(Start 버튼 직후 1회) ===================== -->
+<div id="player-entry-modal" class="modal-overlay" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="player-entry-title">
+    <h2 id="player-entry-title">👋 Who's playing?</h2>
+    <p class="modal-sub">Tell us your name and country!</p>
+    <div class="ranking-entry-form">
+      <input id="player-input-name" type="text" placeholder="Name" maxlength="20">
+      <input id="player-input-country" type="text" placeholder="Country" maxlength="30">
+    </div>
+    <button id="player-entry-submit" class="tool-btn tool-btn-primary auto-confirm-btn">▶<span>Let's Play!</span></button>
+    <button id="player-entry-skip" class="text-link-btn">Skip</button>
+  </div>
+</div>
+
+<!-- ===================== 완주 기록 입력 모달(이름/나라) ===================== -->
+<div id="ranking-entry-modal" class="modal-overlay" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="ranking-entry-title">
+    <h2 id="ranking-entry-title">🎉 All 10 Levels Clear!</h2>
+    <p id="ranking-entry-time" class="modal-sub"></p>
+    <div class="ranking-entry-form">
+      <input id="ranking-input-name" type="text" placeholder="Name" maxlength="20">
+      <input id="ranking-input-country" type="text" placeholder="Country" maxlength="30">
+    </div>
+    <button id="ranking-entry-submit" class="tool-btn tool-btn-primary auto-confirm-btn">✅<span>Save my record!</span></button>
+    <button id="ranking-entry-skip" class="text-link-btn">Skip</button>
+  </div>
+</div>
+
+<!-- ===================== 파이널 보스 클리어 축하 모달(팡파레 + 프린트) ===================== -->
+<div id="boss-fanfare-modal" class="modal-overlay boss-fanfare-overlay" hidden>
+  <div class="modal-card boss-fanfare-card" role="dialog" aria-modal="true" aria-labelledby="boss-fanfare-title">
+    <div id="confetti-layer" class="confetti-layer" aria-hidden="true"></div>
+    <h2 id="boss-fanfare-title">🎉👑 Final Boss Defeated! 👑🎉</h2>
+    <p id="boss-fanfare-sub" class="modal-sub"></p>
+    <p class="modal-sub boss-fanfare-gift">🎁 Here's a gift — print it and color it again on paper!</p>
+    <div class="boss-fanfare-actions">
+      <button id="btn-print-art" class="tool-btn tool-btn-primary">🖼️<span>Print My Art</span></button>
+      <button id="btn-print-blank" class="tool-btn">🖨️<span>Print Blank Page</span></button>
+    </div>
+    <button id="boss-fanfare-close" class="text-link-btn">Close</button>
+  </div>
+</div>
+
+<!-- ===================== 프린트 전용 영역(화면엔 안 보이고 인쇄할 때만 나타남) ===================== -->
+<div id="print-area" class="print-area"></div>
+
+<!-- ===================== 랭킹 보드 모달 ===================== -->
+<div id="ranking-board-modal" class="modal-overlay" hidden>
+  <div class="modal-card ranking-board-card" role="dialog" aria-modal="true" aria-labelledby="ranking-board-title">
+    <h2 id="ranking-board-title">🏆 Ranking</h2>
+    <p class="modal-sub">Fastest full clear time, by mode</p>
+    <div id="ranking-tabs" class="ranking-tabs" role="tablist"></div>
+    <div id="ranking-list" class="ranking-list"></div>
+    <button id="ranking-board-close" class="text-link-btn">Close</button>
+  </div>
+</div>
+
+<script src="templates.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

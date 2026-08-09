@@ -1,0 +1,3 @@
+node_modules/
+scripts/_test-*.js
+*.log

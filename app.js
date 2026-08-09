@@ -1,0 +1,2056 @@
+(function () {
+  'use strict';
+
+  const WORK_SIZE = 640;           // 내부 작업 해상도(정사각형)
+  const STROKE_COLOR = '#2b2b2b';
+  const ALPHA_WALL_THRESHOLD = 20; // 이 값 이상 알파면 "선"으로 취급 (번짐 방지)
+  const MIN_REGION_SIZE = 10;      // 이보다 작은 조각은 탭 불가능한 슬리버로 보고 채점 대상에서 제외
+  const MAX_UNDO = 15;
+
+  const COLORS = [
+    '#FF5B5B', '#FF9F43', '#FFD166', '#8BD17C',
+    '#4DB6AC', '#4D96FF', '#8C7AE6', '#F368E0',
+    '#7F5539', '#4A4A4A', '#E8D9B8'
+  ];
+  const WHITE_SUBSTITUTE = '#E8D9B8'; // 흰색은 배경(캔버스)과 구분이 안 돼서 베이지로 대체
+
+  const RATING_LEVELS = [
+    { level: 1, emoji: '🌟', label: 'Perfect! Color Master!' },
+    { level: 2, emoji: '😄', label: 'Great job!' },
+    { level: 3, emoji: '🙂', label: 'Good job!' },
+    { level: 4, emoji: '💪', label: 'Keep trying!' },
+    { level: 5, emoji: '🌱', label: 'Try again!' }
+  ];
+
+  const TOTAL_LEVELS = 10;
+  const CLEARED_KEY = 'clearedTemplates';
+  const SCORES_KEY = 'templateScores';
+
+  // ---------- 난이도(타이머) 모드 — 레벨 하나(그 레벨의 10개 그림 전부)를 이 시간 안에 다 색칠해야 함 ----------
+  const MODES = {
+    easy: { label: 'Easy', minutes: 15 },
+    normal: { label: 'Normal', minutes: 10 },
+    hard: { label: 'Hard', minutes: 5 },
+    veryhard: { label: 'Very Hard', minutes: 3 }
+  };
+  const MODE_KEY = 'gameMode';
+  const LEVEL_ATTEMPTS_KEY = 'levelAttempts'; // { [level]: 시작한 시각(ms) } — 타임어택 진행 중인 레벨
+  const LEVEL_TIMES_KEY = 'levelClearTimes'; // { [level]: {seconds, mode} } — 그 레벨을 완료하는 데 걸린 시간과 당시 모드
+  const RANKING_KEY = 'rankingEntries'; // [{name, country, mode, seconds, date}] — 10레벨 전부(같은 모드로) 클리어한 기록
+  const PLAYER_KEY = 'playerProfile'; // {name, country} — Start 버튼 직후 1회 입력, 이후 랭킹 등록 시 재사용
+
+  // ---------- 상태 ----------
+  let currentTemplate = null;
+  let currentLevel = null;
+  let currentBossMode = null; // null이 아니면 지금 파이널 보스를 색칠 중(그 모드 값 'easy'|'normal'|'hard'|'veryhard')
+  let selectedColor = COLORS[0];
+  let undoStack = [];
+  let soundOn = true;
+  let levelTimerInterval = null;
+  let audioCtx = null;
+
+  // ---------- DOM ----------
+  const coverScreen = document.getElementById('cover-screen');
+  const coverBosses = document.getElementById('cover-bosses');
+  const btnCoverStart = document.getElementById('btn-cover-start');
+  const playerEntryModal = document.getElementById('player-entry-modal');
+  const playerInputName = document.getElementById('player-input-name');
+  const playerInputCountry = document.getElementById('player-input-country');
+  const playerEntrySubmit = document.getElementById('player-entry-submit');
+  const playerEntrySkip = document.getElementById('player-entry-skip');
+  const mapScreen = document.getElementById('map-screen');
+  const mapGrid = document.getElementById('map-grid');
+  const galleryScreen = document.getElementById('gallery-screen');
+  const coloringScreen = document.getElementById('coloring-screen');
+  const galleryGrid = document.getElementById('gallery-grid');
+  const btnMapBack = document.getElementById('btn-map-back');
+  const levelTitle = document.getElementById('level-title');
+  const levelProgress = document.getElementById('level-progress');
+  const levelNextBanner = document.getElementById('level-next-banner');
+  const levelNextText = document.getElementById('level-next-text');
+  const btnLevelNext = document.getElementById('btn-level-next');
+  const btnLevelBack = document.getElementById('btn-level-back');
+  const btnLevelReset = document.getElementById('btn-level-reset');
+  const btnResetAll = document.getElementById('btn-reset-all');
+  const modeButtons = Array.from(document.querySelectorAll('.mode-btn'));
+  const coloringTimerText = document.getElementById('coloring-timer-text');
+  const statLine = document.getElementById('stat-line');
+  const coloringTitle = document.getElementById('coloring-title');
+  const fillCanvas = document.getElementById('fill-canvas');
+  const lineCanvas = document.getElementById('line-canvas');
+  const maskCanvas = document.getElementById('mask-canvas');
+  const goalCanvas = document.getElementById('goal-canvas');
+  const goalEmoji = document.getElementById('goal-emoji');
+  const tapLayer = document.getElementById('tap-layer');
+  const palette = document.getElementById('palette');
+  const btnHome = document.getElementById('btn-home');
+  const btnSound = document.getElementById('btn-sound');
+  const btnMusic = document.getElementById('btn-music');
+  const btnUndo = document.getElementById('btn-undo');
+  const btnClear = document.getElementById('btn-clear');
+  const btnSave = document.getElementById('btn-save');
+  const ratingModal = document.getElementById('rating-modal');
+  const autoResultView = document.getElementById('auto-result-view');
+  const autoResultDetail = document.getElementById('auto-result-detail');
+  const autoResultBadge = document.getElementById('auto-result-badge');
+  const autoResultConfirm = document.getElementById('auto-result-confirm');
+  const btnManualOverride = document.getElementById('btn-manual-override');
+  const manualSelectView = document.getElementById('manual-select-view');
+  const ratingOptions = document.getElementById('rating-options');
+  const ratingSkip = document.getElementById('rating-skip');
+  const praiseOverlay = document.getElementById('praise-overlay');
+  const praiseEmoji = document.getElementById('praise-emoji');
+  const praiseText = document.getElementById('praise-text');
+
+  const btnRanking = document.getElementById('btn-ranking');
+  const rankingEntryModal = document.getElementById('ranking-entry-modal');
+  const rankingEntryTime = document.getElementById('ranking-entry-time');
+  const rankingInputName = document.getElementById('ranking-input-name');
+  const rankingInputCountry = document.getElementById('ranking-input-country');
+  const rankingEntrySubmit = document.getElementById('ranking-entry-submit');
+  const rankingEntrySkip = document.getElementById('ranking-entry-skip');
+  const rankingBoardModal = document.getElementById('ranking-board-modal');
+  const rankingTabs = document.getElementById('ranking-tabs');
+  const rankingList = document.getElementById('ranking-list');
+  const rankingBoardClose = document.getElementById('ranking-board-close');
+
+  const levelsLeftLine = document.getElementById('levels-left-line');
+  const bossGrid = document.getElementById('boss-grid');
+  const bossFanfareModal = document.getElementById('boss-fanfare-modal');
+  const bossFanfareSub = document.getElementById('boss-fanfare-sub');
+  const confettiLayer = document.getElementById('confetti-layer');
+  const bossFanfareClose = document.getElementById('boss-fanfare-close');
+  const btnPrintArt = document.getElementById('btn-print-art');
+  const btnPrintBlank = document.getElementById('btn-print-blank');
+  const printArea = document.getElementById('print-area');
+
+  const fillCtx = fillCanvas.getContext('2d', { willReadFrequently: true });
+  const lineCtx = lineCanvas.getContext('2d');
+  const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
+  const goalCtx = goalCanvas.getContext('2d');
+
+  [fillCanvas, lineCanvas, maskCanvas, goalCanvas].forEach((c) => {
+    c.width = WORK_SIZE;
+    c.height = WORK_SIZE;
+  });
+
+  let wallMask = null; // Uint8Array WORK_SIZE*WORK_SIZE, 1 = 벽(선), 0 = 칠할 수 있음
+  let currentLabelMap = null; // Int32Array WORK_SIZE*WORK_SIZE, 픽셀 -> 영역 라벨(없으면 -1)
+  let currentGradableRegions = []; // [{seed, size, label}] 채점 대상 영역(배경 제외)
+  let currentLabelToColor = null; // Map<label, hex> 영역별 정답색(컬러바이넘버)
+  let currentSampledColors = null; // Map<label, hex> 이모지 원본에서 뽑은 실제 색(있으면 우선 사용)
+  let lastAutoLevel = null;
+  let lastScore = 0;
+
+  // 목표 이미지용 고정 팔레트("안 칠함"과 헷갈리는 흰색 대체 베이지는 제외)
+  const TARGET_PALETTE = COLORS.filter((c) => c !== WHITE_SUBSTITUTE);
+
+  // ================= 진행 상황(시도/만점) =================
+  // clearedTemplates: "한 번이라도 시도해서 저장한" 도안(만점 여부와 무관 — X 표시용)
+  function getClearedSet() {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(CLEARED_KEY) || '[]'));
+    } catch (e) {
+      return new Set();
+    }
+  }
+
+  function markCleared(tplId) {
+    const set = getClearedSet();
+    set.add(tplId);
+    try {
+      localStorage.setItem(CLEARED_KEY, JSON.stringify(Array.from(set)));
+    } catch (e) { /* 저장 공간 부족 시 무시 */ }
+  }
+
+  function getTemplatesForLevel(level) {
+    return COLORING_TEMPLATES.filter((t) => t.difficulty === level);
+  }
+
+  // 도안별 "가장 잘 한" 점수(재도전해도 낮은 점수로 안 떨어지게 최고점 유지)
+  function getScores() {
+    try {
+      return JSON.parse(localStorage.getItem(SCORES_KEY) || '{}');
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveScoreIfBest(tplId, score) {
+    const scores = getScores();
+    if (!(tplId in scores) || score > scores[tplId]) {
+      scores[tplId] = score;
+      try {
+        localStorage.setItem(SCORES_KEY, JSON.stringify(scores));
+      } catch (e) { /* 저장 공간 부족 시 무시 */ }
+    }
+  }
+
+  // 만점(100점)을 받은 적이 있어야 "완료"로 인정 — 다음 레벨은 그 레벨 전부 만점이어야 열림
+  function isMastered(tplId, scores) {
+    const map = scores || getScores();
+    return map[tplId] === 100;
+  }
+
+  // 레벨의 합산 점수 — 그 레벨에서 한 번이라도 시도한 도안들의 최고점 합계(평균 아님). 아직 하나도 없으면 null.
+  function getLevelTotalScore(level, scores) {
+    const map = scores || getScores();
+    const list = getTemplatesForLevel(level);
+    const done = list.filter((t) => t.id in map);
+    if (!done.length) return null;
+    return done.reduce((acc, t) => acc + map[t.id], 0);
+  }
+
+  function isLevelCleared(level, scores) {
+    const map = scores || getScores();
+    const list = getTemplatesForLevel(level);
+    return list.length > 0 && list.every((t) => isMastered(t.id, map));
+  }
+
+  function isLevelUnlocked(level, scores) {
+    if (level <= 1) return true;
+    return isLevelCleared(level - 1, scores);
+  }
+
+  // 특정 레벨의 도안 점수/시도 기록만 지운다(그 레벨과 그 이후 레벨의 진행 상황이 초기화됨).
+  function resetLevelProgress(level) {
+    const list = getTemplatesForLevel(level);
+    const ids = new Set(list.map((t) => t.id));
+    const scores = getScores();
+    ids.forEach((id) => { delete scores[id]; });
+    try { localStorage.setItem(SCORES_KEY, JSON.stringify(scores)); } catch (e) { /* 무시 */ }
+    const cleared = getClearedSet();
+    ids.forEach((id) => cleared.delete(id));
+    try { localStorage.setItem(CLEARED_KEY, JSON.stringify(Array.from(cleared))); } catch (e) { /* 무시 */ }
+    const times = getLevelTimes();
+    if (level in times) { delete times[level]; saveLevelTimes(times); }
+  }
+
+  // 전체 진행 상황(모든 레벨의 점수/시도 기록)을 지우고 처음부터 다시 시작할 수 있게 한다.
+  function resetAllProgress() {
+    try {
+      localStorage.removeItem(SCORES_KEY);
+      localStorage.removeItem(CLEARED_KEY);
+      localStorage.removeItem(LEVEL_ATTEMPTS_KEY);
+      localStorage.removeItem(LEVEL_TIMES_KEY);
+      localStorage.removeItem(BOSS_ATTEMPTS_KEY);
+      localStorage.removeItem(BOSS_CLEARED_KEY);
+    } catch (e) { /* 무시 */ }
+  }
+
+  // 레벨 10개를 다 완료하는 데 걸린 시간(초) 기록 — 메인 화면 레벨 블록 아래에 표시한다.
+  function getLevelTimes() {
+    try { return JSON.parse(localStorage.getItem(LEVEL_TIMES_KEY) || '{}'); } catch (e) { return {}; }
+  }
+
+  function saveLevelTimes(obj) {
+    try { localStorage.setItem(LEVEL_TIMES_KEY, JSON.stringify(obj)); } catch (e) { /* 무시 */ }
+  }
+
+  function recordLevelClearTime(level, seconds) {
+    const times = getLevelTimes();
+    times[level] = { seconds: Math.round(seconds), mode: getMode() };
+    saveLevelTimes(times);
+  }
+
+  // 예전 버전은 levelClearTimes 값이 그냥 숫자(초)였다 — 옛 기록도 안 깨지게 둘 다 받아준다.
+  function getLevelTimeSeconds(entry) {
+    if (entry == null) return null;
+    return typeof entry === 'number' ? entry : entry.seconds;
+  }
+  function getLevelTimeMode(entry) {
+    if (entry == null || typeof entry === 'number') return null;
+    return entry.mode;
+  }
+
+  function formatClearTime(totalSeconds) {
+    const sec = Math.max(0, Math.round(totalSeconds));
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  // ================= 랭킹(10레벨 전부, 같은 모드로 클리어한 완주 기록) =================
+  function getRankingEntries() {
+    try { return JSON.parse(localStorage.getItem(RANKING_KEY) || '[]'); } catch (e) { return []; }
+  }
+
+  function saveRankingEntries(list) {
+    try { localStorage.setItem(RANKING_KEY, JSON.stringify(list)); } catch (e) { /* 무시 */ }
+  }
+
+  function getPlayerProfile() {
+    try { return JSON.parse(localStorage.getItem(PLAYER_KEY) || 'null'); } catch (e) { return null; }
+  }
+
+  function savePlayerProfile(profile) {
+    try { localStorage.setItem(PLAYER_KEY, JSON.stringify(profile)); } catch (e) { /* 무시 */ }
+  }
+
+  // 방금 레벨 10을 클리어한 시점에 호출 — 1~10레벨이 전부 "같은 모드"로 클리어된 기록이 남아있으면
+  // (중간에 모드를 바꿔가며 깬 경우는 제외) 완주로 인정하고 이름/나이/나라 입력 모달을 띄운다.
+  function checkFullRunClear() {
+    const times = getLevelTimes();
+    const mode = getMode();
+    let total = 0;
+    for (let lv = 1; lv <= TOTAL_LEVELS; lv++) {
+      const entry = times[lv];
+      const secs = getLevelTimeSeconds(entry);
+      const entryMode = getLevelTimeMode(entry);
+      if (secs == null || entryMode !== mode) return; // 하나라도 없거나 모드가 다르면 완주로 안 침
+      total += secs;
+    }
+    openRankingEntryModal(mode, total);
+  }
+
+  let pendingRunMode = null;
+  let pendingRunSeconds = 0;
+
+  function openRankingEntryModal(mode, totalSeconds) {
+    pendingRunMode = mode;
+    pendingRunSeconds = totalSeconds;
+    rankingEntryTime.textContent = (MODES[mode] ? MODES[mode].label : mode) + ' mode · ' + formatClearTime(totalSeconds);
+    const profile = getPlayerProfile() || {};
+    rankingInputName.value = profile.name || '';
+    rankingInputCountry.value = profile.country || '';
+    rankingEntryModal.hidden = false;
+  }
+
+  function closeRankingEntryModal() {
+    rankingEntryModal.hidden = true;
+  }
+
+  rankingEntrySubmit.addEventListener('click', () => {
+    const name = rankingInputName.value.trim() || 'Anonymous';
+    const country = rankingInputCountry.value.trim();
+    savePlayerProfile({ name, country });
+    const entries = getRankingEntries();
+    entries.push({
+      name,
+      country,
+      mode: pendingRunMode,
+      seconds: Math.round(pendingRunSeconds),
+      date: new Date().toISOString()
+    });
+    saveRankingEntries(entries);
+    closeRankingEntryModal();
+    openRankingBoard(pendingRunMode);
+  });
+
+  rankingEntrySkip.addEventListener('click', closeRankingEntryModal);
+
+  const MODE_ORDER = ['easy', 'normal', 'hard', 'veryhard'];
+  let currentRankingTab = 'easy';
+
+  function openRankingBoard(mode) {
+    currentRankingTab = mode && MODES[mode] ? mode : getMode();
+    rankingTabs.innerHTML = '';
+    MODE_ORDER.forEach((m) => {
+      const tab = document.createElement('button');
+      tab.className = 'ranking-tab';
+      tab.textContent = MODES[m].label;
+      tab.setAttribute('role', 'tab');
+      tab.addEventListener('click', () => renderRankingTab(m));
+      tab.dataset.mode = m;
+      rankingTabs.appendChild(tab);
+    });
+    renderRankingTab(currentRankingTab);
+    rankingBoardModal.hidden = false;
+  }
+
+  function renderRankingTab(mode) {
+    currentRankingTab = mode;
+    Array.from(rankingTabs.children).forEach((tab) => {
+      tab.classList.toggle('active', tab.dataset.mode === mode);
+    });
+    const entries = getRankingEntries()
+      .filter((e) => e.mode === mode)
+      .sort((a, b) => a.seconds - b.seconds);
+    rankingList.innerHTML = '';
+    if (!entries.length) {
+      rankingList.innerHTML = '<p class="ranking-empty">No records yet for this mode!</p>';
+      return;
+    }
+    entries.forEach((e, i) => {
+      const row = document.createElement('div');
+      row.className = 'ranking-row';
+      const meta = e.country || '';
+      row.innerHTML =
+        '<span class="r-rank">' + (i + 1) + '</span>' +
+        '<span class="r-info"><span class="r-name">' + escapeHtml(e.name) + '</span>' +
+        (meta ? '<br><span class="r-meta">' + escapeHtml(meta) + '</span>' : '') + '</span>' +
+        '<span class="r-time">⏱ ' + formatClearTime(e.seconds) + '</span>';
+      rankingList.appendChild(row);
+    });
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  btnRanking.addEventListener('click', () => openRankingBoard(getMode()));
+  rankingBoardClose.addEventListener('click', () => { rankingBoardModal.hidden = true; });
+
+  // ================= 난이도(타이머) 모드 =================
+  // 모드별 진행 순서 — 이전 모드의 파이널 보스를 이겨야 다음 모드가 열린다(easy는 항상 열려 있음).
+  function isModeUnlocked(mode) {
+    const idx = MODE_ORDER.indexOf(mode);
+    if (idx <= 0) return true;
+    return isBossCleared(MODE_ORDER[idx - 1]);
+  }
+
+  function getMode() {
+    const m = localStorage.getItem(MODE_KEY);
+    const stored = MODES[m] ? m : 'easy';
+    // 예전에 골라둔 모드가 그 사이 다시 잠긴 상태로 판정되면(비정상 데이터 등) easy로 안전하게 되돌린다.
+    return isModeUnlocked(stored) ? stored : 'easy';
+  }
+
+  // 진행 중(시작했지만 아직 클리어도, 시간초과도 안 된)인 레벨/보스가 하나라도 있는지 —
+  // 있으면 모드를 못 바꾸게 잠근다(모드를 바꾸면 그 레벨의 남은 시간이 바뀌어버리는 걸 방지).
+  // 보스는 지금 선택된 모드가 아니라도(예: easy 보스에 도전 중인데 normal이 선택돼 있는 경우) 걸려야 하므로
+  // 모드 하나만 보지 않고 전체 모드를 다 확인한다.
+  function hasAnyActiveAttempt() {
+    const attempts = getLevelAttempts();
+    const budget = getLevelBudgetSeconds();
+    const levelActive = Object.keys(attempts).some((lvl) => {
+      const start = attempts[lvl];
+      return start && (Date.now() - start) / 1000 < budget && !isLevelCleared(Number(lvl));
+    });
+    if (levelActive) return true;
+    return MODE_ORDER.some((m) => hasActiveBossAttempt(m));
+  }
+
+  function setMode(m) {
+    if (!MODES[m] || m === getMode()) return;
+    if (!isModeUnlocked(m)) {
+      const prevMode = MODE_ORDER[MODE_ORDER.indexOf(m) - 1];
+      window.alert('아직 잠겨 있어요! ' + (MODES[prevMode] ? MODES[prevMode].label : '이전') + ' 모드의 파이널 보스를 먼저 이겨야 열려요.');
+      return;
+    }
+    if (hasAnyActiveAttempt()) {
+      window.alert('진행 중인 레벨이 있어서 모드를 바꿀 수 없어요. 먼저 그 레벨을 초기화(🔄)하고 다시 시도해주세요!');
+      return;
+    }
+    try { localStorage.setItem(MODE_KEY, m); } catch (e) { /* 무시 */ }
+    renderModeButtons();
+    updateLevelTimerDisplay();
+  }
+
+  function renderModeButtons() {
+    const cur = getMode();
+    const activeAttemptLocked = hasAnyActiveAttempt();
+    modeButtons.forEach((btn) => {
+      const mode = btn.dataset.mode;
+      const isActive = mode === cur;
+      const bossLocked = !isModeUnlocked(mode);
+      btn.classList.toggle('active', isActive);
+      btn.disabled = bossLocked || (activeAttemptLocked && !isActive);
+      btn.classList.toggle('mode-locked', !bossLocked && activeAttemptLocked && !isActive);
+      btn.classList.toggle('mode-boss-locked', bossLocked);
+    });
+  }
+
+  function getLevelBudgetSeconds() {
+    return MODES[getMode()].minutes * 60;
+  }
+
+  function getLevelAttempts() {
+    try { return JSON.parse(localStorage.getItem(LEVEL_ATTEMPTS_KEY) || '{}'); } catch (e) { return {}; }
+  }
+
+  function saveLevelAttempts(obj) {
+    try { localStorage.setItem(LEVEL_ATTEMPTS_KEY, JSON.stringify(obj)); } catch (e) { /* 무시 */ }
+  }
+
+  function clearLevelAttempt(level) {
+    const attempts = getLevelAttempts();
+    if (level in attempts) {
+      delete attempts[level];
+      saveLevelAttempts(attempts);
+    }
+  }
+
+  // 레벨에 들어갈 때 호출 — 이미 진행 중(만료 전)인 타임어택이 있으면 이어서, 없거나 만료됐으면 새로 시작
+  // (그 레벨이 이미 만점 클리어된 경우는 타이머가 필요 없으므로 호출하지 않는다).
+  function startOrResumeLevelAttempt(level) {
+    const attempts = getLevelAttempts();
+    const budget = getLevelBudgetSeconds();
+    const start = attempts[level];
+    if (start && (Date.now() - start) / 1000 < budget) return; // 아직 유효 — 그대로 이어감
+    if (start) resetLevelProgress(level); // 만료된 이전 시도가 남아있었다면 그 레벨 점수를 초기화
+    attempts[level] = Date.now();
+    saveLevelAttempts(attempts);
+  }
+
+  // ================= 파이널 보스(모드별 10레벨 완주 보상) =================
+  const BOSS_ATTEMPTS_KEY = 'bossAttempts'; // { [mode]: 시작한 시각(ms) }
+  const BOSS_CLEARED_KEY = 'bossCleared'; // { [mode]: true } — 그 모드 보스를 100점으로 이긴 적 있음
+
+  function getBossTemplate(mode) {
+    return (window.BOSS_TEMPLATES || {})[mode] || null;
+  }
+
+  // 그 모드로 레벨 1~10이 전부(모드 안 섞고) 클리어돼 있어야 보스가 열린다 — checkFullRunClear와 같은 조건.
+  function isBossUnlocked(mode) {
+    const times = getLevelTimes();
+    for (let lv = 1; lv <= TOTAL_LEVELS; lv++) {
+      const entry = times[lv];
+      if (getLevelTimeSeconds(entry) == null || getLevelTimeMode(entry) !== mode) return false;
+    }
+    return true;
+  }
+
+  function getBossAttempts() {
+    try { return JSON.parse(localStorage.getItem(BOSS_ATTEMPTS_KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function saveBossAttempts(obj) {
+    try { localStorage.setItem(BOSS_ATTEMPTS_KEY, JSON.stringify(obj)); } catch (e) { /* 무시 */ }
+  }
+  function clearBossAttempt(mode) {
+    const attempts = getBossAttempts();
+    if (mode in attempts) { delete attempts[mode]; saveBossAttempts(attempts); }
+  }
+  function getBossClearedMap() {
+    try { return JSON.parse(localStorage.getItem(BOSS_CLEARED_KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function isBossCleared(mode) {
+    return !!getBossClearedMap()[mode];
+  }
+  function markBossCleared(mode) {
+    const map = getBossClearedMap();
+    map[mode] = true;
+    try { localStorage.setItem(BOSS_CLEARED_KEY, JSON.stringify(map)); } catch (e) { /* 무시 */ }
+  }
+  // 레벨과 동일한 규칙: 시간 초과 시 그 보스의 점수만 초기화(완주 기록 자체는 안 건드림 — 다시 도전 가능).
+  function resetBossProgress(mode) {
+    const tpl = getBossTemplate(mode);
+    if (!tpl) return;
+    const scores = getScores();
+    delete scores[tpl.id];
+    try { localStorage.setItem(SCORES_KEY, JSON.stringify(scores)); } catch (e) { /* 무시 */ }
+    const cleared = getClearedSet();
+    cleared.delete(tpl.id);
+    try { localStorage.setItem(CLEARED_KEY, JSON.stringify(Array.from(cleared))); } catch (e) { /* 무시 */ }
+    const bc = getBossClearedMap();
+    delete bc[mode];
+    try { localStorage.setItem(BOSS_CLEARED_KEY, JSON.stringify(bc)); } catch (e) { /* 무시 */ }
+  }
+  function startOrResumeBossAttempt(mode) {
+    const attempts = getBossAttempts();
+    const budget = MODES[mode].minutes * 60;
+    const start = attempts[mode];
+    if (start && (Date.now() - start) / 1000 < budget) return; // 아직 유효
+    if (start) resetBossProgress(mode); // 만료된 이전 시도 — 점수 초기화
+    attempts[mode] = Date.now();
+    saveBossAttempts(attempts);
+  }
+  function hasActiveBossAttempt(mode) {
+    const attempts = getBossAttempts();
+    const start = attempts[mode];
+    return !!(start && (Date.now() - start) / 1000 < MODES[mode].minutes * 60 && !isBossCleared(mode));
+  }
+
+  function formatMMSS(totalSeconds) {
+    const sec = Math.max(0, Math.floor(totalSeconds));
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function stopLevelTimer() {
+    if (levelTimerInterval) { clearInterval(levelTimerInterval); levelTimerInterval = null; }
+    coloringTimerText.hidden = true;
+  }
+
+  function startLevelTimer() {
+    stopLevelTimer();
+    levelTimerInterval = setInterval(updateLevelTimerDisplay, 1000);
+    updateLevelTimerDisplay();
+  }
+
+  // 시간 초과 처리: 그 레벨 점수 초기화 + 안내 + 갤러리로
+  function handleLevelTimeUp(level) {
+    stopLevelTimer();
+    clearLevelAttempt(level);
+    resetLevelProgress(level);
+    window.alert('⏰ 시간 초과! Level ' + level + ' 진행 상황이 초기화됐어요. 다시 도전해봐요!');
+    if (currentLevel === level) {
+      // 색칠 화면에 있었더라도 갤러리로 돌려보낸다
+      coloringScreen.hidden = true;
+      galleryScreen.hidden = false;
+      renderLevelGallery();
+    }
+  }
+
+  // 시간 초과 처리(보스): 그 보스 점수 초기화 + 안내 + 맵으로 (완주 기록 자체는 안 지워지므로 다시 도전 가능)
+  function handleBossTimeUp(mode) {
+    stopLevelTimer();
+    clearBossAttempt(mode);
+    resetBossProgress(mode);
+    const tpl = getBossTemplate(mode);
+    window.alert('⏰ 시간 초과! ' + (tpl ? tpl.name : '보스') + ' 도전이 초기화됐어요. 다시 도전해봐요!');
+    if (currentBossMode === mode) {
+      currentBossMode = null;
+      coloringScreen.hidden = true;
+      mapScreen.hidden = false;
+      renderMap();
+    }
+  }
+
+  // 카운트다운 표시 위치: 갤러리(그림 목록) 화면에서는 Back/Next 버튼 사이(가운데)에,
+  // 색칠 화면에서는 제목 밑 서브타이틀 자리(홈/사운드 아이콘과 안 겹침)에 보여준다.
+  function updateLevelTimerDisplay() {
+    coloringTimerText.hidden = true;
+    if (currentBossMode) {
+      const mode = currentBossMode;
+      if (isBossCleared(mode)) return;
+      const attempts = getBossAttempts();
+      const start = attempts[mode];
+      if (!start) return;
+      const budget = MODES[mode].minutes * 60;
+      const remaining = budget - (Date.now() - start) / 1000;
+      if (remaining <= 0) { handleBossTimeUp(mode); return; }
+      coloringTimerText.hidden = false;
+      coloringTimerText.textContent = '⏱ ' + formatMMSS(remaining);
+      coloringTimerText.classList.toggle('warn', remaining <= 30);
+      return;
+    }
+    if (currentLevel == null) return;
+    if (isLevelCleared(currentLevel)) return;
+    const attempts = getLevelAttempts();
+    const start = attempts[currentLevel];
+    if (!start) return;
+    const budget = getLevelBudgetSeconds();
+    const remaining = budget - (Date.now() - start) / 1000;
+    if (remaining <= 0) {
+      handleLevelTimeUp(currentLevel);
+      return;
+    }
+    const text = '⏱ ' + formatMMSS(remaining);
+    const warn = remaining <= 30;
+    if (!galleryScreen.hidden) {
+      levelNextBanner.hidden = false;
+      levelNextText.textContent = text;
+      levelNextText.classList.toggle('timer-warn', warn);
+    } else {
+      coloringTimerText.hidden = false;
+      coloringTimerText.textContent = text;
+      coloringTimerText.classList.toggle('warn', warn);
+    }
+  }
+
+  function getHistory() {
+    try {
+      return JSON.parse(localStorage.getItem('coloringHistory') || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function updateStatLine() {
+    const cleared = getClearedSet();
+    const total = COLORING_TEMPLATES.length;
+    let doneCount = 0;
+    COLORING_TEMPLATES.forEach((t) => { if (cleared.has(t.id)) doneCount++; });
+    if (doneCount > 0) {
+      statLine.hidden = false;
+      statLine.textContent = '🎉 You finished ' + doneCount + ' of ' + total + ' pictures!';
+    } else {
+      statLine.hidden = true;
+    }
+    // 10단계(마지막 레벨)까지 전부 만점 클리어했을 때만 "초기화하고 다시 시작" 버튼을 보여준다.
+    btnResetAll.hidden = !isLevelCleared(TOTAL_LEVELS);
+
+    // 레벨 10까지 몇 레벨 남았는지 안내(아직 다 못 깼을 때만)
+    let clearedLevels = 0;
+    for (let lv = 1; lv <= TOTAL_LEVELS; lv++) { if (isLevelCleared(lv)) clearedLevels++; }
+    const remainingLevels = TOTAL_LEVELS - clearedLevels;
+    if (remainingLevels > 0 && clearedLevels > 0) {
+      levelsLeftLine.hidden = false;
+      levelsLeftLine.textContent = '🚀 ' + remainingLevels + ' more level' + (remainingLevels === 1 ? '' : 's') + ' to go!';
+    } else {
+      levelsLeftLine.hidden = true;
+    }
+  }
+
+  // ================= 도안 카드 렌더 =================
+  function buildSvgMarkup(tpl) {
+    return (
+      '<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">' +
+      '<g fill="none" stroke="' + STROKE_COLOR + '" stroke-width="9" ' +
+      'stroke-linecap="round" stroke-linejoin="round">' + tpl.svg + '</g></svg>'
+    );
+  }
+
+  // ================= 레벨 지도(맵) =================
+  function renderMap() {
+    const scores = getScores();
+    const attempts = getLevelAttempts();
+    const times = getLevelTimes();
+    mapGrid.innerHTML = '';
+    for (let lv = 1; lv <= TOTAL_LEVELS; lv++) {
+      const list = getTemplatesForLevel(lv);
+      const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
+      const isClear = isLevelCleared(lv, scores);
+      const unlocked = isLevelUnlocked(lv, scores);
+      const totalScore = getLevelTotalScore(lv, scores);
+
+      const wrap = document.createElement('div');
+      wrap.className = 'level-node-wrap';
+
+      const node = document.createElement('button');
+      node.className = 'level-node' + (unlocked ? '' : ' locked') + (isClear ? ' cleared' : '');
+      node.setAttribute('role', 'listitem');
+      node.disabled = !unlocked;
+      node.setAttribute('aria-label', 'Level ' + lv + (isClear ? ' (cleared)' : unlocked ? '' : ' (locked)'));
+
+      let inner = '<span class="lv-num">' + lv + '</span><span class="lv-label">Level</span>';
+      if (!unlocked) {
+        inner += '<span class="lv-lock">🔒</span>';
+      } else if (isClear) {
+        inner += '<span class="lv-clear-badge">✓ CLEAR</span><span class="lv-progress">' + doneCount + ' / ' + list.length + '</span>';
+      } else {
+        inner += '<span class="lv-progress">' + doneCount + ' / ' + list.length + '</span>';
+      }
+      if (unlocked && totalScore != null) {
+        inner += '<span class="lv-score">⭐ ' + totalScore + '</span>';
+      }
+      node.innerHTML = inner;
+
+      if (unlocked) node.addEventListener('click', () => openLevel(lv));
+      wrap.appendChild(node);
+
+      // 완료(클리어)까지 걸린 시간 — 카드 바로 아래에 별도로 표시
+      const lvSeconds = getLevelTimeSeconds(times[lv]);
+      if (isClear && lvSeconds != null) {
+        const timeEl = document.createElement('div');
+        timeEl.className = 'lv-time';
+        timeEl.textContent = '⏱ ' + formatClearTime(lvSeconds);
+        wrap.appendChild(timeEl);
+      }
+
+      // 진행 중이거나 시도한 적 있는(리셋할 게 있는) 레벨엔 지도 화면에서 바로 초기화할 수 있는
+      // 작은 🔄 버튼을 얹는다 — 모드 변경 인터락 때문에, 열어보지 않고도 바로 리셋할 수 있어야 함.
+      if (unlocked && (doneCount > 0 || lv in attempts)) {
+        const resetBtn = document.createElement('button');
+        resetBtn.className = 'level-reset-mini';
+        resetBtn.setAttribute('aria-label', 'Reset Level ' + lv);
+        resetBtn.textContent = '🔄';
+        resetBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (!window.confirm('Level ' + lv + '의 점수를 초기화할까요? (이후 레벨의 잠금도 다시 걸릴 수 있어요)')) return;
+          resetLevelProgress(lv);
+          clearLevelAttempt(lv);
+          renderMap();
+        });
+        wrap.appendChild(resetBtn);
+      }
+
+      mapGrid.appendChild(wrap);
+    }
+    updateStatLine();
+    renderModeButtons();
+    renderBossSection();
+  }
+
+  // ================= 파이널 보스 카드(모드별) =================
+  function renderBossSection() {
+    bossGrid.innerHTML = '';
+    MODE_ORDER.forEach((mode) => {
+      const tpl = getBossTemplate(mode);
+      if (!tpl) return;
+      const unlocked = isBossUnlocked(mode);
+      const cleared = isBossCleared(mode);
+      const card = document.createElement('button');
+      card.className = 'boss-card' + (unlocked ? '' : ' locked') + (cleared ? ' boss-cleared' : '');
+      card.setAttribute('role', 'listitem');
+      card.disabled = !unlocked;
+      card.setAttribute('aria-label', tpl.name + (unlocked ? (cleared ? ' (defeated)' : '') : ' (locked)'));
+
+      let inner = '<span class="boss-mode-label">' + MODES[mode].label + '</span>';
+      if (!unlocked) {
+        inner += '<span class="boss-lock">🔒</span><span class="boss-name">' + tpl.name + '</span>';
+      } else if (cleared) {
+        inner += '<span class="boss-crown">👑</span><span class="boss-name">' + tpl.name + '</span>' +
+          '<span class="boss-cleared-badge">✓ Defeated!</span>';
+      } else {
+        inner += '<span class="boss-crown pulse">👑</span><span class="boss-name">' + tpl.name + '</span>' +
+          '<span class="boss-cta">Tap to challenge!</span>';
+      }
+      card.innerHTML = inner;
+      if (unlocked) card.addEventListener('click', () => openBoss(mode));
+      bossGrid.appendChild(card);
+    });
+  }
+
+  function openBoss(mode) {
+    const tpl = getBossTemplate(mode);
+    if (!tpl || !isBossUnlocked(mode)) return;
+    currentLevel = null;
+    mapScreen.hidden = true;
+    galleryScreen.hidden = true;
+    openTemplate(tpl);
+  }
+
+  function goToMap() {
+    stopLevelTimer();
+    coloringScreen.hidden = true;
+    galleryScreen.hidden = true;
+    mapScreen.hidden = false;
+    renderMap();
+  }
+
+  btnMapBack.addEventListener('click', goToMap);
+
+  modeButtons.forEach((btn) => {
+    btn.addEventListener('click', () => setMode(btn.dataset.mode));
+  });
+  renderModeButtons();
+
+  btnResetAll.addEventListener('click', () => {
+    if (!window.confirm('정말 모든 진행 상황을 초기화하고 처음부터 다시 시작할까요?')) return;
+    resetAllProgress();
+    renderMap();
+  });
+
+  btnLevelReset.addEventListener('click', () => {
+    if (!window.confirm('Level ' + currentLevel + '의 점수를 초기화할까요? (이후 레벨의 잠금도 다시 걸릴 수 있어요)')) return;
+    resetLevelProgress(currentLevel);
+    clearLevelAttempt(currentLevel); // 시간도 완전히 멈춤 — 그림을 다시 열 때 새로 시작됨(모드 변경도 이제 가능)
+    renderLevelGallery();
+    startLevelTimer();
+  });
+
+  btnLevelNext.addEventListener('click', () => {
+    const nextLevel = currentLevel + 1;
+    if (nextLevel <= TOTAL_LEVELS && isLevelUnlocked(nextLevel)) {
+      openLevel(nextLevel);
+    } else {
+      goToMap();
+    }
+  });
+
+  btnLevelBack.addEventListener('click', () => {
+    if (currentLevel > 1) openLevel(currentLevel - 1);
+  });
+
+  // ================= 레벨별 도안 갤러리 =================
+  function openLevel(level) {
+    currentBossMode = null;
+    currentLevel = level;
+    if (isLevelCleared(level)) clearLevelAttempt(level); // 이미 클리어된 레벨은 타이머 불필요
+    // 주의: 그림 목록만 구경하는 걸로는 시간이 소모되면 안 되므로, 여기서는 타임어택을 시작하지
+    // 않는다 — 실제로 그림 하나를 열 때(openTemplate)가 되어서야 처음 시작한다.
+    renderLevelGallery();
+    mapScreen.hidden = true;
+    galleryScreen.hidden = false;
+    startLevelTimer();
+  }
+
+  function renderLevelGallery() {
+    const scores = getScores();
+    const list = getTemplatesForLevel(currentLevel);
+    const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
+    const totalScore = getLevelTotalScore(currentLevel, scores);
+
+    levelTitle.textContent = 'Level ' + currentLevel;
+    levelProgress.textContent = doneCount + ' / ' + list.length + ' perfect' +
+      (totalScore != null ? '  ·  ⭐ ' + totalScore + ' pts' : '');
+
+    const isClear = doneCount >= list.length;
+    const hasBack = currentLevel > 1;
+    btnLevelBack.hidden = !hasBack;
+    if (isClear) {
+      // 아직 지우기 전, 진행 중이던 타임어택이 있었으면 그 시작 시각 기준으로 걸린 시간을 기록해둔다
+      // (완전히 클리어할 때까지 걸린 시간 — 메인 화면 레벨 블록 아래에 표시됨).
+      const attemptStart = getLevelAttempts()[currentLevel];
+      if (attemptStart) recordLevelClearTime(currentLevel, (Date.now() - attemptStart) / 1000);
+      clearLevelAttempt(currentLevel); // 클리어했으니 이 레벨의 타임어택은 끝 — 더 이상 시간 잴 필요 없음
+      if (currentLevel === TOTAL_LEVELS) checkFullRunClear(); // 마지막 레벨까지 깼으면 완주 기록 확인
+      const hasNext = currentLevel < TOTAL_LEVELS;
+      levelNextText.textContent = hasNext ? '🎉 Level ' + currentLevel + ' clear!' : '🎉 All levels clear!';
+      btnLevelNext.textContent = hasNext ? 'Next ▶' : 'Map ▶';
+      btnLevelNext.hidden = false;
+    } else {
+      levelNextText.textContent = '';
+      btnLevelNext.hidden = true;
+    }
+    const hasTimer = !isClear && currentLevel in getLevelAttempts();
+    levelNextBanner.hidden = !(isClear || hasBack || hasTimer);
+    updateLevelTimerDisplay();
+
+    galleryGrid.innerHTML = '';
+    list.forEach((tpl) => {
+      const card = document.createElement('button');
+      card.className = 'tpl-card';
+      card.setAttribute('role', 'listitem');
+      card.setAttribute('aria-label', 'Color the ' + tpl.name);
+      const score = scores[tpl.id];
+      const attempted = score !== undefined;
+      const mastered = score === 100;
+      let badge = '';
+      if (attempted) {
+        badge = mastered
+          ? '<span class="tpl-done-badge tpl-badge-good">✓</span>'
+          : '<span class="tpl-done-badge tpl-badge-bad">✗</span>';
+      }
+      card.innerHTML =
+        '<span class="tpl-emoji">' + tpl.emoji + '</span>' +
+        '<span class="tpl-label">' + tpl.name + '</span>' +
+        '<span class="tpl-score">' + (attempted ? score + ' pts' : '') + '</span>' +
+        badge;
+      card.addEventListener('click', () => openTemplate(tpl));
+      galleryGrid.appendChild(card);
+    });
+  }
+
+  // ================= 색칠 화면 진입 =================
+  function openTemplate(tpl, onReady) {
+    currentTemplate = tpl;
+    // 실제로 그림을 열어서 색칠을 시작하는 이 순간에 그 레벨(또는 보스)의 타임어택을 시작(또는 이어감).
+    if (tpl.isBoss) {
+      currentBossMode = tpl.mode;
+      startOrResumeBossAttempt(tpl.mode);
+      startLevelTimer();
+    } else {
+      currentBossMode = null;
+      if (!isLevelCleared(tpl.difficulty)) {
+        startOrResumeLevelAttempt(tpl.difficulty);
+        startLevelTimer();
+      }
+    }
+    coloringTitle.textContent = tpl.emoji + ' ' + tpl.name;
+    goalEmoji.textContent = tpl.emoji;
+    galleryScreen.hidden = true;
+    coloringScreen.hidden = false;
+
+    loadTemplateSource(tpl, (wall, lineSource, sampledColors) => {
+      // 선(윤곽선) 레이어
+      lineCtx.clearRect(0, 0, WORK_SIZE, WORK_SIZE);
+      lineCtx.drawImage(lineSource, 0, 0, WORK_SIZE, WORK_SIZE);
+
+      wallMask = wall;
+      currentSampledColors = sampledColors;
+
+      // 채점 대상 영역(선으로 닫힌 칸) 자동 인식 — 가장 큰 영역(배경)은 채점에서 제외
+      currentGradableRegions = computeGradableRegions();
+
+      // 목표(정답) 이미지 렌더링 + 영역별 정답색 배정
+      renderGoalPreview(lineSource);
+
+      // 정답색이 정해진 뒤에 팔레트 구성(그 도안에 실제 필요한 색이 반드시 포함되게)
+      renderPalette();
+
+      // 채우기 레이어 초기화
+      fillCtx.clearRect(0, 0, WORK_SIZE, WORK_SIZE);
+      undoStack = [];
+      pushUndo();
+      updateUndoButton();
+
+      if (onReady) onReady();
+    });
+  }
+
+  // 도안 소스 로딩: 기존 손그림 SVG(tpl.svg) 또는 이모지 글자(tpl.renderMode==='emoji')
+  // callback(wallMask: Uint8Array, lineSource: <img|canvas> 검은 선만 있는 레이어)
+  const EMOJI_DARK_THRESHOLD = 70; // 이보다 어두운(RGB 최대값 기준) 픽셀만 "선(벽)"으로 취급
+
+  function loadTemplateSource(tpl, callback) {
+    if (tpl.renderMode === 'emoji' || tpl.renderMode === 'svgArt') {
+      // 'svgArt'(파이널 보스 등 손으로 그린 오리지널 일러스트)는 이모지 글자 대신 tpl.svgArt 마크업을
+      // 그대로 그린다 — 그 아래 벽(선) 인식/영역 분리/팔레트 스냅 파이프라인은 완전히 동일하게 재사용.
+      const bodyMarkup = tpl.renderMode === 'svgArt'
+        ? tpl.svgArt
+        : '<text x="200" y="300" font-size="320" text-anchor="middle">' + tpl.emoji + '</text>';
+      const svgMarkup =
+        '<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">' + bodyMarkup + '</svg>';
+      const svgUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgMarkup);
+      const img = new Image();
+      img.onload = () => {
+        const rawC = document.createElement('canvas');
+        rawC.width = WORK_SIZE; rawC.height = WORK_SIZE;
+        const rawCtx = rawC.getContext('2d', { willReadFrequently: true });
+        rawCtx.drawImage(img, 0, 0, WORK_SIZE, WORK_SIZE);
+        const data = rawCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE).data;
+        const W = WORK_SIZE, H = WORK_SIZE;
+
+        // 1단계: 원래 검은 선(어두운 픽셀) + 색상 경계(옆/아래 픽셀과 색이 크게 다른 곳)를 벽 후보로 표시
+        const rawWall = new Uint8Array(W * H);
+        const EDGE_THRESHOLD = 35; // RGB 유클리드 거리 기준
+        for (let y = 0; y < H; y++) {
+          for (let x = 0; x < W; x++) {
+            const p = y * W + x;
+            const i = p * 4;
+            const a = data[i + 3];
+            const maxCh = Math.max(data[i], data[i + 1], data[i + 2]);
+            let isWall = a > ALPHA_WALL_THRESHOLD && maxCh < EMOJI_DARK_THRESHOLD;
+            if (!isWall && a > ALPHA_WALL_THRESHOLD) {
+              // 부드러운 그라데이션 경계는 바로 옆 픽셀 차이만으론 못 잡을 수 있어 2px 떨어진 픽셀과도 비교한다.
+              const offsets = [1, 2];
+              for (let k = 0; k < offsets.length && !isWall; k++) {
+                const o = offsets[k];
+                if (x < W - o) {
+                  const j = (p + o) * 4;
+                  const dr = data[i] - data[j], dg = data[i + 1] - data[j + 1], db = data[i + 2] - data[j + 2];
+                  if (Math.sqrt(dr * dr + dg * dg + db * db) > EDGE_THRESHOLD) isWall = true;
+                }
+                if (!isWall && y < H - o) {
+                  const j = (p + o * W) * 4;
+                  const dr = data[i] - data[j], dg = data[i + 1] - data[j + 1], db = data[i + 2] - data[j + 2];
+                  if (Math.sqrt(dr * dr + dg * dg + db * db) > EDGE_THRESHOLD) isWall = true;
+                }
+              }
+            }
+            rawWall[p] = isWall ? 1 : 0;
+          }
+        }
+
+        // 2단계: 선 두께를 손그림 도안과 비슷하게 통일한다.
+        // 이모지 폰트의 원래 굵은 테두리는 "열린 칸에서 K px 이내"만 남기고 안쪽 깊은 부분은 깎아내고(얇게),
+        // 이미 얇은 색 경계선은 K보다 훨씬 얇으므로 전혀 손대지 않고 그대로 유지한다.
+        const LINE_THICKNESS_CAP = 22; // WORK_SIZE(640) 기준 픽셀 — 손그림 stroke-width 10과 비슷한 굵기
+        const dist = new Int32Array(W * H).fill(-1);
+        const queue = new Int32Array(W * H);
+        let qHead = 0, qTail = 0;
+        for (let p = 0; p < W * H; p++) {
+          if (rawWall[p] === 0) { dist[p] = 0; queue[qTail++] = p; }
+        }
+        while (qHead < qTail) {
+          const p = queue[qHead++];
+          const d = dist[p];
+          if (d >= LINE_THICKNESS_CAP) continue;
+          const x = p % W, y = (p / W) | 0;
+          if (x > 0 && dist[p - 1] === -1) { dist[p - 1] = d + 1; queue[qTail++] = p - 1; }
+          if (x < W - 1 && dist[p + 1] === -1) { dist[p + 1] = d + 1; queue[qTail++] = p + 1; }
+          if (y > 0 && dist[p - W] === -1) { dist[p - W] = d + 1; queue[qTail++] = p - W; }
+          if (y < H - 1 && dist[p + W] === -1) { dist[p + W] = d + 1; queue[qTail++] = p + W; }
+        }
+
+        const wall = new Uint8Array(W * H);
+        const lineData = new Uint8ClampedArray(W * H * 4);
+        for (let p = 0; p < W * H; p++) {
+          const isWall = rawWall[p] === 1 && dist[p] !== -1 && dist[p] <= LINE_THICKNESS_CAP;
+          wall[p] = isWall ? 1 : 0;
+          if (isWall) {
+            const op = p * 4;
+            lineData[op] = 0; lineData[op + 1] = 0; lineData[op + 2] = 0; lineData[op + 3] = 255;
+          }
+        }
+
+        // 2.4단계: 이모지 추출만으로 구분이 안 되는 부분은 수동으로 선을 얹을 수 있다(tpl.overlaySvg).
+        // 예: sun은 원래 뾰족한 부분과 안쪽 원이 같은 색이라 하나로 뭉치므로, 원을 하나 그려 넣어 나눈다.
+        if (tpl.overlaySvg) {
+          const overlayMarkup =
+            '<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">' +
+            '<g fill="none" stroke="' + STROKE_COLOR + '" stroke-width="6">' + tpl.overlaySvg + '</g></svg>';
+          const overlayUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(overlayMarkup);
+          const overlayImg = new Image();
+          overlayImg.onload = () => {
+            const oC = document.createElement('canvas');
+            oC.width = W; oC.height = H;
+            const oCtx = oC.getContext('2d', { willReadFrequently: true });
+            oCtx.drawImage(overlayImg, 0, 0, W, H);
+            const oData = oCtx.getImageData(0, 0, W, H).data;
+            for (let p = 0; p < W * H; p++) {
+              if (oData[p * 4 + 3] > ALPHA_WALL_THRESHOLD) {
+                wall[p] = 1;
+                const op = p * 4;
+                lineData[op] = 0; lineData[op + 1] = 0; lineData[op + 2] = 0; lineData[op + 3] = 255;
+              }
+            }
+            continueProcessing();
+          };
+          overlayImg.src = overlayUrl;
+        } else {
+          continueProcessing();
+        }
+
+        function continueProcessing() {
+        // 2.5단계: 하이라이트 같은 약한 색 경계는 군데군데 끊어진 채 벽으로 잡혀 점선처럼 보인다.
+        // 닫힌 도형을 이루지 못할 만큼 작고 고립된 벽 조각은 노이즈로 보고 지운다(선 레이어에서도 제거).
+        {
+          const WALL_NOISE_MIN = window.__DEBUG_COLOR__ ? 0 : 15;
+          const visited = new Uint8Array(W * H);
+          const compSizes = [];
+          for (let start = 0; start < W * H; start++) {
+            if (wall[start] !== 1 || visited[start]) continue;
+            const comp = [start];
+            visited[start] = 1;
+            let qi = 0;
+            while (qi < comp.length) {
+              const p = comp[qi++];
+              const x = p % W, y = (p / W) | 0;
+              if (x > 0 && wall[p - 1] === 1 && !visited[p - 1]) { visited[p - 1] = 1; comp.push(p - 1); }
+              if (x < W - 1 && wall[p + 1] === 1 && !visited[p + 1]) { visited[p + 1] = 1; comp.push(p + 1); }
+              if (y > 0 && wall[p - W] === 1 && !visited[p - W]) { visited[p - W] = 1; comp.push(p - W); }
+              if (y < H - 1 && wall[p + W] === 1 && !visited[p + W]) { visited[p + W] = 1; comp.push(p + W); }
+            }
+            compSizes.push(comp.length);
+            if (comp.length < WALL_NOISE_MIN) {
+              comp.forEach((p) => {
+                wall[p] = 0;
+                lineData[p * 4 + 3] = 0;
+              });
+            }
+          }
+          if (window.__DEBUG_COLOR__) console.log('[wallcomp]', tpl.id, JSON.stringify(compSizes.sort((a, b) => a - b)));
+        }
+
+        // 2.6단계: 남은 약한 선이 군데군데 끊겨 보이지 않도록 2px 팽창으로 작은 틈을 이어붙인다.
+        {
+          const before = wall.slice();
+          for (let y = 0; y < H; y++) {
+            for (let x = 0; x < W; x++) {
+              const p = y * W + x;
+              if (before[p] === 1) continue;
+              let hit = false;
+              for (let dy = -2; dy <= 2 && !hit; dy++) {
+                for (let dx = -2; dx <= 2; dx++) {
+                  const nx = x + dx, ny = y + dy;
+                  if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+                  if (before[ny * W + nx] === 1) { hit = true; break; }
+                }
+              }
+              if (hit) {
+                wall[p] = 1;
+                const op = p * 4;
+                lineData[op] = 0; lineData[op + 1] = 0; lineData[op + 2] = 0; lineData[op + 3] = 255;
+              }
+            }
+          }
+        }
+
+        // 3단계: 이모지 원본 색을 그대로 정답색으로 쓰기 위해, 각 영역의 실제 색을 뽑아
+        // 가장 가까운 팔레트 색으로 스냅한다 (원본은 미세한 그라데이션이 있어 그대로 쓰면
+        // 같은 부위인데 색이 조금씩 달라 매칭이 불가능해짐).
+        // 잠정(provisional) 라벨링: 병합 대상(테두리 근처 얇고 어두운 조각)을 찾기 위한 1차 패스.
+        let prov = labelRegions(wall);
+        const provLabelSet = new Set(prov.gradable.map((r) => r.label));
+        const sumR = new Map(), sumG = new Map(), sumB = new Map(), cnt = new Map();
+        for (let p = 0; p < W * H; p++) {
+          const lbl = prov.labelMap[p];
+          if (lbl === -1 || !provLabelSet.has(lbl)) continue;
+          const i = p * 4;
+          sumR.set(lbl, (sumR.get(lbl) || 0) + data[i]);
+          sumG.set(lbl, (sumG.get(lbl) || 0) + data[i + 1]);
+          sumB.set(lbl, (sumB.get(lbl) || 0) + data[i + 2]);
+          cnt.set(lbl, (cnt.get(lbl) || 0) + 1);
+        }
+        // 두께를 깎는 과정에서 생기는 "테두리 근처 얇고 어두운 조각"은 색칠 대상이 아니라
+        // 원래 테두리의 일부이므로, 색을 매기는 대신 벽으로 흡수해서 안 보이게 한다.
+        const DARK_MERGE_MAX = 90;
+        const DARK_MERGE_SIZE = 4000;
+        const mergeLabels = new Set();
+        const colorBySeed = new Map(); // seed 픽셀은 병합 전후로 안 바뀌는 안정적인 식별자
+        prov.gradable.forEach((r) => {
+          const n = cnt.get(r.label) || 1;
+          const rr = Math.round(sumR.get(r.label) / n);
+          const gg = Math.round(sumG.get(r.label) / n);
+          const bb = Math.round(sumB.get(r.label) / n);
+          const maxCh = Math.max(rr, gg, bb);
+          if (maxCh < DARK_MERGE_MAX && r.size < DARK_MERGE_SIZE) {
+            mergeLabels.add(r.label);
+          } else {
+            colorBySeed.set(r.seed, snapToPaletteColor(rr, gg, bb, tpl.paletteOverride));
+          }
+        });
+        if (mergeLabels.size) {
+          for (let p = 0; p < W * H; p++) {
+            if (mergeLabels.has(prov.labelMap[p])) {
+              wall[p] = 1;
+              const op = p * 4;
+              lineData[op] = 0; lineData[op + 1] = 0; lineData[op + 2] = 0; lineData[op + 3] = 255;
+            }
+          }
+        }
+
+        // 3.5단계: 손가락으로 탭하기엔 너무 얇은 영역(벽에서 가장 먼 지점까지의 거리가 짧음)은
+        // 색칠 대상에서 빼고 벽으로 흡수한다 — 특히 쉬운 레벨(1~3단계)에서 중요.
+        if (tpl.difficulty && tpl.difficulty <= 3 && !tpl.keepThinParts) {
+          const mid = labelRegions(wall);
+          const distToWall2 = new Int32Array(W * H).fill(-1);
+          const q2 = new Int32Array(W * H);
+          let qh2 = 0, qt2 = 0;
+          for (let p = 0; p < W * H; p++) {
+            if (wall[p] === 1) { distToWall2[p] = 0; q2[qt2++] = p; }
+          }
+          while (qh2 < qt2) {
+            const p = q2[qh2++];
+            const d = distToWall2[p];
+            const x = p % W, y = (p / W) | 0;
+            if (x > 0 && distToWall2[p - 1] === -1) { distToWall2[p - 1] = d + 1; q2[qt2++] = p - 1; }
+            if (x < W - 1 && distToWall2[p + 1] === -1) { distToWall2[p + 1] = d + 1; q2[qt2++] = p + 1; }
+            if (y > 0 && distToWall2[p - W] === -1) { distToWall2[p - W] = d + 1; q2[qt2++] = p - W; }
+            if (y < H - 1 && distToWall2[p + W] === -1) { distToWall2[p + W] = d + 1; q2[qt2++] = p + W; }
+          }
+          const maxDist = new Map();
+          for (let p = 0; p < W * H; p++) {
+            const lbl = mid.labelMap[p];
+            if (lbl === -1) continue;
+            const d = distToWall2[p];
+            if (!maxDist.has(lbl) || d > maxDist.get(lbl)) maxDist.set(lbl, d);
+          }
+          const THIN_MERGE = 9; // WORK_SIZE(640) 기준 — 이보다 얇으면 탭하기 빡빡하다고 보고 병합
+          const thinLabels = new Set();
+          mid.gradable.forEach((r) => { if ((maxDist.get(r.label) || 0) < THIN_MERGE) thinLabels.add(r.label); });
+          if (thinLabels.size) {
+            for (let p = 0; p < W * H; p++) {
+              if (thinLabels.has(mid.labelMap[p])) {
+                wall[p] = 1;
+                lineData[p * 4 + 3] = 255;
+              }
+            }
+          }
+        }
+
+        // 3.55단계: 라인 안쪽의 미세한 명암 때문에, 배경/내부의 큰 흰 영역과 아주 가느다란 실금으로
+        // 연결된 채 선 한가운데를 파고드는 흰 균열이 생길 수 있다(별 모양 꼭짓점 등). 이런 실금은
+        // 전체 면적이 커서(큰 영역에 붙어있으므로) 면적 기준으로는 못 잡으므로, 아주 작은 반경(R)의
+        // 모폴로지 열림으로 국소 폭만 보고 닫는다. 원래 잉크였던(rawWall===1) 자리만 다시 메워서,
+        // 디자인상 원래 배경이었던 곳(벌레 다리 사이 등)은 절대 건드리지 않는다. 반경을 아주 작게 유지해
+        // 뾰족한 꼭짓점에서 두께가 늘어나거나 돌기가 생기는 부작용을 피한다.
+        {
+          const CRACK_CLOSE_RADIUS = 4; // WORK_SIZE(640) 기준 — 아주 보수적인 값(실금 폭 몇 px 정도만 대상)
+          const distToWall3 = new Int32Array(W * H).fill(-1);
+          const qc1 = new Int32Array(W * H);
+          let hc1 = 0, tc1 = 0;
+          for (let p = 0; p < W * H; p++) {
+            if (wall[p] === 1) { distToWall3[p] = 0; qc1[tc1++] = p; }
+          }
+          while (hc1 < tc1) {
+            const p = qc1[hc1++];
+            const d = distToWall3[p];
+            if (d >= CRACK_CLOSE_RADIUS) continue;
+            const x = p % W, y = (p / W) | 0;
+            if (x > 0 && distToWall3[p - 1] === -1) { distToWall3[p - 1] = d + 1; qc1[tc1++] = p - 1; }
+            if (x < W - 1 && distToWall3[p + 1] === -1) { distToWall3[p + 1] = d + 1; qc1[tc1++] = p + 1; }
+            if (y > 0 && distToWall3[p - W] === -1) { distToWall3[p - W] = d + 1; qc1[tc1++] = p - W; }
+            if (y < H - 1 && distToWall3[p + W] === -1) { distToWall3[p + W] = d + 1; qc1[tc1++] = p + W; }
+          }
+          const distToSurvivor3 = new Int32Array(W * H).fill(-1);
+          const qc2 = new Int32Array(W * H);
+          let hc2 = 0, tc2 = 0;
+          for (let p = 0; p < W * H; p++) {
+            if (wall[p] === 0 && (distToWall3[p] === -1 || distToWall3[p] >= CRACK_CLOSE_RADIUS)) { distToSurvivor3[p] = 0; qc2[tc2++] = p; }
+          }
+          while (hc2 < tc2) {
+            const p = qc2[hc2++];
+            const d = distToSurvivor3[p];
+            if (d >= CRACK_CLOSE_RADIUS) continue;
+            const x = p % W, y = (p / W) | 0;
+            if (x > 0 && wall[p - 1] === 0 && distToSurvivor3[p - 1] === -1) { distToSurvivor3[p - 1] = d + 1; qc2[tc2++] = p - 1; }
+            if (x < W - 1 && wall[p + 1] === 0 && distToSurvivor3[p + 1] === -1) { distToSurvivor3[p + 1] = d + 1; qc2[tc2++] = p + 1; }
+            if (y > 0 && wall[p - W] === 0 && distToSurvivor3[p - W] === -1) { distToSurvivor3[p - W] = d + 1; qc2[tc2++] = p - W; }
+            if (y < H - 1 && wall[p + W] === 0 && distToSurvivor3[p + W] === -1) { distToSurvivor3[p + W] = d + 1; qc2[tc2++] = p + W; }
+          }
+          for (let p = 0; p < W * H; p++) {
+            if (wall[p] === 0 && distToSurvivor3[p] === -1 && rawWall[p] === 1) {
+              wall[p] = 1;
+              const op = p * 4;
+              lineData[op] = 0; lineData[op + 1] = 0; lineData[op + 2] = 0; lineData[op + 3] = 255;
+            }
+          }
+        }
+
+        // 3.6단계: 지금까지의 모든 팽창/병합이 끝난 "최종" 벽 상태 기준으로, 선 안쪽 명암 때문에
+        // 생기는 아주 작은 흰색 티끌(구멍)을 노이즈로 보고 메운다. 2.5단계(검은 티끌 제거)와 대칭인
+        // 로직 — 면적만으로 판단하며 두께를 바꾸는 팽창/침식은 쓰지 않아 정상 색칠 점(항상 훨씬 큼)이나
+        // 선 두께에는 영향이 없다. (이 단계보다 앞에서 하면, 뒤이은 팽창 단계가 새로 만들어내는 티끌을
+        // 놓치므로 반드시 맨 마지막에 한다.)
+        {
+          const HOLE_NOISE_MAX = 120; // px² — 실측: 노이즈 티끌은 수십 px² 이하, 정상 색칠 점은 700px² 이상
+          const visitedHole = new Uint8Array(W * H);
+          for (let start = 0; start < W * H; start++) {
+            if (wall[start] !== 0 || visitedHole[start]) continue;
+            const comp = [start];
+            visitedHole[start] = 1;
+            let qi = 0;
+            while (qi < comp.length) {
+              const p = comp[qi++];
+              const x = p % W, y = (p / W) | 0;
+              if (x > 0 && wall[p - 1] === 0 && !visitedHole[p - 1]) { visitedHole[p - 1] = 1; comp.push(p - 1); }
+              if (x < W - 1 && wall[p + 1] === 0 && !visitedHole[p + 1]) { visitedHole[p + 1] = 1; comp.push(p + 1); }
+              if (y > 0 && wall[p - W] === 0 && !visitedHole[p - W]) { visitedHole[p - W] = 1; comp.push(p - W); }
+              if (y < H - 1 && wall[p + W] === 0 && !visitedHole[p + W]) { visitedHole[p + W] = 1; comp.push(p + W); }
+            }
+            if (comp.length <= HOLE_NOISE_MAX) {
+              comp.forEach((p) => {
+                wall[p] = 1;
+                const op = p * 4;
+                lineData[op] = 0; lineData[op + 1] = 0; lineData[op + 2] = 0; lineData[op + 3] = 255;
+              });
+            }
+          }
+        }
+
+        // 최종(final) 라벨링: 병합으로 벽이 늘어난 뒤 다시 매긴 라벨 — 이후 openTemplate이
+        // 실제로 쓰는 라벨링과 반드시 동일해야 하므로, 여기서 미리 같은 라벨로 정답색을 맞춰둔다.
+        const final = labelRegions(wall);
+        const sampledColors = new Map();
+        final.gradable.forEach((r) => {
+          const hex = colorBySeed.get(r.seed);
+          if (hex) sampledColors.set(r.label, hex);
+        });
+
+        const lineC = document.createElement('canvas');
+        lineC.width = W; lineC.height = H;
+        lineC.getContext('2d').putImageData(new ImageData(lineData, W, H), 0, 0);
+        callback(wall, lineC, sampledColors);
+        } // continueProcessing 끝
+      };
+      img.src = svgUrl;
+    } else {
+      const svgMarkup = buildSvgMarkup(tpl);
+      const svgUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgMarkup);
+      const img = new Image();
+      img.onload = () => {
+        const maskC = document.createElement('canvas');
+        maskC.width = WORK_SIZE; maskC.height = WORK_SIZE;
+        const mCtx = maskC.getContext('2d', { willReadFrequently: true });
+        mCtx.drawImage(img, 0, 0, WORK_SIZE, WORK_SIZE);
+        const data = mCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE).data;
+        const wall = new Uint8Array(WORK_SIZE * WORK_SIZE);
+        for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+          wall[p] = data[i + 3] > ALPHA_WALL_THRESHOLD ? 1 : 0;
+        }
+        callback(wall, img, null);
+      };
+      img.src = svgUrl;
+    }
+  }
+
+  // 임의의 RGB를 COLORS 중 가장 가까운 색으로 스냅(유클리드 거리)
+  function rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h = 0, s = 0;
+    const l = (max + min) / 2;
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+      else if (max === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h *= 60;
+    }
+    return [h, s, l];
+  }
+
+  const PALETTE_HSL = COLORS.map((hex) => {
+    const [r, g, b] = hexToRgba(hex);
+    return { hex, hsl: rgbToHsl(r, g, b) };
+  });
+
+  // 단순 RGB 유클리드 거리는 채도 높은 색(진한 초록 등)이 회색/갈색으로 잘못 스냅되는 경우가 많아,
+  // 색상(hue)을 우선 맞추고 채도·명도는 보조 기준으로 쓰는 HSL 기반 거리로 비교한다.
+  // paletteOverride가 있으면(파이널 보스 전용 확장 팔레트) 그 색상 목록 안에서만 스냅한다 —
+  // 기존 100개 도안의 스냅 결과에 전혀 영향을 주지 않기 위해 전역 COLORS는 그대로 둔다.
+  function snapToPaletteColor(r, g, b, paletteOverride) {
+    const hslList = paletteOverride
+      ? paletteOverride.map((hex) => { const [rr, gg, bb] = hexToRgba(hex); return { hex, hsl: rgbToHsl(rr, gg, bb) }; })
+      : PALETTE_HSL;
+    const [h, s, l] = rgbToHsl(r, g, b);
+    let best = hslList[0].hex;
+    let bestDist = Infinity;
+    hslList.forEach((entry) => {
+      const [ph, ps, pl] = entry.hsl;
+      let dh = Math.abs(h - ph);
+      if (dh > 180) dh = 360 - dh;
+      // 채도가 아예 없는(회색·흰색) 샘플이 아니면 색상(hue) 일치를 최우선으로 본다 —
+      // 그래야 "탁한 초록"이 "밝은 갈색"보다 항상 초록 팔레트에 먼저 매칭된다.
+      const hueWeight = 0.3 + 0.7 * Math.min(s, ps);
+      const dist = (dh / 180) * (dh / 180) * hueWeight * 6 + (s - ps) * (s - ps) * 0.5 + (l - pl) * (l - pl) * 0.5;
+      if (dist < bestDist) { bestDist = dist; best = entry.hex; }
+    });
+    return best;
+  }
+
+  // ================= 목표(정답) 미리보기 =================
+  // 자동 인식된 영역 순서대로 고정 팔레트를 배정해 "이렇게 칠하면 돼요" 예시를 만든다.
+  function renderGoalPreview(lineImg) {
+    currentLabelToColor = new Map();
+    const custom = currentTemplate && currentTemplate.partColors;
+    const sampled = currentSampledColors;
+    const cyclePalette = (currentTemplate && currentTemplate.paletteOverride) ||
+      targetPaletteForLevel(currentTemplate && currentTemplate.difficulty);
+    currentGradableRegions.forEach((r, i) => {
+      let hex;
+      if (custom && custom[i]) hex = custom[i];
+      else if (sampled && sampled.has(r.label)) hex = sampled.get(r.label);
+      else hex = cyclePalette[i % cyclePalette.length];
+      currentLabelToColor.set(r.label, hex);
+    });
+
+    const imgData = goalCtx.createImageData(WORK_SIZE, WORK_SIZE);
+    const data = imgData.data;
+    for (let i = 0; i < WORK_SIZE * WORK_SIZE; i++) {
+      const label = currentLabelMap[i];
+      const hex = label >= 0 ? currentLabelToColor.get(label) : undefined;
+      if (hex) {
+        const [r, g, b] = hexToRgba(hex);
+        const p = i * 4;
+        data[p] = r; data[p + 1] = g; data[p + 2] = b; data[p + 3] = 255;
+      }
+    }
+    goalCtx.putImageData(imgData, 0, 0);
+    goalCtx.drawImage(lineImg, 0, 0, WORK_SIZE, WORK_SIZE);
+  }
+
+  // ================= 색칠 영역 자동 인식(연결 요소 탐색) =================
+  // 순수 함수: wall(벽 마스크)만 받아 라벨맵 + 채점 대상 영역을 계산 (전역 상태 안 건드림 — 갤러리 썸네일 생성에도 재사용)
+  function labelRegions(wall) {
+    const total = WORK_SIZE * WORK_SIZE;
+    const visited = new Uint8Array(total);
+    const labelMap = new Int32Array(total).fill(-1);
+    const regions = [];
+    let labelCounter = 0;
+
+    for (let start = 0; start < total; start++) {
+      if (wall[start] === 1 || visited[start]) continue;
+      let size = 0;
+      const stack = [start];
+      visited[start] = 1;
+      const myLabel = labelCounter++;
+      while (stack.length) {
+        const cur = stack.pop();
+        size++;
+        labelMap[cur] = myLabel;
+        const cx = cur % WORK_SIZE;
+        const cy = (cur / WORK_SIZE) | 0;
+        if (cx > 0) tryVisit(cur - 1);
+        if (cx < WORK_SIZE - 1) tryVisit(cur + 1);
+        if (cy > 0) tryVisit(cur - WORK_SIZE);
+        if (cy < WORK_SIZE - 1) tryVisit(cur + WORK_SIZE);
+      }
+      regions.push({ seed: start, size, label: myLabel });
+
+      function tryVisit(n) {
+        if (!visited[n] && wall[n] === 0) {
+          visited[n] = 1;
+          stack.push(n);
+        }
+      }
+    }
+
+    // 가장 큰 영역(도안 바깥의 배경)은 채점 및 목표 이미지에서 제외 — 나머지가 실제 "그림 부분"
+    regions.sort((a, b) => b.size - a.size);
+    const withoutBackground = regions.length > 1 ? regions.slice(1) : regions;
+    // 겹치는 도형 경계에서 생기는 눈에 안 보이는 미세 슬리버(탭 불가능)는 채점 대상에서 제외
+    const gradable = withoutBackground.filter((r) => r.size >= MIN_REGION_SIZE);
+    return { labelMap, gradable };
+  }
+
+  function computeGradableRegions() {
+    const result = labelRegions(wallMask);
+    currentLabelMap = result.labelMap;
+    return result.gradable;
+  }
+
+
+  function goHome() {
+    coloringScreen.hidden = true;
+    if (currentBossMode) {
+      stopLevelTimer();
+      currentBossMode = null;
+      galleryScreen.hidden = true;
+      mapScreen.hidden = false;
+      renderMap();
+    } else {
+      galleryScreen.hidden = false;
+      renderLevelGallery();
+    }
+  }
+
+  // ================= 팔레트 =================
+  // 난이도(1~10단계)가 오를수록 고를 수 있는 색상 수가 늘어남(4색 → 10색), 10단계에서 흰색 보너스 추가
+  const PALETTE_SIZE_BY_LEVEL = [4, 4, 5, 6, 7, 8, 9, 10, 10, 10];
+
+  // 목표 이미지 자동 색 배정(순환)용 — 흰색 제외, 그 단계에서 실제로 고를 수 있는 색 범위 안에서만 순환
+  function targetPaletteForLevel(level) {
+    const idx = Math.min(Math.max(level || 10, 1), 10) - 1;
+    return TARGET_PALETTE.slice(0, PALETTE_SIZE_BY_LEVEL[idx]);
+  }
+
+  function paletteColorsForLevel(level, requiredColors) {
+    const idx = Math.min(Math.max(level || 10, 1), 10) - 1;
+    const n = PALETTE_SIZE_BY_LEVEL[idx];
+    const cols = TARGET_PALETTE.slice(0, n);
+    if ((level || 10) >= 10 && !cols.includes(WHITE_SUBSTITUTE)) cols.push(WHITE_SUBSTITUTE);
+    // 도안이 실사 색을 위해 이 단계 기본 팔레트 밖의 색을 쓰면(예: 흰색 달걀, 파란 물방울)
+    // 그 색이 반드시 선택 가능하도록 팔레트에 추가한다.
+    (requiredColors || []).forEach((c) => { if (!cols.includes(c)) cols.push(c); });
+    return cols;
+  }
+
+  function renderPalette() {
+    const level = currentTemplate ? currentTemplate.difficulty : 10;
+    const usedColors = currentLabelToColor ? Array.from(new Set(currentLabelToColor.values())) : [];
+    const required = usedColors.length ? usedColors : ((currentTemplate && currentTemplate.partColors) || []);
+    let cols;
+    if (currentTemplate && currentTemplate.paletteOverride) {
+      cols = currentTemplate.paletteOverride.slice();
+      required.forEach((c) => { if (!cols.includes(c)) cols.push(c); });
+    } else {
+      cols = paletteColorsForLevel(level, required);
+    }
+    selectedColor = cols[0];
+    palette.innerHTML = '';
+    cols.forEach((color, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'color-swatch' + (idx === 0 ? ' active' : '');
+      btn.style.background = color;
+      btn.setAttribute('role', 'listitem');
+      btn.setAttribute('aria-label', 'Pick a color');
+      btn.dataset.color = color;
+      btn.addEventListener('click', () => {
+        selectedColor = color;
+        palette.querySelectorAll('.color-swatch').forEach((el) => el.classList.remove('active'));
+        btn.classList.add('active');
+      });
+      palette.appendChild(btn);
+    });
+  }
+
+  // ================= 플러드필 =================
+  function hexToRgba(hex) {
+    const h = hex.replace('#', '');
+    const r = parseInt(h.substring(0, 2), 16);
+    const g = parseInt(h.substring(2, 4), 16);
+    const b = parseInt(h.substring(4, 6), 16);
+    return [r, g, b, 255];
+  }
+
+  function floodFill(startX, startY, hexColor) {
+    if (startX < 0 || startY < 0 || startX >= WORK_SIZE || startY >= WORK_SIZE) return;
+    const startIdx = startY * WORK_SIZE + startX;
+    if (!wallMask || wallMask[startIdx] === 1) return; // 선을 눌렀으면 무시
+
+    const imgData = fillCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE);
+    const data = imgData.data;
+    const [r, g, b, a] = hexToRgba(hexColor);
+
+    const startPixel = startIdx * 4;
+    // 이미 같은 색이면 스킵
+    if (data[startPixel] === r && data[startPixel + 1] === g &&
+        data[startPixel + 2] === b && data[startPixel + 3] === a) {
+      return;
+    }
+
+    const visited = new Uint8Array(WORK_SIZE * WORK_SIZE);
+    const stack = [startIdx];
+    visited[startIdx] = 1;
+
+    while (stack.length) {
+      const idx = stack.pop();
+      const x = idx % WORK_SIZE;
+      const y = (idx / WORK_SIZE) | 0;
+      const p = idx * 4;
+      data[p] = r; data[p + 1] = g; data[p + 2] = b; data[p + 3] = a;
+
+      if (x > 0) tryPush(idx - 1);
+      if (x < WORK_SIZE - 1) tryPush(idx + 1);
+      if (y > 0) tryPush(idx - WORK_SIZE);
+      if (y < WORK_SIZE - 1) tryPush(idx + WORK_SIZE);
+    }
+
+    function tryPush(nIdx) {
+      if (visited[nIdx] || wallMask[nIdx] === 1) return;
+      visited[nIdx] = 1;
+      stack.push(nIdx);
+    }
+
+    fillCtx.putImageData(imgData, 0, 0);
+    pushUndo();
+    updateUndoButton();
+    playPop();
+  }
+
+  // ================= 실행 취소 =================
+  function pushUndo() {
+    undoStack.push(fillCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE));
+    if (undoStack.length > MAX_UNDO) undoStack.shift();
+  }
+
+  function updateUndoButton() {
+    btnUndo.disabled = undoStack.length <= 1;
+    btnUndo.style.opacity = undoStack.length <= 1 ? 0.4 : 1;
+  }
+
+  btnUndo.addEventListener('click', () => {
+    if (undoStack.length <= 1) return;
+    undoStack.pop();
+    const prev = undoStack[undoStack.length - 1];
+    fillCtx.putImageData(prev, 0, 0);
+    updateUndoButton();
+  });
+
+  btnClear.addEventListener('click', () => {
+    fillCtx.clearRect(0, 0, WORK_SIZE, WORK_SIZE);
+    undoStack = [];
+    pushUndo();
+    updateUndoButton();
+  });
+
+  // ================= 탭 → 채우기 =================
+  function handleTap(clientX, clientY) {
+    const rect = tapLayer.getBoundingClientRect();
+    const x = Math.floor(((clientX - rect.left) / rect.width) * WORK_SIZE);
+    const y = Math.floor(((clientY - rect.top) / rect.height) * WORK_SIZE);
+    floodFill(x, y, selectedColor);
+  }
+
+  tapLayer.addEventListener('pointerdown', (e) => {
+    handleTap(e.clientX, e.clientY);
+  });
+
+  // ================= 성공률 자동 채점(컬러바이넘버: 정답색 일치 여부) =================
+  function computeCompletion() {
+    if (!currentGradableRegions || currentGradableRegions.length === 0) {
+      return { matched: 0, total: 0 };
+    }
+    const data = fillCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE).data;
+    let matched = 0;
+    currentGradableRegions.forEach((r) => {
+      const p = r.seed * 4;
+      if (data[p + 3] === 0) return; // 안 칠한 영역
+      const targetHex = currentLabelToColor ? currentLabelToColor.get(r.label) : null;
+      if (!targetHex) return;
+      const [tr, tg, tb] = hexToRgba(targetHex);
+      if (data[p] === tr && data[p + 1] === tg && data[p + 2] === tb) matched++;
+    });
+    return { matched, total: currentGradableRegions.length };
+  }
+
+  function mapRatioToLevel(ratio) {
+    if (ratio >= 0.9) return RATING_LEVELS[0];
+    if (ratio >= 0.75) return RATING_LEVELS[1];
+    if (ratio >= 0.6) return RATING_LEVELS[2];
+    if (ratio >= 0.4) return RATING_LEVELS[3];
+    return RATING_LEVELS[4];
+  }
+
+  // ================= 완료(채점) =================
+  // 예전엔 "Done!"을 누를 때마다 그림 파일이 자동으로 다운로드됐는데, 그림 하나 끝낼 때마다
+  // 다운로드 창이 계속 뜨는 게 번거롭다는 피드백으로 자동 저장은 뺐다(채점/평가만 진행).
+  btnSave.addEventListener('click', () => {
+    showAutoResult();
+  });
+
+  // ================= 평가: 자동 채점 + 부모 직접 평가(선택) =================
+  function renderRatingOptions() {
+    ratingOptions.innerHTML = '';
+    RATING_LEVELS.forEach((r) => {
+      const btn = document.createElement('button');
+      btn.className = 'rating-btn';
+      btn.dataset.level = r.level;
+      btn.innerHTML = '<span class="r-emoji">' + r.emoji + '</span><span>' + r.label + '</span>';
+      btn.addEventListener('click', () => submitRating(r));
+      ratingOptions.appendChild(btn);
+    });
+  }
+
+  function showAutoResult() {
+    const { matched, total } = computeCompletion();
+    const ratio = total > 0 ? matched / total : 0;
+    const score = Math.round(ratio * 100);
+    const level = mapRatioToLevel(ratio);
+    lastAutoLevel = level;
+    lastScore = score;
+
+    autoResultDetail.textContent = 'You colored the ' + (currentTemplate ? currentTemplate.name : '') + '!';
+    autoResultBadge.innerHTML =
+      '<span class="b-emoji">' + level.emoji + '</span>' +
+      '<span class="b-label">' + level.label + '</span>' +
+      '<span class="b-score">' + score + ' points</span>' +
+      '<span class="b-count">' + matched + ' / ' + total + ' parts colored right</span>';
+
+    autoResultView.hidden = false;
+    manualSelectView.hidden = true;
+    ratingModal.hidden = false;
+  }
+
+  function closeRatingModal() {
+    ratingModal.hidden = true;
+  }
+
+  autoResultConfirm.addEventListener('click', () => {
+    closeRatingModal();
+    saveHistory(lastAutoLevel);
+    showPraise(lastAutoLevel);
+  });
+
+  btnManualOverride.addEventListener('click', () => {
+    autoResultView.hidden = true;
+    manualSelectView.hidden = false;
+  });
+
+  ratingSkip.addEventListener('click', () => {
+    manualSelectView.hidden = true;
+    autoResultView.hidden = false;
+  });
+
+  function submitRating(r) {
+    closeRatingModal();
+    saveHistory(r);
+    showPraise(r);
+  }
+
+  // 이번 제출로 그 레벨이 "방금 처음" 클리어됐는지(이미 클리어돼 있던 레벨을 다시 색칠한 게 아닌지) —
+  // saveHistory에서 점수 저장 전/후 상태를 비교해 기록해두고, showPraise가 이 값으로만 축하를 띄운다.
+  let justBecameLevelCleared = false;
+  let justBecameBossCleared = false;
+
+  function saveHistory(r) {
+    const history = getHistory();
+    history.push({
+      date: new Date().toISOString(),
+      template: currentTemplate ? currentTemplate.name : '',
+      difficulty: currentTemplate ? currentTemplate.difficulty : null,
+      score: lastScore,
+      level: r.level,
+      label: r.label
+    });
+    try {
+      localStorage.setItem('coloringHistory', JSON.stringify(history));
+    } catch (e) { /* 저장 공간 부족 시 무시 */ }
+    justBecameLevelCleared = false;
+    justBecameBossCleared = false;
+    if (currentTemplate) {
+      if (currentTemplate.isBoss) {
+        const mode = currentTemplate.mode;
+        const wasBossClearedBefore = isBossCleared(mode);
+        markCleared(currentTemplate.id);
+        saveScoreIfBest(currentTemplate.id, lastScore);
+        if (lastScore === 100) {
+          markBossCleared(mode);
+          clearBossAttempt(mode); // 완주했으니 이 보스의 타임어택은 끝
+        }
+        justBecameBossCleared = !wasBossClearedBefore && lastScore === 100;
+      } else {
+        const wasClearedBefore = isLevelCleared(currentTemplate.difficulty);
+        markCleared(currentTemplate.id);
+        saveScoreIfBest(currentTemplate.id, lastScore);
+        justBecameLevelCleared = !wasClearedBefore && isLevelCleared(currentTemplate.difficulty);
+      }
+    }
+  }
+
+  function showPraise(r) {
+    if (justBecameBossCleared) {
+      showBossFanfare();
+      return;
+    }
+    praiseEmoji.textContent = r.emoji;
+    const justClearedLevel = justBecameLevelCleared;
+    praiseText.textContent = justClearedLevel
+      ? r.label + ' — Level ' + currentTemplate.difficulty + ' Clear! 🎉'
+      : r.label;
+    praiseOverlay.hidden = false;
+    if (justClearedLevel) playExcellent();
+    setTimeout(() => {
+      praiseOverlay.hidden = true;
+      goHome();
+    }, 1800);
+  }
+
+  praiseOverlay.addEventListener('click', () => {
+    praiseOverlay.hidden = true;
+    goHome();
+  });
+
+  // ================= 파이널 보스 축하(팡파레 + 컨페티 + 프린트 선물) =================
+  const CONFETTI_COLORS = ['#FF5B5B', '#FFD166', '#8BD17C', '#4D96FF', '#8C7AE6', '#F368E0', '#F1C40F'];
+
+  function spawnConfetti() {
+    confettiLayer.innerHTML = '';
+    for (let i = 0; i < 30; i++) {
+      const el = document.createElement('span');
+      el.className = 'confetti-piece';
+      el.style.left = Math.random() * 100 + '%';
+      el.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+      el.style.animationDelay = (Math.random() * 0.6) + 's';
+      el.style.animationDuration = (1.6 + Math.random() * 1.2) + 's';
+      confettiLayer.appendChild(el);
+    }
+  }
+
+  function showBossFanfare() {
+    bossFanfareSub.textContent = (currentTemplate ? currentTemplate.name : '') +
+      ' — ' + (currentBossMode && MODES[currentBossMode] ? MODES[currentBossMode].label : '') + ' mode complete!';
+    spawnConfetti();
+    bossFanfareModal.hidden = false;
+    playBossVictory();
+  }
+
+  bossFanfareClose.addEventListener('click', () => {
+    bossFanfareModal.hidden = true;
+    goHome();
+  });
+
+  // 완성작/빈 도안을 인쇄용 흰 배경 캔버스로 합성해 data URL로 반환
+  function composePrintImage(includeFill) {
+    const c = document.createElement('canvas');
+    c.width = WORK_SIZE; c.height = WORK_SIZE;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, WORK_SIZE, WORK_SIZE);
+    if (includeFill) ctx.drawImage(fillCanvas, 0, 0);
+    ctx.drawImage(lineCanvas, 0, 0);
+    return c.toDataURL('image/png');
+  }
+
+  function doPrint(dataUrl, title) {
+    printArea.innerHTML = '<h2>' + title + '</h2><img src="' + dataUrl + '" alt="' + title + '">';
+    window.print();
+  }
+
+  btnPrintArt.addEventListener('click', () => {
+    doPrint(composePrintImage(true), (currentTemplate ? currentTemplate.name : '') + ' - My Artwork');
+  });
+  btnPrintBlank.addEventListener('click', () => {
+    doPrint(composePrintImage(false), (currentTemplate ? currentTemplate.name : '') + ' - Coloring Page');
+  });
+
+  // ================= 효과음 =================
+  function playPop() {
+    if (!soundOn) return;
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(520, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(760, audioCtx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.16);
+    } catch (e) { /* 오디오 미지원 브라우저는 무시 */ }
+  }
+
+  // 레벨을 클리어했을 때 "Excellent!"를 아이 목소리 느낌으로 읽어준다(브라우저 내장 음성합성 사용 —
+  // 실제 아이 목소리 음원은 없으므로, 밝고 높은 톤(pitch/rate 상향)으로 흉내낸다).
+  let cachedVoices = [];
+  function loadVoices() {
+    if (!('speechSynthesis' in window)) return;
+    cachedVoices = window.speechSynthesis.getVoices();
+  }
+  if ('speechSynthesis' in window) {
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }
+  function pickChildishVoice() {
+    if (!cachedVoices.length) return null;
+    const english = cachedVoices.filter((v) => /^en/i.test(v.lang));
+    const pool = english.length ? english : cachedVoices;
+    // "아이 목소리"에 제일 가까운 걸 이름으로 추정(Child > Female > 그 외 아무거나)
+    return (
+      pool.find((v) => /child|kid/i.test(v.name)) ||
+      pool.find((v) => /female|zira|aria|jenny|samantha/i.test(v.name)) ||
+      pool[0]
+    );
+  }
+  // 레벨 클리어 때마다 매번 "Excellent!"만 나오면 금방 질리니 여러 문구 중 랜덤으로 고른다.
+  const LEVEL_CLEAR_PHRASES = [
+    'Excellent!', 'Awesome!', 'Great job!', 'Amazing!', 'Fantastic!',
+    'You did it!', 'Way to go!', 'Wonderful!', 'You are a star!', 'Super!'
+  ];
+
+  function speakPraise(phrase) {
+    if (!soundOn || !('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel(); // 이전에 읽던 게 있으면 정리
+      const utter = new SpeechSynthesisUtterance(phrase);
+      const voice = pickChildishVoice();
+      if (voice) utter.voice = voice;
+      utter.pitch = 1.9;   // 높은 톤 = 아이 목소리 느낌
+      utter.rate = 1.05;
+      utter.volume = 1;
+      window.speechSynthesis.speak(utter);
+    } catch (e) { /* 음성합성 미지원 브라우저는 무시 */ }
+  }
+
+  function playExcellent() {
+    speakPraise(LEVEL_CLEAR_PHRASES[Math.floor(Math.random() * LEVEL_CLEAR_PHRASES.length)]);
+  }
+
+  function playBossVictory() {
+    speakPraise('You defeated the final boss! You are a champion!');
+  }
+
+  btnSound.addEventListener('click', () => {
+    soundOn = !soundOn;
+    btnSound.textContent = soundOn ? '🔊' : '🔇';
+  });
+
+  // ================= 배경음악 =================
+  // CC0(퍼블릭 도메인) "Children's March Theme" by Cleyton Kauffman — opengameart.org
+  // (이전 "Happy Adventure" 트랙이 사용자에게 "80년대 느낌"이라는 피드백을 받아 교체됨, 2026-08-09)
+  const MUSIC_KEY = 'musicOn';
+  const bgm = document.getElementById('bgm');
+  bgm.volume = 0.35;
+
+  function isMusicOn() {
+    const v = localStorage.getItem(MUSIC_KEY);
+    return v === null ? true : v === '1'; // 기본값: 켜짐
+  }
+
+  function updateMusicButton() {
+    btnMusic.textContent = isMusicOn() ? '🎵' : '🔇';
+  }
+
+  function tryPlayMusic() {
+    if (!isMusicOn()) return;
+    bgm.play().catch(() => { /* 아직 사용자 상호작용 전이면 브라우저가 막음 — 다음 탭 때 다시 시도됨 */ });
+  }
+
+  btnMusic.addEventListener('click', () => {
+    const next = !isMusicOn();
+    try { localStorage.setItem(MUSIC_KEY, next ? '1' : '0'); } catch (e) { /* 무시 */ }
+    updateMusicButton();
+    if (next) tryPlayMusic(); else bgm.pause();
+  });
+
+  // 브라우저는 사용자가 화면을 한 번 조작하기 전엔 소리 있는 자동재생을 막으므로,
+  // 앱을 켠 뒤 첫 탭/클릭 때 배경음악을 시작한다(메인 화면부터 계속 깔리는 느낌).
+  const startMusicOnFirstInteraction = () => {
+    tryPlayMusic();
+    document.removeEventListener('pointerdown', startMusicOnFirstInteraction);
+  };
+  document.addEventListener('pointerdown', startMusicOnFirstInteraction);
+  updateMusicButton();
+
+  // ================= 네비게이션 =================
+  btnHome.addEventListener('click', goHome);
+
+  // ================= 표지 화면 =================
+  // 파이널 보스 4종의 svgArt는 이미 완성된(정답) 색으로 그려져 있어서, 색칠 파이프라인을 거치지 않고
+  // 그대로 <svg>에 꽂아 넣기만 해도 완성작 미리보기 아이콘으로 쓸 수 있다.
+  // 표지에서는 제목 바로 밑에 한 줄로, 몸통 없이 얼굴(머리)만 보이도록 viewBox를 얼굴 영역으로 좁혀서 잘라낸다.
+  const COVER_FACE_VIEWBOX = '90 15 220 220';
+  function renderCoverBosses() {
+    coverBosses.innerHTML = '';
+    MODE_ORDER.forEach((mode) => {
+      const tpl = getBossTemplate(mode);
+      if (!tpl) return;
+      const item = document.createElement('div');
+      item.className = 'cover-boss-item';
+      item.innerHTML = '<svg viewBox="' + COVER_FACE_VIEWBOX + '" xmlns="http://www.w3.org/2000/svg">' + tpl.svgArt + '</svg>';
+      coverBosses.appendChild(item);
+    });
+  }
+
+  function enterMapFromCover() {
+    coverScreen.hidden = true;
+    mapScreen.hidden = false;
+    renderMap();
+  }
+
+  btnCoverStart.addEventListener('click', () => {
+    // 프로필(이름/나라)이 아직 없으면 맵으로 넘어가기 전에 딱 한 번만 물어본다.
+    if (getPlayerProfile()) {
+      enterMapFromCover();
+    } else {
+      playerInputName.value = '';
+      playerInputCountry.value = '';
+      playerEntryModal.hidden = false;
+    }
+  });
+
+  playerEntrySubmit.addEventListener('click', () => {
+    savePlayerProfile({
+      name: playerInputName.value.trim() || 'Anonymous',
+      country: playerInputCountry.value.trim()
+    });
+    playerEntryModal.hidden = true;
+    enterMapFromCover();
+  });
+
+  playerEntrySkip.addEventListener('click', () => {
+    savePlayerProfile({ name: '', country: '' }); // 다시 묻지 않도록 빈 프로필이라도 저장
+    playerEntryModal.hidden = true;
+    enterMapFromCover();
+  });
+
+  // ================= 초기화 =================
+  renderCoverBosses();
+  renderMap();
+  renderPalette();
+  renderRatingOptions();
+
+  // 디버그/테스트용: 현재 도안의 채점 대상 영역 개수 확인
+  window.__debugRegionCount = () => (currentGradableRegions ? currentGradableRegions.length : 0);
+
+  // 디버그/테스트용: id로 도안을 열고 영역 수/난이도/팔레트 크기/정답색 목록을 반환
+  window.__debugOpenTemplate = (tplId) => new Promise((resolve) => {
+    const bossTpl = Object.keys(window.BOSS_TEMPLATES || {}).map((m) => window.BOSS_TEMPLATES[m]).find((t) => t.id === tplId);
+    const tpl = bossTpl || COLORING_TEMPLATES.find((t) => t.id === tplId);
+    if (!tpl) return resolve(null);
+    openTemplate(tpl, () => {
+      // 실제 화면에 그려진 팔레트 스와치를 그대로 읽는다(렌더팔레트가 currentLabelToColor 기반으로 동적 구성하므로)
+      const paletteColors = Array.from(palette.querySelectorAll('.color-swatch')).map((el) => el.dataset.color);
+      // 각 영역에서 "벽으로부터 가장 먼(가장 안전하게 탭할 수 있는) 지점"을 계산한다.
+      // seed(첫 발견 픽셀)나 centroid(평균 좌표)는 곡선/오목한 모양에서 벽 위나 바깥에 걸릴 수 있어 부적합.
+      const W = WORK_SIZE, H = WORK_SIZE;
+      const distToWall = new Int32Array(W * H).fill(-1);
+      {
+        const q = new Int32Array(W * H);
+        let qh = 0, qt = 0;
+        for (let p = 0; p < W * H; p++) {
+          if (wallMask[p] === 1) { distToWall[p] = 0; q[qt++] = p; }
+        }
+        while (qh < qt) {
+          const p = q[qh++];
+          const d = distToWall[p];
+          const x = p % W, y = (p / W) | 0;
+          if (x > 0 && distToWall[p - 1] === -1) { distToWall[p - 1] = d + 1; q[qt++] = p - 1; }
+          if (x < W - 1 && distToWall[p + 1] === -1) { distToWall[p + 1] = d + 1; q[qt++] = p + 1; }
+          if (y > 0 && distToWall[p - W] === -1) { distToWall[p - W] = d + 1; q[qt++] = p - W; }
+          if (y < H - 1 && distToWall[p + W] === -1) { distToWall[p + W] = d + 1; q[qt++] = p + W; }
+        }
+      }
+      const bestP = new Map(), bestD = new Map();
+      for (let p = 0; p < W * H; p++) {
+        const lbl = currentLabelMap[p];
+        if (lbl === -1) continue;
+        const d = distToWall[p];
+        if (!bestD.has(lbl) || d > bestD.get(lbl)) { bestD.set(lbl, d); bestP.set(lbl, p); }
+      }
+      const centroids = currentGradableRegions.map((r) => bestP.get(r.label));
+      const tapMargins = currentGradableRegions.map((r) => bestD.get(r.label)); // 640기준 px, 작을수록 탭하기 어려움
+      resolve({
+        id: tpl.id,
+        difficulty: tpl.difficulty,
+        regionCount: currentGradableRegions.length,
+        paletteSize: paletteColors.length,
+        targetColors: currentGradableRegions.map((r) => currentLabelToColor.get(r.label)),
+        sizes: currentGradableRegions.map((r) => r.size),
+        seeds: currentGradableRegions.map((r) => r.seed),
+        centroids: centroids,
+        tapMargins: tapMargins,
+        paletteColors: paletteColors
+      });
+    });
+  });
+
+  // 디버그/테스트용: 열려 있는 도안의 모든 영역을 정답색으로 채운 뒤 성공률 계산(검증용)
+  window.__debugSimulatePerfect = () => {
+    if (!currentGradableRegions) return null;
+    currentGradableRegions.forEach((r) => {
+      const hex = currentLabelToColor.get(r.label);
+      if (hex) floodFill(r.seed % WORK_SIZE, (r.seed / WORK_SIZE) | 0, hex);
+    });
+    const { matched, total } = computeCompletion();
+    return { matched, total, score: total > 0 ? Math.round((matched / total) * 100) : 0 };
+  };
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+})();
