@@ -137,6 +137,7 @@
   let wallMask = null; // Uint8Array WORK_SIZE*WORK_SIZE, 1 = 벽(선), 0 = 칠할 수 있음
   let currentLabelMap = null; // Int32Array WORK_SIZE*WORK_SIZE, 픽셀 -> 영역 라벨(없으면 -1)
   let currentGradableRegions = []; // [{seed, size, label}] 채점 대상 영역(배경 제외)
+  let currentGradableLabelSet = new Set(); // currentGradableRegions의 label만 모아둔 Set(탭 보정용 빠른 조회)
   let currentLabelToColor = null; // Map<label, hex> 영역별 정답색(컬러바이넘버)
   let currentSampledColors = null; // Map<label, hex> 이모지 원본에서 뽑은 실제 색(있으면 우선 사용)
   let lastAutoLevel = null;
@@ -841,6 +842,7 @@
   function openLevel(level) {
     currentBossMode = null;
     currentLevel = level;
+    setMusicForLevel(level);
     if (isLevelCleared(level)) clearLevelAttempt(level); // 이미 클리어된 레벨은 타이머 불필요
     // 주의: 그림 목록만 구경하는 걸로는 시간이 소모되면 안 되므로, 여기서는 타임어택을 시작하지
     // 않는다 — 실제로 그림 하나를 열 때(openTemplate)가 되어서야 처음 시작한다.
@@ -937,6 +939,7 @@
 
       // 채점 대상 영역(선으로 닫힌 칸) 자동 인식 — 가장 큰 영역(배경)은 채점에서 제외
       currentGradableRegions = computeGradableRegions();
+      currentGradableLabelSet = new Set(currentGradableRegions.map((r) => r.label));
 
       // 목표(정답) 이미지 렌더링 + 영역별 정답색 배정
       renderGoalPreview(lineSource);
@@ -967,6 +970,12 @@
       // 결과가 기기별로 어긋나는 문제가 있었다(2026-08-09 발견). Twemoji 파일을 앱에 내장해두면
       // 어떤 기기에서 열어도 항상 동일한 소스 이미지로 렌더링된다.
       const img = new Image();
+      img.onerror = (e) => {
+        // 예전엔 이미지 로딩이 실패하면 콜백이 영영 안 불려서 화면이 그냥 멈춘 것처럼 보였다
+        // (2026-08-09, 로컬 미리보기에서 원인 불명으로 화면 전환이 안 되던 문제 조사 중 발견).
+        console.error('[loadTemplateSource] 도안 이미지 로딩 실패:', tpl.id, img.src, e);
+        alert('그림을 못 불러왔어요 (' + tpl.id + '). 콘솔(F12)에서 빨간 에러 메시지를 확인해주세요.');
+      };
       img.onload = () => {
         const rawC = document.createElement('canvas');
         rawC.width = WORK_SIZE; rawC.height = WORK_SIZE;
@@ -987,8 +996,11 @@
             // 반투명(안티에일리어싱) 픽셀은 그 자체로 실루엣 경계라는 뜻이므로, 이웃과 색이 얼마나
             // 다른지 계산할 필요 없이 곧장 벽으로 취급한다 — 완만한(여러 픽셀에 걸친) 그라데이션
             // 경계는 이웃-비교 방식만으론 못 잡을 때가 있어서(2026-08-09, tree 몸통이 배경과 이어져
-            // 안 잡히던 문제) 알파값만으로 판단하는 이 경로를 추가했다.
-            const isPartialAlpha = a > ALPHA_WALL_THRESHOLD && a < 250;
+            // 안 잡히던 문제) 알파값만으로 판단하는 이 경로를 추가했다. emoji(Twemoji) 모드에만
+            // 적용한다 — svgArt(보스 손그림)는 도형마다 이미 자체 테두리 선이 있어서, 겹치는 도형
+            // 여러 개의 반투명 경계가 겹치는 지점(관절 등)에서 이 검사가 너무 넓은 검은 덩어리로
+            // 잘못 뭉쳐버리는 부작용이 있었다(2026-08-10, 신데렐라 팔 안쪽 검은 부분 버그로 발견).
+            const isPartialAlpha = tpl.renderMode === 'emoji' && a > ALPHA_WALL_THRESHOLD && a < 250;
             let isWall = isPartialAlpha || (a > ALPHA_WALL_THRESHOLD && maxCh < EMOJI_DARK_THRESHOLD);
             if (!isWall && a > ALPHA_WALL_THRESHOLD) {
               // 부드러운 그라데이션 경계는 바로 옆 픽셀 차이만으론 못 잡을 수 있어 2px 떨어진 픽셀과도 비교한다.
@@ -1679,11 +1691,37 @@
   });
 
   // ================= 탭 → 채우기 =================
+  // 수염/입/이마주름처럼 폭이 몇 픽셀 안 되는 아주 얇은 색칠 영역은 손가락으로 정확히
+  // 맞추기 힘들다(2026-08-09, 사용자가 cat 레벨에서 제보). 그림 자체는 그대로 두고, 탭한
+  // 지점이 선이거나 색칠 대상이 아니면 근처(반경 TAP_SNAP_RADIUS)를 나선형으로 뒤져서
+  // 가장 가까운 색칠 가능 지점을 대신 찾아준다 — 모든 도안의 얇은 부분에 공통 적용됨.
+  const TAP_SNAP_RADIUS = 16; // WORK_SIZE(640) 기준 픽셀
+  function isTappable(idx) {
+    return wallMask && wallMask[idx] !== 1 && currentLabelMap && currentGradableLabelSet.has(currentLabelMap[idx]);
+  }
+  function findTapTarget(x, y) {
+    const idx = y * WORK_SIZE + x;
+    if (isTappable(idx)) return { x, y };
+    for (let r = 1; r <= TAP_SNAP_RADIUS; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; // 이번 반경의 테두리만 훑는다
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= WORK_SIZE || ny >= WORK_SIZE) continue;
+          const nIdx = ny * WORK_SIZE + nx;
+          if (isTappable(nIdx)) return { x: nx, y: ny };
+        }
+      }
+    }
+    return null; // 근처에 색칠 가능한 곳이 전혀 없으면 그냥 무시
+  }
   function handleTap(clientX, clientY) {
     const rect = tapLayer.getBoundingClientRect();
     const x = Math.floor(((clientX - rect.left) / rect.width) * WORK_SIZE);
     const y = Math.floor(((clientY - rect.top) / rect.height) * WORK_SIZE);
-    floodFill(x, y, selectedColor);
+    const target = findTapTarget(x, y);
+    if (!target) return;
+    floodFill(target.x, target.y, selectedColor);
   }
 
   tapLayer.addEventListener('pointerdown', (e) => {
@@ -1972,11 +2010,31 @@
   });
 
   // ================= 배경음악 =================
-  // CC0(퍼블릭 도메인) "Children's March Theme" by Cleyton Kauffman — opengameart.org
-  // (이전 "Happy Adventure" 트랙이 사용자에게 "80년대 느낌"이라는 피드백을 받아 교체됨, 2026-08-09)
+  // 레벨 구간별로 다른 CC0(퍼블릭 도메인) 트랙을 틀어준다(2026-08-09, "레벨 바뀔 때마다 음악도
+  // 바뀌면 좋겠다"는 요청으로 추가) — 전부 opengameart.org:
+  //   Lv1-3  "Sunny Side Up Updated Version" — Alex McCulloch (mp3만 있음)
+  //   Lv4-6  "Children's March Theme" — Cleyton Kauffman (기존 곡, ogg+mp3)
+  //   Lv7-10 "Good Morning" — Cakeflaps (ogg만 있음)
+  // 형식이 하나뿐인 트랙은 canPlayType으로 지원 여부를 확인하고, 못 트는 기기에서는 조용히
+  // 이전 트랙을 그대로 유지한다(에러 없이 그냥 안 바뀜 — 흔치 않은 극단 케이스라 이 정도면 충분).
+  const MUSIC_TRACKS = {
+    sunny: { ogg: null, mp3: 'audio/bgm-sunny-side-up.mp3' },
+    march: { ogg: 'audio/bgm-childrens-march.ogg', mp3: 'audio/bgm-childrens-march.mp3' },
+    goodmorning: { ogg: 'audio/bgm-good-morning.ogg', mp3: null }
+  };
+  function trackKeyForLevel(level) {
+    if (level <= 3) return 'sunny';
+    if (level <= 6) return 'march';
+    return 'goodmorning';
+  }
+
   const MUSIC_KEY = 'musicOn';
   const bgm = document.getElementById('bgm');
-  bgm.volume = 0.35;
+  const BGM_VOLUME = 0.35;
+  const BGM_FADE_MS = 700;
+  bgm.volume = BGM_VOLUME;
+  let currentMusicTrackKey = null;
+  let bgmFadeTimer = null;
 
   function isMusicOn() {
     const v = localStorage.getItem(MUSIC_KEY);
@@ -1987,8 +2045,55 @@
     btnMusic.textContent = isMusicOn() ? '🎵' : '🔇';
   }
 
+  function pickSrc(track) {
+    if (track.ogg && bgm.canPlayType('audio/ogg')) return track.ogg;
+    if (track.mp3 && bgm.canPlayType('audio/mpeg')) return track.mp3;
+    return track.ogg || track.mp3 || null; // 마지막 안전장치 — canPlayType이 애매하게 답할 때도 일단 시도는 해본다
+  }
+
+  function fadeTo(targetVolume, ms, onDone) {
+    if (bgmFadeTimer) clearInterval(bgmFadeTimer);
+    const steps = 14;
+    const startVolume = bgm.volume;
+    const stepMs = ms / steps;
+    let i = 0;
+    bgmFadeTimer = setInterval(() => {
+      i++;
+      bgm.volume = startVolume + (targetVolume - startVolume) * (i / steps);
+      if (i >= steps) {
+        clearInterval(bgmFadeTimer);
+        bgmFadeTimer = null;
+        bgm.volume = targetVolume;
+        if (onDone) onDone();
+      }
+    }, stepMs);
+  }
+
+  // 레벨에 맞는 트랙으로 부드럽게 전환한다(같은 구간 안에서 도안만 바꿀 땐 트랙이 그대로라 아무 일도
+  // 안 함 — 매번 처음부터 다시 트는 게 아니라 실제로 구간이 바뀔 때만 전환됨).
+  function setMusicForLevel(level) {
+    const key = trackKeyForLevel(level);
+    if (key === currentMusicTrackKey) return;
+    const src = pickSrc(MUSIC_TRACKS[key]);
+    if (!src) return; // 이 기기가 재생 못 하는 형식뿐이면 그냥 이전 트랙 유지
+    currentMusicTrackKey = key;
+    if (!isMusicOn() || bgm.paused) {
+      // 아직 음악이 안 틀어져 있으면(꺼둔 상태거나 첫 상호작용 전) 페이드 없이 소스만 바꿔둔다 —
+      // 다음에 재생될 때 이 트랙으로 시작함.
+      bgm.src = src;
+      return;
+    }
+    fadeTo(0, BGM_FADE_MS, () => {
+      bgm.src = src;
+      bgm.play().catch(() => {});
+      fadeTo(BGM_VOLUME, BGM_FADE_MS);
+    });
+  }
+
   function tryPlayMusic() {
     if (!isMusicOn()) return;
+    if (!bgm.src) bgm.src = pickSrc(MUSIC_TRACKS[currentMusicTrackKey || 'sunny']);
+    bgm.volume = BGM_VOLUME;
     bgm.play().catch(() => { /* 아직 사용자 상호작용 전이면 브라우저가 막음 — 다음 탭 때 다시 시도됨 */ });
   }
 
@@ -2006,6 +2111,7 @@
     document.removeEventListener('pointerdown', startMusicOnFirstInteraction);
   };
   document.addEventListener('pointerdown', startMusicOnFirstInteraction);
+  setMusicForLevel(1); // 첫 화면(지도)은 1구간 트랙으로 시작
   updateMusicButton();
 
   // ================= 네비게이션 =================
@@ -2132,7 +2238,12 @@
     return { matched, total, score: total > 0 ? Math.round((matched / total) * 100) : 0 };
   };
 
-  if ('serviceWorker' in navigator) {
+  // localhost 로컬 미리보기에서는 서비스워커를 등록하지 않는다 — 한번 등록되면 서버/파일을
+  // 아무리 새로 고쳐도 예전 캐시를 계속 우선해서 보여줘서 로컬 테스트할 때마다 혼란을 준다
+  // (2026-08-09, 사용자가 로컬 미리보기에서 계속 옛날 버전만 보이던 문제로 발견). 실제 배포
+  // 사이트(localhost가 아닌 진짜 도메인)에서는 그대로 정상 등록된다.
+  const isLocalPreview = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if ('serviceWorker' in navigator && !isLocalPreview) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js').catch(() => {});
     });

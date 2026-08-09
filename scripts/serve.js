@@ -19,7 +19,10 @@ http.createServer((req, res) => {
   const full = path.join(ROOT, p);
   fs.readFile(full, (err, data) => {
     if (err) { res.writeHead(404); res.end('not found'); return; }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(full)] || 'application/octet-stream' });
+    res.writeHead(200, {
+      'Content-Type': MIME[path.extname(full)] || 'application/octet-stream',
+      'Cache-Control': 'no-store' // 미리보기는 항상 최신 파일을 봐야 하므로 브라우저 캐시 금지
+    });
     res.end(data);
   });
 }).listen(PORT, () => console.log('serving on http://localhost:' + PORT));
