@@ -1,3 +1,4 @@
 node_modules/
-scripts/_test-*.js
+scripts/_*.js
+_goal-*.png
 *.log

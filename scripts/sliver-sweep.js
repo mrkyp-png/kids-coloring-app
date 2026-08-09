@@ -3,7 +3,7 @@
 const path = require('path');
 const puppeteer = require('puppeteer-core');
 const EDGE_PATH = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-const INDEX_URL = 'file:///' + path.resolve(__dirname, '..', 'index.html').replace(/\\/g, '/');
+const INDEX_URL = process.env.LOCAL_SERVER_URL || ('file:///' + path.resolve(__dirname, '..', 'index.html').replace(/\\/g, '/'));
 const SLIVER_THRESHOLD = 10;
 
 (async () => {

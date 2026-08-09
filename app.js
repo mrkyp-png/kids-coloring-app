@@ -960,14 +960,12 @@
 
   function loadTemplateSource(tpl, callback) {
     if (tpl.renderMode === 'emoji' || tpl.renderMode === 'svgArt') {
-      // 'svgArt'(파이널 보스 등 손으로 그린 오리지널 일러스트)는 이모지 글자 대신 tpl.svgArt 마크업을
-      // 그대로 그린다 — 그 아래 벽(선) 인식/영역 분리/팔레트 스냅 파이프라인은 완전히 동일하게 재사용.
-      const bodyMarkup = tpl.renderMode === 'svgArt'
-        ? tpl.svgArt
-        : '<text x="200" y="300" font-size="320" text-anchor="middle">' + tpl.emoji + '</text>';
-      const svgMarkup =
-        '<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">' + bodyMarkup + '</svg>';
-      const svgUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgMarkup);
+      // 'svgArt'(파이널 보스 등 손으로 그린 오리지널 일러스트)는 tpl.svgArt 마크업을 그대로 그린다.
+      // 'emoji'는 기기 시스템 폰트로 이모지 글자를 그리던 예전 방식 대신, 미리 내려받아 둔 Twemoji
+      // SVG 파일(assets/emoji/<id>.svg)을 직접 불러온다 — 시스템 폰트에 맡기면 기기마다(Windows
+      // Segoe UI Emoji vs 안드로이드 Noto/제조사 이모지) 그림 모양이 달라져서 선/색칠영역 자동 인식
+      // 결과가 기기별로 어긋나는 문제가 있었다(2026-08-09 발견). Twemoji 파일을 앱에 내장해두면
+      // 어떤 기기에서 열어도 항상 동일한 소스 이미지로 렌더링된다.
       const img = new Image();
       img.onload = () => {
         const rawC = document.createElement('canvas');
@@ -986,25 +984,84 @@
             const i = p * 4;
             const a = data[i + 3];
             const maxCh = Math.max(data[i], data[i + 1], data[i + 2]);
-            let isWall = a > ALPHA_WALL_THRESHOLD && maxCh < EMOJI_DARK_THRESHOLD;
+            // 반투명(안티에일리어싱) 픽셀은 그 자체로 실루엣 경계라는 뜻이므로, 이웃과 색이 얼마나
+            // 다른지 계산할 필요 없이 곧장 벽으로 취급한다 — 완만한(여러 픽셀에 걸친) 그라데이션
+            // 경계는 이웃-비교 방식만으론 못 잡을 때가 있어서(2026-08-09, tree 몸통이 배경과 이어져
+            // 안 잡히던 문제) 알파값만으로 판단하는 이 경로를 추가했다.
+            const isPartialAlpha = a > ALPHA_WALL_THRESHOLD && a < 250;
+            let isWall = isPartialAlpha || (a > ALPHA_WALL_THRESHOLD && maxCh < EMOJI_DARK_THRESHOLD);
             if (!isWall && a > ALPHA_WALL_THRESHOLD) {
               // 부드러운 그라데이션 경계는 바로 옆 픽셀 차이만으론 못 잡을 수 있어 2px 떨어진 픽셀과도 비교한다.
-              const offsets = [1, 2];
+              // 오른쪽/아래쪽뿐 아니라 왼쪽/위쪽 이웃도 반드시 봐야 한다 — 검은 테두리 선이 없는(Twemoji
+              // 같은 플랫 디자인) 도형은 오른쪽/아래쪽만 보면 실루엣의 위/왼쪽 변이 통째로 안 잡혀서
+              // 배경과 하나로 뭉쳐버리는 문제가 있었다(2026-08-09, cactus에서 발견).
+              const offsets = [1, 2, 4];
               for (let k = 0; k < offsets.length && !isWall; k++) {
                 const o = offsets[k];
                 if (x < W - o) {
                   const j = (p + o) * 4;
                   const dr = data[i] - data[j], dg = data[i + 1] - data[j + 1], db = data[i + 2] - data[j + 2];
-                  if (Math.sqrt(dr * dr + dg * dg + db * db) > EDGE_THRESHOLD) isWall = true;
+                  const da = data[i + 3] - data[j + 3];
+                  if (Math.sqrt(dr * dr + dg * dg + db * db) > EDGE_THRESHOLD || Math.abs(da) > EDGE_THRESHOLD) isWall = true;
+                }
+                if (!isWall && x >= o) {
+                  const j = (p - o) * 4;
+                  const dr = data[i] - data[j], dg = data[i + 1] - data[j + 1], db = data[i + 2] - data[j + 2];
+                  const da = data[i + 3] - data[j + 3];
+                  if (Math.sqrt(dr * dr + dg * dg + db * db) > EDGE_THRESHOLD || Math.abs(da) > EDGE_THRESHOLD) isWall = true;
                 }
                 if (!isWall && y < H - o) {
                   const j = (p + o * W) * 4;
                   const dr = data[i] - data[j], dg = data[i + 1] - data[j + 1], db = data[i + 2] - data[j + 2];
-                  if (Math.sqrt(dr * dr + dg * dg + db * db) > EDGE_THRESHOLD) isWall = true;
+                  const da = data[i + 3] - data[j + 3];
+                  if (Math.sqrt(dr * dr + dg * dg + db * db) > EDGE_THRESHOLD || Math.abs(da) > EDGE_THRESHOLD) isWall = true;
+                }
+                if (!isWall && y >= o) {
+                  const j = (p - o * W) * 4;
+                  const dr = data[i] - data[j], dg = data[i + 1] - data[j + 1], db = data[i + 2] - data[j + 2];
+                  const da = data[i + 3] - data[j + 3];
+                  if (Math.sqrt(dr * dr + dg * dg + db * db) > EDGE_THRESHOLD || Math.abs(da) > EDGE_THRESHOLD) isWall = true;
                 }
               }
             }
             rawWall[p] = isWall ? 1 : 0;
+          }
+        }
+
+        // 1.5단계: 실루엣 바깥 경계를 알파값만으로 별도 확정한다. 위의 색상-비교 방식은 그라데이션
+        // 폭이 넓거나 미묘하면 틈을 놓칠 수 있어(2026-08-09, tree 도안에서 몸통이 배경과 이어져
+        // 통째로 "배경"으로 오인되던 문제 — 나무 몸통이 색칠 영역에서 통째로 빠졌었다) 캔버스
+        // 테두리에서부터 "불투명하지 않은(alpha<=threshold)" 픽셀만 타고 BFS로 퍼뜨려 진짜 배경을
+        // 알파 마스크만으로(색 비교 없이) 확정하고, 그 배경과 맞닿은 불투명 픽셀은 전부 벽으로
+        // 편입한다 — 그라데이션 폭에 상관없이 항상 실루엣이 완전히 막히는 것을 보장한다.
+        {
+          const outside = new Uint8Array(W * H);
+          const q2 = new Int32Array(W * H);
+          let qh2 = 0, qt2 = 0;
+          const pushIfOutside = (idx) => {
+            if (outside[idx]) return;
+            if (data[idx * 4 + 3] <= ALPHA_WALL_THRESHOLD) {
+              outside[idx] = 1;
+              q2[qt2++] = idx;
+            }
+          };
+          for (let x = 0; x < W; x++) { pushIfOutside(x); pushIfOutside((H - 1) * W + x); }
+          for (let y = 0; y < H; y++) { pushIfOutside(y * W); pushIfOutside(y * W + W - 1); }
+          while (qh2 < qt2) {
+            const cur = q2[qh2++];
+            const cx = cur % W, cy = (cur / W) | 0;
+            if (cx > 0) pushIfOutside(cur - 1);
+            if (cx < W - 1) pushIfOutside(cur + 1);
+            if (cy > 0) pushIfOutside(cur - W);
+            if (cy < H - 1) pushIfOutside(cur + W);
+          }
+          for (let p = 0; p < W * H; p++) {
+            if (outside[p] || rawWall[p] === 1) continue;
+            const x = p % W, y = (p / W) | 0;
+            const touchesOutside =
+              (x > 0 && outside[p - 1]) || (x < W - 1 && outside[p + 1]) ||
+              (y > 0 && outside[p - W]) || (y < H - 1 && outside[p + W]);
+            if (touchesOutside) rawWall[p] = 1;
           }
         }
 
@@ -1072,7 +1129,7 @@
         // 2.5단계: 하이라이트 같은 약한 색 경계는 군데군데 끊어진 채 벽으로 잡혀 점선처럼 보인다.
         // 닫힌 도형을 이루지 못할 만큼 작고 고립된 벽 조각은 노이즈로 보고 지운다(선 레이어에서도 제거).
         {
-          const WALL_NOISE_MIN = window.__DEBUG_COLOR__ ? 0 : 15;
+          const WALL_NOISE_MIN = window.__DEBUG_COLOR__ ? 0 : 6;
           const visited = new Uint8Array(W * H);
           const compSizes = [];
           for (let start = 0; start < W * H; start++) {
@@ -1301,7 +1358,11 @@
         callback(wall, lineC, sampledColors);
         } // continueProcessing 끝
       };
-      img.src = svgUrl;
+      img.src = tpl.renderMode === 'svgArt'
+        ? 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+            '<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">' + tpl.svgArt + '</svg>'
+          )
+        : 'assets/emoji/' + tpl.id + '.svg';
     } else {
       const svgMarkup = buildSvgMarkup(tpl);
       const svgUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgMarkup);
@@ -1435,9 +1496,32 @@
       }
     }
 
-    // 가장 큰 영역(도안 바깥의 배경)은 채점 및 목표 이미지에서 제외 — 나머지가 실제 "그림 부분"
-    regions.sort((a, b) => b.size - a.size);
-    const withoutBackground = regions.length > 1 ? regions.slice(1) : regions;
+    // 배경 식별: 예전엔 "가장 큰 영역 = 배경"으로 가정했지만, Twemoji처럼 그림이 캔버스 대부분을
+    // 꽉 채우는 소스(예: cactus)에서는 그림 몸통 자체가 배경보다 커져서 이 가정이 깨진다(2026-08-09
+    // 발견 — cactus 몸통이 배경으로 오인되어 목표 이미지에서 색이 빠지고 채점도 안 되던 버그).
+    // 대신 "캔버스 테두리에 실제로 닿아있는 영역"을 배경으로 본다 — 그림은 항상 여백 안에 그려지므로
+    // 크기와 무관하게 더 정확하다.
+    const borderLabels = new Set();
+    for (let x = 0; x < WORK_SIZE; x++) {
+      const top = labelMap[x];
+      const bottom = labelMap[(WORK_SIZE - 1) * WORK_SIZE + x];
+      if (top !== -1) borderLabels.add(top);
+      if (bottom !== -1) borderLabels.add(bottom);
+    }
+    for (let y = 0; y < WORK_SIZE; y++) {
+      const left = labelMap[y * WORK_SIZE];
+      const right = labelMap[y * WORK_SIZE + WORK_SIZE - 1];
+      if (left !== -1) borderLabels.add(left);
+      if (right !== -1) borderLabels.add(right);
+    }
+    let withoutBackground = regions.filter((r) => !borderLabels.has(r.label));
+    // 안전장치: 그림이 캔버스 끝까지 꽉 채워서 테두리 판정으로 아무것도 못 거른 극단적인 경우엔
+    // 예전 방식(가장 큰 영역 하나만 배경 취급)으로 폴백한다.
+    if (withoutBackground.length === regions.length && regions.length > 1) {
+      const sorted = regions.slice().sort((a, b) => b.size - a.size);
+      const biggestLabel = sorted[0].label;
+      withoutBackground = regions.filter((r) => r.label !== biggestLabel);
+    }
     // 겹치는 도형 경계에서 생기는 눈에 안 보이는 미세 슬리버(탭 불가능)는 채점 대상에서 제외
     const gradable = withoutBackground.filter((r) => r.size >= MIN_REGION_SIZE);
     return { labelMap, gradable };
