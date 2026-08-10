@@ -457,10 +457,12 @@ button:active { transform: scale(0.94); }
 .palette { grid-column: 2; grid-row: 2 / 4; }
 .toolbar { grid-column: 1 / -1; grid-row: 4; }
 .coloring-header {
+  /* 2026-08-10: "이미지를 최대한 키워달라, 아이콘과 안 겹치는 조건" — 아이콘 크기(56px, 탭 타겟)는
+     그대로 두고 순수 여백만 줄여서 goal/canvas 행에 세로 공간을 더 돌려줌. */
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 4px 12px;
 }
 .coloring-title {
   margin: 0;
@@ -502,7 +504,7 @@ button:active { transform: scale(0.94); }
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
+  padding: 2px; /* canvas-wrap과 반드시 동일해야 함(안 그러면 둘이 다시 어긋남) */
   container-type: size;
 }
 .goal-canvas-wrap {
@@ -531,7 +533,7 @@ button:active { transform: scale(0.94); }
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
+  padding: 2px; /* .goal-panel과 반드시 동일해야 함(안 그러면 둘이 다시 어긋남) */
   min-height: 0;
   min-width: 0;
   overflow: hidden;
@@ -592,7 +594,7 @@ button:active { transform: scale(0.94); }
   /* 2026-08-10: "그림영역을 최대한 키워줘"로 절반 크기로 축소해서 캔버스 쪽에 세로 공간을 더 줌. */
   display: flex;
   gap: 6px;
-  padding: 5px 14px 8px;
+  padding: 3px 14px 6px;
 }
 .tool-btn {
   flex: 1;
