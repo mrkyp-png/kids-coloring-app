@@ -865,6 +865,7 @@
   });
 
   btnLevelNext.addEventListener('click', () => {
+    speakPraise('Next!');
     const nextLevel = currentLevel + 1;
     if (nextLevel <= TOTAL_LEVELS && isLevelUnlocked(nextLevel)) {
       openLevel(nextLevel);
@@ -874,6 +875,7 @@
   });
 
   btnLevelBack.addEventListener('click', () => {
+    speakPraise('Back!');
     if (currentLevel > 1) openLevel(currentLevel - 1);
   });
 
@@ -966,6 +968,7 @@
     goalEmoji.textContent = tpl.emoji;
     galleryScreen.hidden = true;
     coloringScreen.hidden = false;
+    speakPraise(tpl.name); // 색칠화면 들어올 때마다 무슨 그림인지 이름을 읽어줌
 
     loadTemplateSource(tpl, (wall, lineSource, sampledColors) => {
       // 선(윤곽선) 레이어
