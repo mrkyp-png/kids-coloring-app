@@ -491,42 +491,42 @@ button:active { transform: scale(0.94); }
   /* 위 #coloring-screen 주석 참고. flex/min-height:0/overflow:hidden은 grid 셀 안에서 이
      박스가 실제로 줄어들 수 있게 하는 부분, container-type:size는 아래 .goal-canvas-wrap이
      cqw/cqh로 정사각형을 유지하며 줄어들 수 있게 하는 부분. 팔레트가 이제 별도 grid 열이라
-     canvas-wrap과 같은 열 폭을 자연히 공유함 — 예전에 여기 있던 118px 패딩 땜빵은 필요 없어짐. */
+     canvas-wrap과 같은 열 폭을 자연히 공유함 — 예전에 여기 있던 118px 패딩 땜빵은 필요 없어짐.
+     2026-08-10: padding을 canvas-wrap과 똑같이 대칭(6px 전체)으로, align-items/justify-content도
+     canvas-wrap과 똑같이 명시 — 예전엔 오른쪽만 padding 있고 align-items도 없어서(기본값 stretch가
+     명시적 높이 앞에서 flex-start로 무너짐) 목표 이미지가 캔버스랑 살짝 어긋나 보였음(세로 중앙
+     정렬 요청으로 발견). */
   flex: 1;
   min-height: 0;
   overflow: hidden;
   display: flex;
-  padding: 6px 6px 6px 0;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
   container-type: size;
 }
 .goal-canvas-wrap {
   width: min(100cqw, 100cqh, 420px);
   height: min(100cqw, 100cqh, 420px);
-  margin: 2px auto 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-md);
-  background: #ffffff;
-  box-shadow: var(--shadow);
 }
 .goal-emoji {
   font-size: min(64vw, 340px);
   line-height: 1;
 }
 .goal-canvas {
+  /* 2026-08-10: "캔버스를 지우고 물체만 나오게" — 흰 배경/그림자/테두리 카드 다 제거. 도안
+     비그림 영역은 애초에 투명 픽셀로 그려지므로(renderGoalPreview) 배경만 없애면 그림만 남음. */
   width: 100%;
   height: 100%;
-  border-radius: var(--radius-md);
-  background: #ffffff;
-  box-shadow: var(--shadow);
-  border: 3px solid var(--brand-soft);
   display: block;
 }
 
 .canvas-wrap {
-  /* 2026-08-10: 캔버스 바깥 wrap에 흰 배경을 준 게 이상해 보인다는 피드백으로 되돌림 — 흰색은
-     실제 캔버스(#fill-canvas)만 갖고, wrap 자체는 다시 투명(페이지 배경 그대로 비침). */
+  /* 2026-08-10: "캔버스를 지우고 물체만 나오게" 요청으로 흰 배경 카드 완전히 제거(wrap도,
+     #fill-canvas 자체도) — 안 칠한 영역은 페이지 배경(크림색)이 그대로 비쳐 보임. */
   position: relative;
   display: flex;
   align-items: center;
@@ -543,7 +543,6 @@ button:active { transform: scale(0.94); }
   height: min(100cqw, 100cqh, 420px);
   border-radius: var(--radius-lg);
 }
-#fill-canvas { background: #ffffff; box-shadow: var(--shadow); }
 #line-canvas { pointer-events: none; }
 .tap-layer {
   position: absolute;
