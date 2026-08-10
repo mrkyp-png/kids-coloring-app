@@ -599,16 +599,18 @@ button:active { transform: scale(0.94); }
   background: var(--card-bg);
   box-shadow: var(--shadow);
   border-radius: var(--radius-md);
-  padding: 6px 4px;
+  padding: 7px 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  font-size: 0.8rem;
-  min-height: 32px;
+  font-size: 0.9rem;
+  min-height: 38px;
   color: var(--ink);
 }
-.tool-btn span { font-size: 0.4rem; font-weight: 600; }
+/* 2026-08-10: "셀 안에서 안 벗어나는 수준으로 최대한 크게" — 0.4rem(거의 안 보임)이었던 걸 버튼
+   폭 안에서 "Undo/Clear/Done!" 다 안 잘리고 안 줄바꿈되는 한도까지 키움. */
+.tool-btn span { font-size: 0.68rem; font-weight: 600; white-space: nowrap; }
 .tool-btn-primary {
   background: var(--good);
   color: #fff;
@@ -947,5 +949,6 @@ button:active { transform: scale(0.94); }
     --brand: #A79CFF;
     --brand-soft: #35305A;
   }
-  #fill-canvas { background: #2A2640; }
+  /* #fill-canvas는 이제 배경 없음(투명) — "캔버스 지우고 물체만" 요청으로 라이트/다크 둘 다
+     제거해야 함. 여기 남아있던 다크모드 전용 배경을 놓쳐서 다크모드에서만 카드가 계속 보였음. */
 }

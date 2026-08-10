@@ -1,4 +1,4 @@
-const CACHE_NAME = 'coloring-app-v53';
+const CACHE_NAME = 'coloring-app-v54';
 const APP_SHELL = [
   './',
   './index.html',
