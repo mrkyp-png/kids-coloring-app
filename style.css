@@ -34,6 +34,7 @@ html, body {
 
 button {
   font-family: inherit;
+  color: inherit;
   border: none;
   background: none;
   cursor: pointer;
@@ -266,21 +267,6 @@ button:active { transform: scale(0.94); }
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--brand);
-}
-.level-reset-mini {
-  position: absolute;
-  top: -8px;
-  left: -8px;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: var(--shadow);
-  font-size: 0.95rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
 }
 .level-node {
   position: relative;

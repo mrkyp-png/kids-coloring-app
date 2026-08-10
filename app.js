@@ -39,6 +39,8 @@
   const RANKING_KEY = 'rankingEntries'; // [{name, country, mode, seconds, date}] — 10레벨 전부(같은 모드로) 클리어한 기록
   const PLAYER_KEY = 'playerProfile'; // {name, country} — Start 버튼 직후 1회 입력, 이후 랭킹 등록 시 재사용
 
+  migrateLegacyProgress(); // 모드별 분리 저장 도입 전 기존 기록을 easy 모드로 1회 이관
+
   // ---------- 상태 ----------
   let currentTemplate = null;
   let currentLevel = null;
@@ -70,7 +72,6 @@
   const levelNextText = document.getElementById('level-next-text');
   const btnLevelNext = document.getElementById('btn-level-next');
   const btnLevelBack = document.getElementById('btn-level-back');
-  const btnLevelReset = document.getElementById('btn-level-reset');
   const btnResetAll = document.getElementById('btn-reset-all');
   const modeButtons = Array.from(document.querySelectorAll('.mode-btn'));
   const coloringTimerText = document.getElementById('coloring-timer-text');
@@ -147,43 +148,70 @@
   const TARGET_PALETTE = COLORS.filter((c) => c !== WHITE_SUBSTITUTE);
 
   // ================= 진행 상황(시도/만점) =================
-  // clearedTemplates: "한 번이라도 시도해서 저장한" 도안(만점 여부와 무관 — X 표시용)
-  function getClearedSet() {
+  // 점수/클리어 기록은 모드별로 완전히 분리 저장한다 — { [mode]: { ...기존 형태... } }.
+  // (쉬움 모드에서 만점 찍은 도안이 보통/어려움 모드로 넘어가도 그대로 "클리어됨"으로 보이는 걸 막기 위함)
+  function getAllScores() {
+    try { return JSON.parse(localStorage.getItem(SCORES_KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function saveAllScores(all) {
+    try { localStorage.setItem(SCORES_KEY, JSON.stringify(all)); } catch (e) { /* 저장 공간 부족 시 무시 */ }
+  }
+  function getAllCleared() {
+    try { return JSON.parse(localStorage.getItem(CLEARED_KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function saveAllCleared(all) {
+    try { localStorage.setItem(CLEARED_KEY, JSON.stringify(all)); } catch (e) { /* 저장 공간 부족 시 무시 */ }
+  }
+
+  // 예전 버전은 templateScores/clearedTemplates가 모드 구분 없이 저장됐다 — 최초 실행 시
+  // 그 기존 기록을 easy 모드 소유로 한 번만 옮겨준다(기존 유저 진행 상황 보존).
+  function migrateLegacyProgress() {
     try {
-      return new Set(JSON.parse(localStorage.getItem(CLEARED_KEY) || '[]'));
-    } catch (e) {
-      return new Set();
-    }
+      const raw = JSON.parse(localStorage.getItem(SCORES_KEY) || '{}');
+      const keys = Object.keys(raw);
+      const looksLegacy = keys.length > 0 && !keys.some((k) => k in MODES);
+      if (looksLegacy) localStorage.setItem(SCORES_KEY, JSON.stringify({ easy: raw }));
+    } catch (e) { /* 무시 */ }
+    try {
+      const raw = JSON.parse(localStorage.getItem(CLEARED_KEY) || '[]');
+      if (Array.isArray(raw) && raw.length > 0) {
+        localStorage.setItem(CLEARED_KEY, JSON.stringify({ easy: raw }));
+      }
+    } catch (e) { /* 무시 */ }
+  }
+
+  // clearedTemplates: "한 번이라도 시도해서 저장한" 도안(만점 여부와 무관 — X 표시용)
+  function getClearedSet(mode) {
+    const all = getAllCleared();
+    return new Set(all[mode || getMode()] || []);
   }
 
   function markCleared(tplId) {
-    const set = getClearedSet();
+    const mode = getMode();
+    const all = getAllCleared();
+    const set = new Set(all[mode] || []);
     set.add(tplId);
-    try {
-      localStorage.setItem(CLEARED_KEY, JSON.stringify(Array.from(set)));
-    } catch (e) { /* 저장 공간 부족 시 무시 */ }
+    all[mode] = Array.from(set);
+    saveAllCleared(all);
   }
 
   function getTemplatesForLevel(level) {
     return COLORING_TEMPLATES.filter((t) => t.difficulty === level);
   }
 
-  // 도안별 "가장 잘 한" 점수(재도전해도 낮은 점수로 안 떨어지게 최고점 유지)
-  function getScores() {
-    try {
-      return JSON.parse(localStorage.getItem(SCORES_KEY) || '{}');
-    } catch (e) {
-      return {};
-    }
+  // 도안별 "가장 잘 한" 점수(재도전해도 낮은 점수로 안 떨어지게 최고점 유지) — 현재 모드 기준
+  function getScores(mode) {
+    const all = getAllScores();
+    return all[mode || getMode()] || {};
   }
 
   function saveScoreIfBest(tplId, score) {
-    const scores = getScores();
+    const mode = getMode();
+    const all = getAllScores();
+    const scores = all[mode] || (all[mode] = {});
     if (!(tplId in scores) || score > scores[tplId]) {
       scores[tplId] = score;
-      try {
-        localStorage.setItem(SCORES_KEY, JSON.stringify(scores));
-      } catch (e) { /* 저장 공간 부족 시 무시 */ }
+      saveAllScores(all);
     }
   }
 
@@ -213,30 +241,51 @@
     return isLevelCleared(level - 1, scores);
   }
 
-  // 특정 레벨의 도안 점수/시도 기록만 지운다(그 레벨과 그 이후 레벨의 진행 상황이 초기화됨).
+  // 특정 레벨의 도안 점수/시도 기록만 지운다(그 레벨과 그 이후 레벨의 진행 상황이 초기화됨) — 현재 모드만.
   function resetLevelProgress(level) {
+    const mode = getMode();
     const list = getTemplatesForLevel(level);
     const ids = new Set(list.map((t) => t.id));
-    const scores = getScores();
+
+    const allScores = getAllScores();
+    const scores = allScores[mode] || {};
     ids.forEach((id) => { delete scores[id]; });
-    try { localStorage.setItem(SCORES_KEY, JSON.stringify(scores)); } catch (e) { /* 무시 */ }
-    const cleared = getClearedSet();
+    allScores[mode] = scores;
+    saveAllScores(allScores);
+
+    const allCleared = getAllCleared();
+    const cleared = new Set(allCleared[mode] || []);
     ids.forEach((id) => cleared.delete(id));
-    try { localStorage.setItem(CLEARED_KEY, JSON.stringify(Array.from(cleared))); } catch (e) { /* 무시 */ }
+    allCleared[mode] = Array.from(cleared);
+    saveAllCleared(allCleared);
+
     const times = getLevelTimes();
     if (level in times) { delete times[level]; saveLevelTimes(times); }
   }
 
-  // 전체 진행 상황(모든 레벨의 점수/시도 기록)을 지우고 처음부터 다시 시작할 수 있게 한다.
-  function resetAllProgress() {
-    try {
-      localStorage.removeItem(SCORES_KEY);
-      localStorage.removeItem(CLEARED_KEY);
-      localStorage.removeItem(LEVEL_ATTEMPTS_KEY);
-      localStorage.removeItem(LEVEL_TIMES_KEY);
-      localStorage.removeItem(BOSS_ATTEMPTS_KEY);
-      localStorage.removeItem(BOSS_CLEARED_KEY);
-    } catch (e) { /* 무시 */ }
+  // 그 모드의 진행 상황(점수/클리어/보스)만 지우고 그 모드를 처음부터 다시 시작할 수 있게 한다.
+  // (다른 모드의 기록은 건드리지 않음 — 레벨별 리셋은 없애고 모드 단위로만 리셋 가능하게 통합함, 2026-08-10)
+  function resetModeProgress(mode) {
+    const allScores = getAllScores();
+    delete allScores[mode];
+    saveAllScores(allScores);
+
+    const allCleared = getAllCleared();
+    delete allCleared[mode];
+    saveAllCleared(allCleared);
+
+    const times = getLevelTimes();
+    Object.keys(times).forEach((lv) => {
+      if (getLevelTimeMode(times[lv]) === mode) delete times[lv];
+    });
+    saveLevelTimes(times);
+
+    clearBossAttempt(mode);
+    const bc = getBossClearedMap();
+    delete bc[mode];
+    try { localStorage.setItem(BOSS_CLEARED_KEY, JSON.stringify(bc)); } catch (e) { /* 무시 */ }
+
+    try { localStorage.removeItem(LEVEL_ATTEMPTS_KEY); } catch (e) { /* 무시 */ } // 진행 중이던 타임어택도 함께 정리
   }
 
   // 레벨 10개를 다 완료하는 데 걸린 시간(초) 기록 — 메인 화면 레벨 블록 아래에 표시한다.
@@ -436,7 +485,7 @@
       return;
     }
     try { localStorage.setItem(MODE_KEY, m); } catch (e) { /* 무시 */ }
-    renderModeButtons();
+    renderMap(); // 모드가 바뀌면 레벨 진행 상황(점수/잠금)도 그 모드 것으로 다시 그려야 함
     updateLevelTimerDisplay();
   }
 
@@ -529,12 +578,18 @@
   function resetBossProgress(mode) {
     const tpl = getBossTemplate(mode);
     if (!tpl) return;
-    const scores = getScores();
+    const allScores = getAllScores();
+    const scores = allScores[mode] || {};
     delete scores[tpl.id];
-    try { localStorage.setItem(SCORES_KEY, JSON.stringify(scores)); } catch (e) { /* 무시 */ }
-    const cleared = getClearedSet();
+    allScores[mode] = scores;
+    saveAllScores(allScores);
+
+    const allCleared = getAllCleared();
+    const cleared = new Set(allCleared[mode] || []);
     cleared.delete(tpl.id);
-    try { localStorage.setItem(CLEARED_KEY, JSON.stringify(Array.from(cleared))); } catch (e) { /* 무시 */ }
+    allCleared[mode] = Array.from(cleared);
+    saveAllCleared(allCleared);
+
     const bc = getBossClearedMap();
     delete bc[mode];
     try { localStorage.setItem(BOSS_CLEARED_KEY, JSON.stringify(bc)); } catch (e) { /* 무시 */ }
@@ -662,8 +717,10 @@
     } else {
       statLine.hidden = true;
     }
-    // 10단계(마지막 레벨)까지 전부 만점 클리어했을 때만 "초기화하고 다시 시작" 버튼을 보여준다.
-    btnResetAll.hidden = !isLevelCleared(TOTAL_LEVELS);
+    // 이 모드로 뭔가 한 번이라도 진행한 게 있을 때만 "이 모드 초기화" 버튼을 보여준다.
+    const mode = getMode();
+    btnResetAll.hidden = doneCount === 0;
+    btnResetAll.textContent = '🔄 Reset ' + (MODES[mode] ? MODES[mode].label : mode) + ' Progress';
 
     // 레벨 10까지 몇 레벨 남았는지 안내(아직 다 못 깼을 때만)
     let clearedLevels = 0;
@@ -689,7 +746,6 @@
   // ================= 레벨 지도(맵) =================
   function renderMap() {
     const scores = getScores();
-    const attempts = getLevelAttempts();
     const times = getLevelTimes();
     mapGrid.innerHTML = '';
     for (let lv = 1; lv <= TOTAL_LEVELS; lv++) {
@@ -731,23 +787,6 @@
         timeEl.className = 'lv-time';
         timeEl.textContent = '⏱ ' + formatClearTime(lvSeconds);
         wrap.appendChild(timeEl);
-      }
-
-      // 진행 중이거나 시도한 적 있는(리셋할 게 있는) 레벨엔 지도 화면에서 바로 초기화할 수 있는
-      // 작은 🔄 버튼을 얹는다 — 모드 변경 인터락 때문에, 열어보지 않고도 바로 리셋할 수 있어야 함.
-      if (unlocked && (doneCount > 0 || lv in attempts)) {
-        const resetBtn = document.createElement('button');
-        resetBtn.className = 'level-reset-mini';
-        resetBtn.setAttribute('aria-label', 'Reset Level ' + lv);
-        resetBtn.textContent = '🔄';
-        resetBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          if (!window.confirm('Level ' + lv + '의 점수를 초기화할까요? (이후 레벨의 잠금도 다시 걸릴 수 있어요)')) return;
-          resetLevelProgress(lv);
-          clearLevelAttempt(lv);
-          renderMap();
-        });
-        wrap.appendChild(resetBtn);
       }
 
       mapGrid.appendChild(wrap);
@@ -812,17 +851,11 @@
   renderModeButtons();
 
   btnResetAll.addEventListener('click', () => {
-    if (!window.confirm('정말 모든 진행 상황을 초기화하고 처음부터 다시 시작할까요?')) return;
-    resetAllProgress();
+    const mode = getMode();
+    const label = MODES[mode] ? MODES[mode].label : mode;
+    if (!window.confirm(label + ' 모드의 진행 상황을 전부 초기화하고 처음부터 다시 시작할까요? (다른 모드는 그대로 남아요)')) return;
+    resetModeProgress(mode);
     renderMap();
-  });
-
-  btnLevelReset.addEventListener('click', () => {
-    if (!window.confirm('Level ' + currentLevel + '의 점수를 초기화할까요? (이후 레벨의 잠금도 다시 걸릴 수 있어요)')) return;
-    resetLevelProgress(currentLevel);
-    clearLevelAttempt(currentLevel); // 시간도 완전히 멈춤 — 그림을 다시 열 때 새로 시작됨(모드 변경도 이제 가능)
-    renderLevelGallery();
-    startLevelTimer();
   });
 
   btnLevelNext.addEventListener('click', () => {
@@ -2036,6 +2069,18 @@
   let currentMusicTrackKey = null;
   let bgmFadeTimer = null;
 
+  // 트랙 전환 시 몇 초씩 무음이 나던 문제 대책: 다른 구간 트랙들을 미리 백그라운드에서
+  // 버퍼링해둔다(같은 URL을 나중에 bgm.src에 넣으면 브라우저가 이미 받아둔 걸 재사용해서
+  // 훨씬 빨리 들림). 실제 재생/음소거와 무관하게 조용히 로드만 해두는 용도.
+  function warmUpTrack(key) {
+    const src = pickSrc(MUSIC_TRACKS[key]);
+    if (!src) return;
+    const a = new Audio();
+    a.preload = 'auto';
+    a.src = src;
+    try { a.load(); } catch (e) { /* 무시 */ }
+  }
+
   function isMusicOn() {
     const v = localStorage.getItem(MUSIC_KEY);
     return v === null ? true : v === '1'; // 기본값: 켜짐
@@ -2085,8 +2130,20 @@
     }
     fadeTo(0, BGM_FADE_MS, () => {
       bgm.src = src;
+      bgm.volume = 0;
+      // 음량 페이드인은 "실제로 소리가 나오기 시작한 뒤"에 시작해야 자연스럽다 — play() 호출
+      // 직후엔 아직 버퍼링 중이라 무음일 수 있는데, 그 상태에서 바로 페이드를 돌리면 소리도 없이
+      // 페이드만 끝나버려서 몇 초간 무음처럼 느껴졌던 원인이었다.
+      let fadeInStarted = false;
+      const beginFadeIn = () => {
+        if (fadeInStarted) return;
+        fadeInStarted = true;
+        bgm.removeEventListener('playing', beginFadeIn);
+        fadeTo(BGM_VOLUME, BGM_FADE_MS);
+      };
+      bgm.addEventListener('playing', beginFadeIn);
       bgm.play().catch(() => {});
-      fadeTo(BGM_VOLUME, BGM_FADE_MS);
+      setTimeout(beginFadeIn, 1500); // playing 이벤트가 안 오는 기기 대비 안전장치
     });
   }
 
@@ -2113,6 +2170,7 @@
   document.addEventListener('pointerdown', startMusicOnFirstInteraction);
   setMusicForLevel(1); // 첫 화면(지도)은 1구간 트랙으로 시작
   updateMusicButton();
+  Object.keys(MUSIC_TRACKS).forEach(warmUpTrack); // 나머지 구간 트랙도 미리 버퍼링(전환 시 무음 구간 줄이기)
 
   // ================= 네비게이션 =================
   btnHome.addEventListener('click', goHome);
