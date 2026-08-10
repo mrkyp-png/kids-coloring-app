@@ -426,28 +426,35 @@ button:active { transform: scale(0.94); }
 }
 
 /* ---------- 색칠 화면 ---------- */
-/* 2026-08-10: "목표(goal) 이미지와 실제 색칠 캔버스가 항상 같은 크기여야 한다" + "미세한 부분
-   색 구분이 어렵다" 피드백으로 구조를 바꿈. 세 가지가 맞물려 있어야 제대로 동작함:
-   1) 공유 클래스 .screen은 flex(column)인데, 여기서만 grid로 바꿔서 goal-panel/canvas-wrap이
-      남는 세로공간을 정확히 반반 나눠 갖게 함(flex-grow로는 이 두 구역이 왜인지 50:50으로 안
-      갈렸다 — 원인 불명, min-height:0으로도 안 고쳐짐. grid는 이 문제에서 더 예측 가능했음).
-   2) height:100dvh를 명시(부모처럼 min-height만 주면 "줄어야 할 압박"이 없어서 내용물 크기대로
-      화면이 뷰포트보다 커져버림) + grid-template-rows에 minmax(0,1fr)(bare 1fr은 grid 기본
-      min이 내용물 최소크기라 정사각형 박스를 못 줄임 — flex의 min-height:0과 같은 부류의 문제).
-   3) goal-canvas-wrap과 실제 캔버스(.stack-canvas/.tap-layer) 둘 다 컨테이너 쿼리 단위
-      (cqw/cqh)로 "너비/높이 중 더 좁은 쪽"에 맞춰 정사각형을 유지하며 줄어듦 — 처음엔
-      aspect-ratio로 시도했는데 그건 확정값 쪽(width)을 유도값 쪽(height)이 따라가기만 하고
-      반대로는 안 되는 단방향이라, max-height로 눌렸을 때 옆으로 퍼진 직사각형이 됐었음.
-   행 순서는 DOM 순서와 그대로 대응: 헤더 / goal-panel(1fr) / coloring-area(1fr, 캔버스+팔레트) / toolbar.
-   2026-08-10 추가: "목표 이미지랑 같은 크기 되니 색칠 캔버스가 작아졌다"는 피드백으로 팔레트를
-   캔버스 밑 가로줄에서 캔버스 오른쪽 세로줄로 옮김(.coloring-area) — 팔레트가 쓰던 가로 줄
-   전체가 이제 grid 행 하나 통째로 줄어서, 그 공간이 goal-panel/coloring-area 1fr 몫으로
-   합쳐져 두 정사각형이 이전보다 더 커짐. */
+/* 2026-08-10, 세 차례 피드백이 누적된 구조 — 바꿀 때 아래 순서/이유를 이해하고 손댈 것:
+   1) "목표 이미지와 캔버스가 항상 같은 크기여야" + "미세한 부분 색 구분이 어렵다": 공유 클래스
+      .screen은 flex(column)인데 여기서만 grid로 바꿈(flex-grow로는 goal-panel/canvas-wrap이
+      왜인지 50:50으로 안 갈렸다 — 원인 불명). height:100dvh를 명시(안 그러면 min-height만 있어
+      "줄어야 할 압박"이 없어 내용물 크기대로 뷰포트보다 커짐) + minmax(0,1fr)(bare 1fr은 grid
+      기본 min이 내용물 최소크기라 못 줄어듦). 정사각형 두 개(goal-canvas-wrap, .stack-canvas/
+      .tap-layer)는 컨테이너 쿼리 단위(cqw/cqh)로 "더 좁은 쪽"에 맞춰 정사각형 유지하며 줄어듦
+      — aspect-ratio는 단방향(확정값→유도값)이라 반대 방향엔 안 먹혀서 못 씀.
+   2) "캔버스가 작아졌다": 팔레트를 캔버스 밑 가로줄 → 오른쪽 세로줄로. 처음엔 canvas-wrap하고만
+      같은 행을 공유하게 했더니 goal-panel만 전체 폭을 다 써서 둘이 어긋났고, padding으로 억지로
+      맞췄었음(118px 하드코딩) — 아래 3번에서 더 나은 방법으로 대체됨.
+   3) "팔레트가 캔버스 높이만큼만 있고 헤더 소리 아이콘 높이까지 안 올라온다": 팔레트를 아예 별도
+      grid 열로 분리(2열 구성: 본문 1fr + 팔레트 88px), goal-panel/canvas-wrap 두 행에 걸쳐
+      (grid-row: 2/4) 세로로 길게 배치 — 헤더 바로 밑부터 툴바 바로 위까지 통으로 이어짐. 이러면
+      goal-panel과 canvas-wrap이 다시 같은 열 폭을 그냥 자연히 공유해서 2번의 118px 패딩 땜빵이
+      더 이상 필요 없어짐(삭제함) — 훨씬 깔끔한 해법이라 이 방식을 기본으로 유지할 것. */
 #coloring-screen {
   display: grid;
   height: 100dvh;
-  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: 1fr 88px;
+  /* 2026-08-10: "색칠하는 게 목적이니 색칠 이미지가 최대한 커야" — goal:canvas를 1:1이 아니라
+     1:2로 줘서 실제로 칠하는 캔버스가 목표 이미지보다 눈에 띄게 크게. */
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 2fr) auto;
 }
+.coloring-header { grid-column: 1 / -1; grid-row: 1; }
+.goal-panel { grid-column: 1; grid-row: 2; }
+.canvas-wrap { grid-column: 1; grid-row: 3; }
+.palette { grid-column: 2; grid-row: 2 / 4; }
+.toolbar { grid-column: 1 / -1; grid-row: 4; }
 .coloring-header {
   display: flex;
   align-items: center;
@@ -480,21 +487,15 @@ button:active { transform: scale(0.94); }
 }
 
 .goal-panel {
-  /* 위 #coloring-screen 주석 참고. flex/min-height:0/overflow:hidden은 grid 행 안에서 이
+  /* 위 #coloring-screen 주석 참고. flex/min-height:0/overflow:hidden은 grid 셀 안에서 이
      박스가 실제로 줄어들 수 있게 하는 부분, container-type:size는 아래 .goal-canvas-wrap이
-     cqw/cqh로 정사각형을 유지하며 줄어들 수 있게 하는 부분.
-     오른쪽 padding(palette-width+gap)은 .coloring-area가 팔레트 때문에 실제로 갖는 폭과
-     맞춰주는 용도 — 안 그러면 캔버스는 팔레트만큼 좁아진 자기 행에 맞춰 작아지는데 goal은 그대로
-     넓은 행을 다 써서 둘이 서로 달라짐(캔버스를 키우는 게 목적이라, goal 쪽을 캔버스에 맞춰
-     좁혀서 크기를 다시 맞춤 — 캔버스 자체는 안 줄임). */
+     cqw/cqh로 정사각형을 유지하며 줄어들 수 있게 하는 부분. 팔레트가 이제 별도 grid 열이라
+     canvas-wrap과 같은 열 폭을 자연히 공유함 — 예전에 여기 있던 118px 패딩 땜빵은 필요 없어짐. */
   flex: 1;
   min-height: 0;
   overflow: hidden;
   display: flex;
-  /* 118px = 팔레트(88) + coloring-area/canvas-wrap 쪽 gap·padding 합(6+12+12); 위아래 6px씩 =
-     canvas-wrap 자기 padding(6px×2)과 맞춤. .coloring-area/.canvas-wrap 쪽 수치를 바꾸면 여기도
-     같이 맞춰야 함(자동 계산 아님, 수치 두 곳에 하드코딩돼 있음). */
-  padding: 6px 118px 6px 0;
+  padding: 6px 6px 6px 0;
   container-type: size;
 }
 .goal-canvas-wrap {
@@ -522,17 +523,8 @@ button:active { transform: scale(0.94); }
   display: block;
 }
 
-.coloring-area {
-  /* 캔버스(왼쪽, 남는 폭 전부) + 팔레트(오른쪽, 세로 줄) — 이 div 하나가 grid의 1fr 행 하나를 씀. */
-  display: flex;
-  flex-direction: row;
-  min-height: 0;
-  gap: 6px;
-  padding: 0 6px;
-}
 .canvas-wrap {
   position: relative;
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -540,6 +532,9 @@ button:active { transform: scale(0.94); }
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+  border-radius: var(--radius-md);
+  background: #ffffff; /* .goal-canvas-wrap과 맞춤 — 안 그러면 padding 여백에 페이지 배경색(크림)이 비쳐 보임 */
+  box-shadow: var(--shadow);
   container-type: size; /* .goal-canvas-wrap과 같은 이유 — 이하 정사각형들이 cqw/cqh로 줄어듦 */
 }
 .stack-canvas {
@@ -562,8 +557,10 @@ button:active { transform: scale(0.94); }
   /* 2026-08-10: 캔버스 밑 가로줄 → 캔버스 오른쪽 세로줄로 변경(색칠 캔버스 공간을 최대한 확보하려는
      요청) — 색이 늘어나면(레벨 오를수록 최대 11개) 세로로 다 안 들어갈 수 있어서 세로 스크롤.
      너비 88px = 스와치 지름(52+테두리4*2=60px) + 선택 표시 링(::after, inset:-6px 이므로 양쪽
-     6px씩 더 필요=72px) + 좌우 패딩 8px씩 — 링이 overflow-x:hidden에 안 잘리게. */
-  flex: 0 0 auto;
+     6px씩 더 필요=72px) + 좌우 패딩 8px씩 — 링이 overflow-x:hidden에 안 잘리게.
+     grid-row:2/4로 goal-panel+canvas-wrap 두 행에 걸쳐서 헤더 바로 밑부터 툴바 바로 위까지
+     이어짐(#coloring-screen 규칙 참고) — 그래서 width도 grid-template-columns의 88px 트랙과
+     맞춰져 있어야 함(둘 다 88이어야 함, 하드코딩 두 곳). */
   width: 88px;
   display: flex;
   flex-direction: column;
@@ -593,25 +590,26 @@ button:active { transform: scale(0.94); }
 }
 
 .toolbar {
+  /* 2026-08-10: "그림영역을 최대한 키워줘"로 절반 크기로 축소해서 캔버스 쪽에 세로 공간을 더 줌. */
   display: flex;
-  gap: 10px;
-  padding: 10px 14px 16px;
+  gap: 6px;
+  padding: 5px 14px 8px;
 }
 .tool-btn {
   flex: 1;
   background: var(--card-bg);
   box-shadow: var(--shadow);
   border-radius: var(--radius-md);
-  padding: 12px 8px;
+  padding: 6px 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  font-size: 1.6rem;
-  min-height: 64px;
+  gap: 1px;
+  font-size: 0.8rem;
+  min-height: 32px;
   color: var(--ink);
 }
-.tool-btn span { font-size: 0.8rem; font-weight: 600; }
+.tool-btn span { font-size: 0.4rem; font-weight: 600; }
 .tool-btn-primary {
   background: var(--good);
   color: #fff;
