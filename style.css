@@ -446,9 +446,10 @@ button:active { transform: scale(0.94); }
   display: grid;
   height: 100dvh;
   grid-template-columns: 1fr 88px;
-  /* 2026-08-10: "색칠하는 게 목적이니 색칠 이미지가 최대한 커야" — goal:canvas를 1:1이 아니라
-     1:2로 줘서 실제로 칠하는 캔버스가 목표 이미지보다 눈에 띄게 크게. */
-  grid-template-rows: auto minmax(0, 1fr) minmax(0, 2fr) auto;
+  /* 2026-08-10: 한 차례 1:2(캔버스 우선)로 줬다가, "목표 이미지도 최대한 키워달라"는 후속
+     피드백으로 다시 1:1로 — 팔레트가 이미 별도 열로 빠지고 툴바도 반으로 줄어든 상태라
+     1:1이어도 원래보다 둘 다 훨씬 큼. */
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto;
 }
 .coloring-header { grid-column: 1 / -1; grid-row: 1; }
 .goal-panel { grid-column: 1; grid-row: 2; }
@@ -524,6 +525,8 @@ button:active { transform: scale(0.94); }
 }
 
 .canvas-wrap {
+  /* 2026-08-10: 캔버스 바깥 wrap에 흰 배경을 준 게 이상해 보인다는 피드백으로 되돌림 — 흰색은
+     실제 캔버스(#fill-canvas)만 갖고, wrap 자체는 다시 투명(페이지 배경 그대로 비침). */
   position: relative;
   display: flex;
   align-items: center;
@@ -532,9 +535,6 @@ button:active { transform: scale(0.94); }
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  border-radius: var(--radius-md);
-  background: #ffffff; /* .goal-canvas-wrap과 맞춤 — 안 그러면 padding 여백에 페이지 배경색(크림)이 비쳐 보임 */
-  box-shadow: var(--shadow);
   container-type: size; /* .goal-canvas-wrap과 같은 이유 — 이하 정사각형들이 cqw/cqh로 줄어듦 */
 }
 .stack-canvas {
