@@ -2072,14 +2072,20 @@
     loadVoices();
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }
+  // 브라우저 내장 TTS엔 "나이" 파라미터가 없다 — 이름으로 추정해서 그나마 안 굵고 안 성인남성 같은
+  // 목소리를 고르는 게 한계. child/kid/junior/young 표시가 있으면 최우선, 없으면 알려진 여성 계열
+  // 이름(플랫폼별로 다 다름 — Windows/Android/iOS 흔한 이름 최대한 망라), 그것도 없으면 최소한
+  // 남성으로 알려진 이름(david/mark/daniel/guy/alex 등)만이라도 피해서 고른다.
   function pickChildishVoice() {
     if (!cachedVoices.length) return null;
     const english = cachedVoices.filter((v) => /^en/i.test(v.lang));
     const pool = english.length ? english : cachedVoices;
-    // "아이 목소리"에 제일 가까운 걸 이름으로 추정(Child > Female > 그 외 아무거나)
+    const knownMale = /david|mark|daniel|guy|alex\b|fred|ryan|christopher|eric|james/i;
+    const knownYoungish = /female|zira|aria|jenny|samantha|karen|moira|tessa|susan|victoria|kate|allison|ava|serena|fiona|moira|salli|joanna|kendra|kimberly/i;
     return (
-      pool.find((v) => /child|kid/i.test(v.name)) ||
-      pool.find((v) => /female|zira|aria|jenny|samantha/i.test(v.name)) ||
+      pool.find((v) => /child|kid|junior|young/i.test(v.name)) ||
+      pool.find((v) => knownYoungish.test(v.name)) ||
+      pool.find((v) => !knownMale.test(v.name)) ||
       pool[0]
     );
   }
@@ -2108,8 +2114,11 @@
       const utter = new SpeechSynthesisUtterance(phrase);
       const voice = pickChildishVoice();
       if (voice) utter.voice = voice;
-      const basePitch = opts.pitch != null ? opts.pitch : 1.9; // 높은 톤 = 아이 목소리 느낌
-      const baseRate = opts.rate != null ? opts.rate : 1.05;
+      // 2026-08-10: "성인 목소리 같다"는 피드백으로 기본값을 API 상한(pitch 2.0)까지 밀어붙임 —
+      // 이게 이 방식(성인 목소리 피치만 올리기)으로 갈 수 있는 진짜 한계치. 이걸로도 부족하면
+      // 다음 단계는 파라미터 조정이 아니라 실제 아동 음성 AI로 고정 문구를 녹음해서 파일로 까는 것.
+      const basePitch = opts.pitch != null ? opts.pitch : 2;
+      const baseRate = opts.rate != null ? opts.rate : 1.15;
       utter.pitch = Math.min(2, Math.max(0.5, basePitch + (Math.random() - 0.5) * 0.3));
       utter.rate = Math.max(0.7, baseRate + (Math.random() - 0.5) * 0.15);
       utter.volume = 1;
@@ -2122,11 +2131,11 @@
 
   function playExcellent() {
     const phrase = LEVEL_CLEAR_PHRASES[Math.floor(Math.random() * LEVEL_CLEAR_PHRASES.length)];
-    speakPraise(phrase, { pitch: 2, rate: 1.15 }); // 칭찬은 더 높고 빠르게 = 더 신난 느낌
+    speakPraise(phrase, { pitch: 2, rate: 1.25 }); // 기본값보다도 더 빠르게 = 더 신난 느낌
   }
 
   function playBossVictory() {
-    speakPraise('Woohoo! You defeated the final boss! You are a true champion!', { pitch: 2, rate: 1.1 });
+    speakPraise('Woohoo! You defeated the final boss! You are a true champion!', { pitch: 2, rate: 1.2 });
   }
 
   btnSound.addEventListener('click', () => {
