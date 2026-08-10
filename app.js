@@ -1473,21 +1473,87 @@
     return best;
   }
 
+  // 문자열 시드 → 32비트 정수 해시 (FNV-1a) → mulberry32로 그 정수를 시드 삼아 재현 가능한 난수열 생성.
+  // 같은 (도안, 모드) 조합이면 항상 같은 난수열이 나와서 "이 모드에서는 이 배치"가 유지되고,
+  // 모드가 바뀌면 시드 문자열도 바뀌어 다른 배치가 나온다.
+  function hashSeed(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+  function mulberry32(seed) {
+    let a = seed;
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // 서로 맞닿은 두 영역(라벨)이 같은 색으로 배정되면 경계가 안 보여서 하나로 뭉개져 보이므로,
+  // 라벨맵에서 이웃 관계를 한 번 스캔해두고 색 배정 시 참고한다.
+  function buildLabelAdjacency(labelMap) {
+    const adj = new Map();
+    const add = (a, b) => {
+      if (a < 0 || b < 0 || a === b) return;
+      if (!adj.has(a)) adj.set(a, new Set());
+      if (!adj.has(b)) adj.set(b, new Set());
+      adj.get(a).add(b);
+      adj.get(b).add(a);
+    };
+    for (let y = 0; y < WORK_SIZE; y++) {
+      const row = y * WORK_SIZE;
+      for (let x = 0; x < WORK_SIZE; x++) {
+        const i = row + x;
+        const lab = labelMap[i];
+        if (lab < 0) continue;
+        if (x < WORK_SIZE - 1) add(lab, labelMap[i + 1]);
+        if (y < WORK_SIZE - 1) add(lab, labelMap[i + WORK_SIZE]);
+      }
+    }
+    return adj;
+  }
+
+  // 영역마다 팔레트에서 하나씩(맞닿은 이웃과는 최대한 안 겹치게) 시드 기반으로 랜덤 배정한다.
+  function seededRegionColors(regions, labelMap, palette, seedStr) {
+    const rand = mulberry32(hashSeed(seedStr));
+    const adj = buildLabelAdjacency(labelMap);
+    const colorByLabel = new Map();
+    regions.forEach((r) => {
+      const neighborColors = new Set();
+      (adj.get(r.label) || []).forEach((n) => {
+        if (colorByLabel.has(n)) neighborColors.add(colorByLabel.get(n));
+      });
+      let candidates = palette.filter((hex) => !neighborColors.has(hex));
+      if (!candidates.length) candidates = palette; // 팔레트가 작아 다 겹치면 어쩔 수 없이 전체에서
+      colorByLabel.set(r.label, candidates[Math.floor(rand() * candidates.length)]);
+    });
+    return colorByLabel;
+  }
+
   // ================= 목표(정답) 미리보기 =================
-  // 자동 인식된 영역 순서대로 고정 팔레트를 배정해 "이렇게 칠하면 돼요" 예시를 만든다.
+  // 보스(손그림 캐릭터)는 하드코딩된 partColors를 그대로 쓰고, 일반 도안(이모지)은 도안+모드
+  // 조합으로 시드를 건 랜덤 색 배치를 쓴다 — 그림(윤곽선) 자체는 안 건드리고 "정답색"만 모드마다
+  // 달라지게 해서, 같은 100개 도안이라도 모드를 바꿔서 다시 하면 색 배치가 새로워진다
+  // (2026-08-10, 반복 플레이 시 식상함 방지 요청으로 추가 — 이전엔 이모지 원본의 실제 색을 그대로 썼음).
   function renderGoalPreview(lineImg) {
     currentLabelToColor = new Map();
     const custom = currentTemplate && currentTemplate.partColors;
-    const sampled = currentSampledColors;
     const cyclePalette = (currentTemplate && currentTemplate.paletteOverride) ||
       targetPaletteForLevel(currentTemplate && currentTemplate.difficulty);
-    currentGradableRegions.forEach((r, i) => {
-      let hex;
-      if (custom && custom[i]) hex = custom[i];
-      else if (sampled && sampled.has(r.label)) hex = sampled.get(r.label);
-      else hex = cyclePalette[i % cyclePalette.length];
-      currentLabelToColor.set(r.label, hex);
-    });
+    if (custom) {
+      currentGradableRegions.forEach((r, i) => {
+        if (custom[i]) currentLabelToColor.set(r.label, custom[i]);
+      });
+    } else {
+      const seed = (currentTemplate ? currentTemplate.id : 'x') + ':' + getMode();
+      const randomColors = seededRegionColors(currentGradableRegions, currentLabelMap, cyclePalette, seed);
+      currentGradableRegions.forEach((r) => currentLabelToColor.set(r.label, randomColors.get(r.label)));
+    }
 
     const imgData = goalCtx.createImageData(WORK_SIZE, WORK_SIZE);
     const data = imgData.data;
