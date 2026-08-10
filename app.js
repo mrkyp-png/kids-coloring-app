@@ -100,18 +100,10 @@
   const btnUndo = document.getElementById('btn-undo');
   const btnClear = document.getElementById('btn-clear');
   const btnSave = document.getElementById('btn-save');
-  const ratingModal = document.getElementById('rating-modal');
-  const autoResultView = document.getElementById('auto-result-view');
-  const autoResultDetail = document.getElementById('auto-result-detail');
-  const autoResultBadge = document.getElementById('auto-result-badge');
-  const autoResultConfirm = document.getElementById('auto-result-confirm');
-  const btnManualOverride = document.getElementById('btn-manual-override');
-  const manualSelectView = document.getElementById('manual-select-view');
-  const ratingOptions = document.getElementById('rating-options');
-  const ratingSkip = document.getElementById('rating-skip');
   const praiseOverlay = document.getElementById('praise-overlay');
   const praiseEmoji = document.getElementById('praise-emoji');
   const praiseText = document.getElementById('praise-text');
+  const praiseCount = document.getElementById('praise-count');
 
   const btnRanking = document.getElementById('btn-ranking');
   const rankingEntryModal = document.getElementById('ranking-entry-modal');
@@ -151,7 +143,6 @@
   let currentGradableLabelSet = new Set(); // currentGradableRegions의 label만 모아둔 Set(탭 보정용 빠른 조회)
   let currentLabelToColor = null; // Map<label, hex> 영역별 정답색(컬러바이넘버)
   let currentSampledColors = null; // Map<label, hex> 이모지 원본에서 뽑은 실제 색(있으면 우선 사용)
-  let lastAutoLevel = null;
   let lastScore = 0;
 
   // 목표 이미지용 고정 팔레트("안 칠함"과 헷갈리는 흰색 대체 베이지는 제외)
@@ -764,7 +755,6 @@
       const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
       const isClear = isLevelCleared(lv, scores);
       const unlocked = isLevelUnlocked(lv, scores);
-      const totalScore = getLevelTotalScore(lv, scores);
 
       const wrap = document.createElement('div');
       wrap.className = 'level-node-wrap';
@@ -782,9 +772,6 @@
         inner += '<span class="lv-clear-badge">✓ CLEAR</span><span class="lv-progress">' + doneCount + ' / ' + list.length + '</span>';
       } else {
         inner += '<span class="lv-progress">' + doneCount + ' / ' + list.length + '</span>';
-      }
-      if (unlocked && totalScore != null) {
-        inner += '<span class="lv-score">⭐ ' + totalScore + '</span>';
       }
       node.innerHTML = inner;
 
@@ -1878,79 +1865,24 @@
     return { matched, total: currentGradableRegions.length };
   }
 
-  function mapRatioToLevel(ratio) {
-    if (ratio >= 0.9) return RATING_LEVELS[0];
-    if (ratio >= 0.75) return RATING_LEVELS[1];
-    if (ratio >= 0.6) return RATING_LEVELS[2];
-    if (ratio >= 0.4) return RATING_LEVELS[3];
-    return RATING_LEVELS[4];
-  }
-
   // ================= 완료(채점) =================
+  // 2026-08-11: "제대로 칠했냐가 중요한거니" 피드백으로 중간 점수/등급 확인 모달("OK!" 버튼 누르는
+  // 페이지, 부모님 직접 채점 포함)을 완전히 없애고, Done! 누르면 곧장 결과가 뜨는 이진 판정으로
+  // 단순화했다: 전부 정확히 맞으면 축하 화면(진행 저장 + 다음으로), 하나라도 틀리면 "다시
+  // 도전!" 화면을 잠깐 보여준 뒤(저장 없이) 그대로 색칠 화면에 머무른다 — 어차피 레벨 클리어는
+  // 원래도 정확히 100점이어야만 인정됐어서, 5단계 등급 자체가 실질적인 의미가 없었음.
   // 예전엔 "Done!"을 누를 때마다 그림 파일이 자동으로 다운로드됐는데, 그림 하나 끝낼 때마다
   // 다운로드 창이 계속 뜨는 게 번거롭다는 피드백으로 자동 저장은 뺐다(채점/평가만 진행).
   btnSave.addEventListener('click', () => {
-    showAutoResult();
-  });
-
-  // ================= 평가: 자동 채점 + 부모 직접 평가(선택) =================
-  function renderRatingOptions() {
-    ratingOptions.innerHTML = '';
-    RATING_LEVELS.forEach((r) => {
-      const btn = document.createElement('button');
-      btn.className = 'rating-btn';
-      btn.dataset.level = r.level;
-      btn.innerHTML = '<span class="r-emoji">' + r.emoji + '</span><span>' + r.label + '</span>';
-      btn.addEventListener('click', () => submitRating(r));
-      ratingOptions.appendChild(btn);
-    });
-  }
-
-  function showAutoResult() {
     const { matched, total } = computeCompletion();
-    const ratio = total > 0 ? matched / total : 0;
-    const score = Math.round(ratio * 100);
-    const level = mapRatioToLevel(ratio);
-    lastAutoLevel = level;
-    lastScore = score;
-
-    autoResultDetail.textContent = 'You colored the ' + (currentTemplate ? currentTemplate.name : '') + '!';
-    autoResultBadge.innerHTML =
-      '<span class="b-emoji">' + level.emoji + '</span>' +
-      '<span class="b-label">' + level.label + '</span>' +
-      '<span class="b-score">' + score + ' points</span>' +
-      '<span class="b-count">' + matched + ' / ' + total + ' parts colored right</span>';
-
-    autoResultView.hidden = false;
-    manualSelectView.hidden = true;
-    ratingModal.hidden = false;
-  }
-
-  function closeRatingModal() {
-    ratingModal.hidden = true;
-  }
-
-  autoResultConfirm.addEventListener('click', () => {
-    closeRatingModal();
-    saveHistory(lastAutoLevel);
-    showPraise(lastAutoLevel);
+    if (total > 0 && matched === total) {
+      lastScore = 100;
+      saveHistory(RATING_LEVELS[0]);
+      showPraise(RATING_LEVELS[0], matched, total);
+    } else {
+      showTryAgain(matched, total);
+    }
   });
-
-  btnManualOverride.addEventListener('click', () => {
-    autoResultView.hidden = true;
-    manualSelectView.hidden = false;
-  });
-
-  ratingSkip.addEventListener('click', () => {
-    manualSelectView.hidden = true;
-    autoResultView.hidden = false;
-  });
-
-  function submitRating(r) {
-    closeRatingModal();
-    saveHistory(r);
-    showPraise(r);
-  }
 
   // 이번 제출로 그 레벨이 "방금 처음" 클리어됐는지(이미 클리어돼 있던 레벨을 다시 색칠한 게 아닌지) —
   // saveHistory에서 점수 저장 전/후 상태를 비교해 기록해두고, showPraise가 이 값으로만 축하를 띄운다.
@@ -1999,17 +1931,19 @@
   // 조기 종료/재호출 시 반드시 지운다.
   let praiseHomeTimer = null;
 
-  function showPraise(r) {
+  function showPraise(r, matched, total) {
     if (praiseHomeTimer) { clearTimeout(praiseHomeTimer); praiseHomeTimer = null; }
     if (justBecameBossCleared) {
       showBossFanfare();
       return;
     }
+    praiseOverlay.classList.remove('fail');
     praiseEmoji.textContent = r.emoji;
     const justClearedLevel = justBecameLevelCleared;
     praiseText.textContent = justClearedLevel
       ? r.label + ' — Level ' + currentTemplate.difficulty + ' Clear! 🎉'
       : r.label;
+    praiseCount.textContent = matched + ' / ' + total + ' parts colored';
     praiseOverlay.hidden = false;
     if (justClearedLevel) playExcellent();
     praiseHomeTimer = setTimeout(() => {
@@ -2019,10 +1953,31 @@
     }, 1800);
   }
 
+  // 하나라도 틀리면 저장하지 않고 "다시 도전!"만 잠깐 보여준 뒤 색칠 화면에 그대로 머무른다
+  // (색칠 화면을 떠난 적이 없으므로 별도 화면 전환 없이 오버레이만 닫으면 됨).
+  function showTryAgain(matched, total) {
+    if (praiseHomeTimer) { clearTimeout(praiseHomeTimer); praiseHomeTimer = null; }
+    praiseOverlay.classList.add('fail');
+    praiseEmoji.textContent = RATING_LEVELS[4].emoji;
+    praiseText.textContent = RATING_LEVELS[4].label;
+    praiseCount.textContent = matched + ' / ' + total + ' parts colored right';
+    praiseOverlay.hidden = false;
+    praiseHomeTimer = setTimeout(() => {
+      praiseHomeTimer = null;
+      praiseOverlay.hidden = true;
+      praiseOverlay.classList.remove('fail');
+    }, 1800);
+  }
+
   praiseOverlay.addEventListener('click', () => {
     if (praiseHomeTimer) { clearTimeout(praiseHomeTimer); praiseHomeTimer = null; }
+    const wasFail = praiseOverlay.classList.contains('fail');
     praiseOverlay.hidden = true;
-    goHome();
+    if (wasFail) {
+      praiseOverlay.classList.remove('fail');
+    } else {
+      goHome();
+    }
   });
 
   // ================= 파이널 보스 축하(팡파레 + 컨페티 + 프린트 선물) =================
@@ -2333,7 +2288,6 @@
   renderCoverBosses();
   renderMap();
   renderPalette();
-  renderRatingOptions();
 
   // 디버그/테스트용: 현재 도안의 채점 대상 영역 개수 확인
   window.__debugRegionCount = () => (currentGradableRegions ? currentGradableRegions.length : 0);

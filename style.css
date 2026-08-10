@@ -33,6 +33,11 @@
 /* display:flex 등 클래스 스타일이 hidden 속성을 덮어쓰지 않도록 항상 최우선 적용 */
 [hidden] { display: none !important; }
 
+/* 2026-08-11: "전체적으로 글자크기를 가독성 좋게" — 거의 모든 텍스트가 rem 단위라 루트 크기를
+   올리면 전체가 비례해서 커짐(기존 상대적 크기 관계는 그대로 유지). 겹침 안 생기는지 여러 화면
+   작은 뷰포트(360px)에서 스크린샷으로 확인 후 적용. */
+html { font-size: 18px; }
+
 html, body {
   margin: 0;
   padding: 0;
@@ -294,18 +299,19 @@ button:active { transform: scale(0.94); }
   gap: 6px;
 }
 .level-node .lv-num {
-  font-size: 2rem;
+  font-size: 2.5rem;
   font-weight: 800;
   color: var(--brand);
 }
 .level-node .lv-label {
-  font-size: 0.85rem;
+  font-size: 1.05rem;
   color: var(--muted);
   font-weight: 700;
 }
 .level-node .lv-progress {
-  font-size: 0.8rem;
+  font-size: 1rem;
   color: var(--muted);
+  font-weight: 600;
 }
 .level-node.locked {
   opacity: 0.55;
@@ -329,12 +335,6 @@ button:active { transform: scale(0.94); }
 .level-node .lv-lock {
   font-size: 1.4rem;
 }
-.level-node .lv-score {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--accent);
-}
-
 .level-next-banner {
   margin: 4px 16px 10px;
   padding: 12px 16px;
@@ -655,50 +655,6 @@ button:active { transform: scale(0.94); }
 .modal-card h2 { margin: 0 0 4px; font-size: 1.4rem; color: var(--brand); }
 .modal-sub { margin: 0 0 16px; color: var(--muted); }
 
-.rating-options {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.rating-btn {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: var(--radius-md);
-  background: var(--brand-soft);
-  font-size: 1.1rem;
-  font-weight: 700;
-  min-height: 56px;
-  text-align: left;
-}
-.rating-btn .r-emoji { font-size: 1.8rem; }
-.rating-btn[data-level="1"] { background: #FFF4CC; }
-.rating-btn[data-level="2"] { background: #E3F9E5; }
-.rating-btn[data-level="3"] { background: #E6F0FF; }
-.rating-btn[data-level="4"] { background: #FFEBD6; }
-.rating-btn[data-level="5"] { background: #FFE3E3; }
-
-.auto-result-badge {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  background: var(--brand-soft);
-  border-radius: var(--radius-md);
-  padding: 18px 14px;
-  margin-top: 6px;
-}
-.auto-result-badge .b-emoji { font-size: 3rem; }
-.auto-result-badge .b-label { font-size: 1.3rem; font-weight: 800; color: var(--brand); }
-.auto-result-badge .b-score { font-size: 1.6rem; font-weight: 800; }
-.auto-result-badge .b-count { font-size: 0.95rem; color: var(--muted); }
-
-.auto-confirm-btn {
-  width: 100%;
-  margin-top: 16px;
-}
-
 .text-link-btn {
   margin-top: 14px;
   color: var(--muted);
@@ -808,7 +764,10 @@ button:active { transform: scale(0.94); }
   padding: 24px 0;
 }
 
-/* ---------- 격려 오버레이 ---------- */
+/* ---------- 격려 오버레이(성공 축하 / 실패 "다시 도전!" 겸용) ---------- */
+/* 2026-08-11: Done! 누르면 중간 점수 확인 모달 없이 바로 이 화면이 뜨도록 바꿈 — 전부 맞으면
+   보라색 축하(기존과 동일), 하나라도 틀리면 .fail 클래스가 붙어 빨간 계열로 바뀌고 "Try again!" +
+   맞은 개수만 보여준 뒤 저장 없이 색칠 화면으로 돌아감(별도 화면 전환 없음, 오버레이만 닫힘). */
 .praise-overlay {
   position: fixed;
   inset: 0;
@@ -822,6 +781,9 @@ button:active { transform: scale(0.94); }
   text-align: center;
   padding: 20px;
 }
+.praise-overlay.fail {
+  background: rgba(214,40,57,0.94);
+}
 .praise-emoji {
   font-size: 5rem;
   animation: pop 0.5s ease;
@@ -830,6 +792,12 @@ button:active { transform: scale(0.94); }
   font-size: 2rem;
   font-weight: 800;
   margin-top: 12px;
+}
+.praise-count {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-top: 8px;
+  opacity: 0.9;
 }
 @keyframes pop {
   0% { transform: scale(0.3); opacity: 0; }

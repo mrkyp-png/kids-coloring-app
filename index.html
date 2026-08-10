@@ -105,32 +105,11 @@
   </div>
 </section>
 
-<!-- ===================== Rating modal (auto score + grown-up rating) ===================== -->
-<div id="rating-modal" class="modal-overlay" hidden>
-  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="rating-title">
-
-    <div id="auto-result-view">
-      <h2 id="rating-title">Your Score</h2>
-      <p id="auto-result-detail" class="modal-sub"></p>
-      <div id="auto-result-badge" class="auto-result-badge"></div>
-      <button id="auto-result-confirm" class="tool-btn tool-btn-primary auto-confirm-btn">✅<span>OK!</span></button>
-      <button id="btn-manual-override" class="text-link-btn">Let a grown-up rate it</button>
-    </div>
-
-    <div id="manual-select-view" hidden>
-      <h2>Grown-up, please rate it!</h2>
-      <p class="modal-sub">How well did they color it?</p>
-      <div id="rating-options" class="rating-options"></div>
-      <button id="rating-skip" class="text-link-btn">Use the auto score</button>
-    </div>
-
-  </div>
-</div>
-
-<!-- ===================== Praise overlay ===================== -->
+<!-- ===================== Praise overlay (성공 축하 / 실패 "다시 도전" 겸용) ===================== -->
 <div id="praise-overlay" class="praise-overlay" hidden>
   <div id="praise-emoji" class="praise-emoji"></div>
   <div id="praise-text" class="praise-text"></div>
+  <div id="praise-count" class="praise-count"></div>
 </div>
 
 <!-- ===================== 시작 시 이름/나라 입력 모달(Start 버튼 직후 1회) ===================== -->

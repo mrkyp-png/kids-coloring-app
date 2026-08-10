@@ -18,7 +18,6 @@ async function completeOneTemplate(page, tplId) {
   if (sim.score !== 100) throw new Error(tplId + ' simulate score=' + sim.score + ' (100 아님)');
 
   await page.evaluate(() => document.getElementById('btn-save').click());
-  await page.evaluate(() => document.getElementById('auto-result-confirm').click());
 
   const bossFanfareVisible = await page.evaluate(() => !document.getElementById('boss-fanfare-modal').hidden);
   if (bossFanfareVisible) {
