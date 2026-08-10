@@ -426,6 +426,24 @@ button:active { transform: scale(0.94); }
 }
 
 /* ---------- 색칠 화면 ---------- */
+/* 2026-08-10: "목표(goal) 이미지와 실제 색칠 캔버스가 항상 같은 크기여야 한다" + "미세한 부분
+   색 구분이 어렵다" 피드백으로 구조를 바꿈. 세 가지가 맞물려 있어야 제대로 동작함:
+   1) 공유 클래스 .screen은 flex(column)인데, 여기서만 grid로 바꿔서 goal-panel/canvas-wrap이
+      남는 세로공간을 정확히 반반 나눠 갖게 함(flex-grow로는 이 두 구역이 왜인지 50:50으로 안
+      갈렸다 — 원인 불명, min-height:0으로도 안 고쳐짐. grid는 이 문제에서 더 예측 가능했음).
+   2) height:100dvh를 명시(부모처럼 min-height만 주면 "줄어야 할 압박"이 없어서 내용물 크기대로
+      화면이 뷰포트보다 커져버림) + grid-template-rows에 minmax(0,1fr)(bare 1fr은 grid 기본
+      min이 내용물 최소크기라 정사각형 박스를 못 줄임 — flex의 min-height:0과 같은 부류의 문제).
+   3) goal-canvas-wrap과 실제 캔버스(.stack-canvas/.tap-layer) 둘 다 컨테이너 쿼리 단위
+      (cqw/cqh)로 "너비/높이 중 더 좁은 쪽"에 맞춰 정사각형을 유지하며 줄어듦 — 처음엔
+      aspect-ratio로 시도했는데 그건 확정값 쪽(width)을 유도값 쪽(height)이 따라가기만 하고
+      반대로는 안 되는 단방향이라, max-height로 눌렸을 때 옆으로 퍼진 직사각형이 됐었음.
+   행 순서는 DOM 순서와 그대로 대응: 헤더 / goal-panel(1fr) / canvas-wrap(1fr) / palette / toolbar. */
+#coloring-screen {
+  display: grid;
+  height: 100dvh;
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto auto;
+}
 .coloring-header {
   display: flex;
   align-items: center;
@@ -458,17 +476,19 @@ button:active { transform: scale(0.94); }
 }
 
 .goal-panel {
-  flex: 0 0 auto;
+  /* 위 #coloring-screen 주석 참고. flex/min-height:0/overflow:hidden은 grid 행 안에서 이
+     박스가 실제로 줄어들 수 있게 하는 부분, container-type:size는 아래 .goal-canvas-wrap이
+     cqw/cqh로 정사각형을 유지하며 줄어들 수 있게 하는 부분. */
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
   padding-top: 4px;
+  container-type: size;
 }
 .goal-canvas-wrap {
-  /* 2026-08-10: 작은 영역 색 구분이 어렵다는 피드백으로 기존(22vh/최대150px)보다 키움 */
-  width: 30vh;
-  height: 30vh;
-  min-width: 120px;
-  min-height: 120px;
-  max-width: 210px;
-  max-height: 210px;
+  width: min(100cqw, 100cqh, 420px);
+  height: min(100cqw, 100cqh, 420px);
   margin: 2px auto 0;
   display: flex;
   align-items: center;
@@ -478,7 +498,7 @@ button:active { transform: scale(0.94); }
   box-shadow: var(--shadow);
 }
 .goal-emoji {
-  font-size: min(20vh, 140px);
+  font-size: min(64vw, 340px);
   line-height: 1;
 }
 .goal-canvas {
@@ -499,21 +519,21 @@ button:active { transform: scale(0.94); }
   justify-content: center;
   padding: 6px;
   min-height: 0;
+  overflow: hidden;
+  container-type: size; /* .goal-canvas-wrap과 같은 이유 — 이하 정사각형들이 cqw/cqh로 줄어듦 */
 }
 .stack-canvas {
   position: absolute;
-  width: min(80vw, 420px);
-  height: min(80vw, 420px);
-  max-height: 100%;
+  width: min(100cqw, 100cqh, 420px);
+  height: min(100cqw, 100cqh, 420px);
   border-radius: var(--radius-lg);
 }
 #fill-canvas { background: #ffffff; box-shadow: var(--shadow); }
 #line-canvas { pointer-events: none; }
 .tap-layer {
   position: absolute;
-  width: min(80vw, 420px);
-  height: min(80vw, 420px);
-  max-height: 100%;
+  width: min(100cqw, 100cqh, 420px);
+  height: min(100cqw, 100cqh, 420px);
   border-radius: var(--radius-lg);
   cursor: pointer;
 }
