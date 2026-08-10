@@ -968,7 +968,6 @@
     goalEmoji.textContent = tpl.emoji;
     galleryScreen.hidden = true;
     coloringScreen.hidden = false;
-    speakPraise(tpl.name); // 색칠화면 들어올 때마다 무슨 그림인지 이름을 읽어줌
 
     loadTemplateSource(tpl, (wall, lineSource, sampledColors) => {
       // 선(윤곽선) 레이어
@@ -1545,18 +1544,26 @@
   }
 
   // ================= 목표(정답) 미리보기 =================
-  // 보스(손그림 캐릭터)는 하드코딩된 partColors를 그대로 쓰고, 일반 도안(이모지)은 도안+모드
-  // 조합으로 시드를 건 랜덤 색 배치를 쓴다 — 그림(윤곽선) 자체는 안 건드리고 "정답색"만 모드마다
-  // 달라지게 해서, 같은 100개 도안이라도 모드를 바꿔서 다시 하면 색 배치가 새로워진다
-  // (2026-08-10, 반복 플레이 시 식상함 방지 요청으로 추가 — 이전엔 이모지 원본의 실제 색을 그대로 썼음).
+  // 보스(손그림 캐릭터)는 하드코딩된 partColors를 그대로 쓴다.
+  // 일반 도안(이모지)은: **쉬움 모드는 기존 그대로**(이모지 원본의 실제 색) 유지하고,
+  // 보통/어려움/매우어려움 모드부터만 도안+모드 조합 시드로 랜덤 색 배치를 쓴다 — 처음 배우는
+  // 쉬움 모드는 "진짜 사물 색"을 보여주고, 그 다음부터는 반복 방지용 색 퍼즐이 되는 구조.
+  // (2026-08-10 추가 시점엔 전체 모드에 랜덤을 적용했다가, 같은 날 "쉬움은 그대로 둬야 한다"는
+  // 피드백으로 쉬움 모드만 원래 방식으로 되돌림.)
   function renderGoalPreview(lineImg) {
     currentLabelToColor = new Map();
     const custom = currentTemplate && currentTemplate.partColors;
     const cyclePalette = (currentTemplate && currentTemplate.paletteOverride) ||
       targetPaletteForLevel(currentTemplate && currentTemplate.difficulty);
+    const sampled = currentSampledColors;
     if (custom) {
       currentGradableRegions.forEach((r, i) => {
         if (custom[i]) currentLabelToColor.set(r.label, custom[i]);
+      });
+    } else if (getMode() === 'easy') {
+      currentGradableRegions.forEach((r, i) => {
+        const hex = (sampled && sampled.has(r.label)) ? sampled.get(r.label) : cyclePalette[i % cyclePalette.length];
+        currentLabelToColor.set(r.label, hex);
       });
     } else {
       const seed = (currentTemplate ? currentTemplate.id : 'x') + ':' + getMode();
