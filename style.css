@@ -438,11 +438,15 @@ button:active { transform: scale(0.94); }
       (cqw/cqh)로 "너비/높이 중 더 좁은 쪽"에 맞춰 정사각형을 유지하며 줄어듦 — 처음엔
       aspect-ratio로 시도했는데 그건 확정값 쪽(width)을 유도값 쪽(height)이 따라가기만 하고
       반대로는 안 되는 단방향이라, max-height로 눌렸을 때 옆으로 퍼진 직사각형이 됐었음.
-   행 순서는 DOM 순서와 그대로 대응: 헤더 / goal-panel(1fr) / canvas-wrap(1fr) / palette / toolbar. */
+   행 순서는 DOM 순서와 그대로 대응: 헤더 / goal-panel(1fr) / coloring-area(1fr, 캔버스+팔레트) / toolbar.
+   2026-08-10 추가: "목표 이미지랑 같은 크기 되니 색칠 캔버스가 작아졌다"는 피드백으로 팔레트를
+   캔버스 밑 가로줄에서 캔버스 오른쪽 세로줄로 옮김(.coloring-area) — 팔레트가 쓰던 가로 줄
+   전체가 이제 grid 행 하나 통째로 줄어서, 그 공간이 goal-panel/coloring-area 1fr 몫으로
+   합쳐져 두 정사각형이 이전보다 더 커짐. */
 #coloring-screen {
   display: grid;
   height: 100dvh;
-  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto;
 }
 .coloring-header {
   display: flex;
@@ -478,12 +482,19 @@ button:active { transform: scale(0.94); }
 .goal-panel {
   /* 위 #coloring-screen 주석 참고. flex/min-height:0/overflow:hidden은 grid 행 안에서 이
      박스가 실제로 줄어들 수 있게 하는 부분, container-type:size는 아래 .goal-canvas-wrap이
-     cqw/cqh로 정사각형을 유지하며 줄어들 수 있게 하는 부분. */
+     cqw/cqh로 정사각형을 유지하며 줄어들 수 있게 하는 부분.
+     오른쪽 padding(palette-width+gap)은 .coloring-area가 팔레트 때문에 실제로 갖는 폭과
+     맞춰주는 용도 — 안 그러면 캔버스는 팔레트만큼 좁아진 자기 행에 맞춰 작아지는데 goal은 그대로
+     넓은 행을 다 써서 둘이 서로 달라짐(캔버스를 키우는 게 목적이라, goal 쪽을 캔버스에 맞춰
+     좁혀서 크기를 다시 맞춤 — 캔버스 자체는 안 줄임). */
   flex: 1;
   min-height: 0;
   overflow: hidden;
   display: flex;
-  padding-top: 4px;
+  /* 118px = 팔레트(88) + coloring-area/canvas-wrap 쪽 gap·padding 합(6+12+12); 위아래 6px씩 =
+     canvas-wrap 자기 padding(6px×2)과 맞춤. .coloring-area/.canvas-wrap 쪽 수치를 바꾸면 여기도
+     같이 맞춰야 함(자동 계산 아님, 수치 두 곳에 하드코딩돼 있음). */
+  padding: 6px 118px 6px 0;
   container-type: size;
 }
 .goal-canvas-wrap {
@@ -511,6 +522,14 @@ button:active { transform: scale(0.94); }
   display: block;
 }
 
+.coloring-area {
+  /* 캔버스(왼쪽, 남는 폭 전부) + 팔레트(오른쪽, 세로 줄) — 이 div 하나가 grid의 1fr 행 하나를 씀. */
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+  gap: 6px;
+  padding: 0 6px;
+}
 .canvas-wrap {
   position: relative;
   flex: 1;
@@ -519,6 +538,7 @@ button:active { transform: scale(0.94); }
   justify-content: center;
   padding: 6px;
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
   container-type: size; /* .goal-canvas-wrap과 같은 이유 — 이하 정사각형들이 cqw/cqh로 줄어듦 */
 }
@@ -539,11 +559,20 @@ button:active { transform: scale(0.94); }
 }
 
 .palette {
+  /* 2026-08-10: 캔버스 밑 가로줄 → 캔버스 오른쪽 세로줄로 변경(색칠 캔버스 공간을 최대한 확보하려는
+     요청) — 색이 늘어나면(레벨 오를수록 최대 11개) 세로로 다 안 들어갈 수 있어서 세로 스크롤.
+     너비 88px = 스와치 지름(52+테두리4*2=60px) + 선택 표시 링(::after, inset:-6px 이므로 양쪽
+     6px씩 더 필요=72px) + 좌우 패딩 8px씩 — 링이 overflow-x:hidden에 안 잘리게. */
+  flex: 0 0 auto;
+  width: 88px;
   display: flex;
+  flex-direction: column;
   flex-wrap: nowrap;
+  align-items: center;
   gap: 10px;
-  overflow-x: auto;
-  padding: 10px 14px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px 8px;
   justify-content: flex-start;
 }
 .color-swatch {

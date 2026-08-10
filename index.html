@@ -89,14 +89,15 @@
     </div>
   </div>
 
-  <div id="canvas-wrap" class="canvas-wrap">
-    <canvas id="fill-canvas" class="stack-canvas"></canvas>
-    <canvas id="line-canvas" class="stack-canvas"></canvas>
-    <canvas id="mask-canvas" class="stack-canvas" hidden></canvas>
-    <div id="tap-layer" class="tap-layer" aria-label="Tap a part to color it"></div>
+  <div class="coloring-area">
+    <div id="canvas-wrap" class="canvas-wrap">
+      <canvas id="fill-canvas" class="stack-canvas"></canvas>
+      <canvas id="line-canvas" class="stack-canvas"></canvas>
+      <canvas id="mask-canvas" class="stack-canvas" hidden></canvas>
+      <div id="tap-layer" class="tap-layer" aria-label="Tap a part to color it"></div>
+    </div>
+    <div id="palette" class="palette" role="list" aria-label="Pick a color"></div>
   </div>
-
-  <div id="palette" class="palette" role="list" aria-label="Pick a color"></div>
 
   <div class="toolbar">
     <button id="btn-undo" class="tool-btn" aria-label="Undo">↩️<span>Undo</span></button>
