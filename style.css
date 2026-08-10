@@ -90,9 +90,10 @@ button:active { transform: scale(0.94); }
   justify-content: center;
   overflow: hidden;
 }
-.cover-boss-item svg {
+.cover-boss-item img {
   width: 100%;
   height: 100%;
+  object-fit: cover;
 }
 .cover-start-btn {
   background: var(--brand);

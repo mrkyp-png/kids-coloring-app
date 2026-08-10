@@ -1549,12 +1549,15 @@
   }
 
   // ================= 목표(정답) 미리보기 =================
-  // 보스(손그림 캐릭터)는 하드코딩된 partColors를 그대로 쓴다.
+  // 보스도 2026-08-10부터 다른 도안들과 똑같이 Twemoji 기반(emoji 모드)이라 partColors는 더 이상
+  // 없음 — custom 분기는 혹시 남아있을 손그림 도안 대비용 안전장치로만 유지.
   // 일반 도안(이모지)은: **쉬움 모드는 기존 그대로**(이모지 원본의 실제 색) 유지하고,
   // 보통/어려움/매우어려움 모드부터만 도안+모드 조합 시드로 랜덤 색 배치를 쓴다 — 처음 배우는
   // 쉬움 모드는 "진짜 사물 색"을 보여주고, 그 다음부터는 반복 방지용 색 퍼즐이 되는 구조.
   // (2026-08-10 추가 시점엔 전체 모드에 랜덤을 적용했다가, 같은 날 "쉬움은 그대로 둬야 한다"는
   // 피드백으로 쉬움 모드만 원래 방식으로 되돌림.)
+  // 보스는 항상 자기 고유의 모드 하나에서만 등장하므로(다른 모드로 다시 칠할 일이 없음) 랜덤화가
+  // 의미 없다 — currentTemplate.isBoss면 전역 getMode()가 뭐든 상관없이 항상 실제 색 그대로.
   function renderGoalPreview(lineImg) {
     currentLabelToColor = new Map();
     const custom = currentTemplate && currentTemplate.partColors;
@@ -1565,7 +1568,7 @@
       currentGradableRegions.forEach((r, i) => {
         if (custom[i]) currentLabelToColor.set(r.label, custom[i]);
       });
-    } else if (getMode() === 'easy') {
+    } else if (getMode() === 'easy' || (currentTemplate && currentTemplate.isBoss)) {
       currentGradableRegions.forEach((r, i) => {
         const hex = (sampled && sampled.has(r.label)) ? sampled.get(r.label) : cyclePalette[i % cyclePalette.length];
         currentLabelToColor.set(r.label, hex);
@@ -2214,10 +2217,10 @@
   btnHome.addEventListener('click', goHome);
 
   // ================= 표지 화면 =================
-  // 파이널 보스 4종의 svgArt는 이미 완성된(정답) 색으로 그려져 있어서, 색칠 파이프라인을 거치지 않고
-  // 그대로 <svg>에 꽂아 넣기만 해도 완성작 미리보기 아이콘으로 쓸 수 있다.
-  // 표지에서는 제목 바로 밑에 한 줄로, 몸통 없이 얼굴(머리)만 보이도록 viewBox를 얼굴 영역으로 좁혀서 잘라낸다.
-  const COVER_FACE_VIEWBOX = '90 15 220 220';
+  // 2026-08-10: 보스가 손그림(svgArt, 이미 완성된 정답색이 마크업에 그대로 박혀있던 방식)에서
+  // 다른 도안들과 같은 Twemoji 파일(assets/emoji/<id>.svg) 기반으로 바뀌면서, 표지 얼굴 아이콘도
+  // 인라인 마크업 대신 그 파일을 <img>로 직접 불러오는 방식으로 바꿈 — 캐릭터 전체가 이미
+  // 36x36 안에 알맞게 그려져 있어서(Twemoji 특유의 반신 구도) 예전처럼 얼굴만 잘라낼 필요가 없다.
   function renderCoverBosses() {
     coverBosses.innerHTML = '';
     MODE_ORDER.forEach((mode) => {
@@ -2225,7 +2228,10 @@
       if (!tpl) return;
       const item = document.createElement('div');
       item.className = 'cover-boss-item';
-      item.innerHTML = '<svg viewBox="' + COVER_FACE_VIEWBOX + '" xmlns="http://www.w3.org/2000/svg">' + tpl.svgArt + '</svg>';
+      const img = document.createElement('img');
+      img.src = 'assets/emoji/' + tpl.id + '.svg';
+      img.alt = tpl.name;
+      item.appendChild(img);
       coverBosses.appendChild(item);
     });
   }
