@@ -951,6 +951,11 @@
 
   // ================= 색칠 화면 진입 =================
   function openTemplate(tpl, onReady) {
+    // 이전 그림의 "축하 후 자동으로 홈으로" 타이머가 아직 안 끝났는데 다음 그림을 벌써 열었다면
+    // 그 타이머는 이제 의미가 없다 — 안 지우면 몇 초 뒤 엉뚱한 시점에 goHome()이 몰래 또 불려서
+    // (지금 보고 있는 그림이 보스든 뭐든) 상태를 헝클어뜨림. praiseOverlay 클릭/showPraise 재호출
+    // 경로 말고도 놓친 경로가 있을까봐 여기서도 한 번 더 방어.
+    if (praiseHomeTimer) { clearTimeout(praiseHomeTimer); praiseHomeTimer = null; }
     currentTemplate = tpl;
     // 실제로 그림을 열어서 색칠을 시작하는 이 순간에 그 레벨(또는 보스)의 타임어택을 시작(또는 이어감).
     if (tpl.isBoss) {
@@ -1974,7 +1979,15 @@
     }
   }
 
+  // 화면을 일찍 탭해서 닫아도(아래 praiseOverlay 클릭 핸들러) 이 타이머가 안 지워지고 남아있다가,
+  // 1.8초 뒤 엉뚱한 시점(예: 다음 그림을 이미 열었거나 보스 도전 중)에 몰래 goHome()을 한 번 더
+  // 불러서 상태를 헝클어뜨리는 버그가 있었음(보스 승리 직후 currentBossMode가 갑자기 null로
+  // 리셋되는 원인 — 헤드리스 전체 클리어 검증 중 발견, 2026-08-10). 타이머 id를 들고 있다가
+  // 조기 종료/재호출 시 반드시 지운다.
+  let praiseHomeTimer = null;
+
   function showPraise(r) {
+    if (praiseHomeTimer) { clearTimeout(praiseHomeTimer); praiseHomeTimer = null; }
     if (justBecameBossCleared) {
       showBossFanfare();
       return;
@@ -1986,13 +1999,15 @@
       : r.label;
     praiseOverlay.hidden = false;
     if (justClearedLevel) playExcellent();
-    setTimeout(() => {
+    praiseHomeTimer = setTimeout(() => {
+      praiseHomeTimer = null;
       praiseOverlay.hidden = true;
       goHome();
     }, 1800);
   }
 
   praiseOverlay.addEventListener('click', () => {
+    if (praiseHomeTimer) { clearTimeout(praiseHomeTimer); praiseHomeTimer = null; }
     praiseOverlay.hidden = true;
     goHome();
   });
