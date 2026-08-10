@@ -1,4 +1,4 @@
-const CACHE_NAME = 'coloring-app-v39';
+const CACHE_NAME = 'coloring-app-v40';
 const APP_SHELL = [
   './',
   './index.html',
@@ -8,10 +8,7 @@ const APP_SHELL = [
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './audio/bgm-childrens-march.ogg',
-  './audio/bgm-childrens-march.mp3',
-  './audio/bgm-sunny-side-up.mp3',
-  './audio/bgm-good-morning.ogg',
+  './audio/bgm-happy-adventure.mp3',
   './assets/emoji/airplane.svg',
   './assets/emoji/ant.svg',
   './assets/emoji/apple.svg',

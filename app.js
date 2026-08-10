@@ -875,7 +875,6 @@
   function openLevel(level) {
     currentBossMode = null;
     currentLevel = level;
-    setMusicForLevel(level);
     if (isLevelCleared(level)) clearLevelAttempt(level); // 이미 클리어된 레벨은 타이머 불필요
     // 주의: 그림 목록만 구경하는 걸로는 시간이 소모되면 안 되므로, 여기서는 타임어택을 시작하지
     // 않는다 — 실제로 그림 하나를 열 때(openTemplate)가 되어서야 처음 시작한다.
@@ -2043,43 +2042,18 @@
   });
 
   // ================= 배경음악 =================
-  // 레벨 구간별로 다른 CC0(퍼블릭 도메인) 트랙을 틀어준다(2026-08-09, "레벨 바뀔 때마다 음악도
-  // 바뀌면 좋겠다"는 요청으로 추가) — 전부 opengameart.org:
-  //   Lv1-3  "Sunny Side Up Updated Version" — Alex McCulloch (mp3만 있음)
-  //   Lv4-6  "Children's March Theme" — Cleyton Kauffman (기존 곡, ogg+mp3)
-  //   Lv7-10 "Good Morning" — Cakeflaps (ogg만 있음)
-  // 형식이 하나뿐인 트랙은 canPlayType으로 지원 여부를 확인하고, 못 트는 기기에서는 조용히
-  // 이전 트랙을 그대로 유지한다(에러 없이 그냥 안 바뀜 — 흔치 않은 극단 케이스라 이 정도면 충분).
-  const MUSIC_TRACKS = {
-    sunny: { ogg: null, mp3: 'audio/bgm-sunny-side-up.mp3' },
-    march: { ogg: 'audio/bgm-childrens-march.ogg', mp3: 'audio/bgm-childrens-march.mp3' },
-    goodmorning: { ogg: 'audio/bgm-good-morning.ogg', mp3: null }
-  };
-  function trackKeyForLevel(level) {
-    if (level <= 3) return 'sunny';
-    if (level <= 6) return 'march';
-    return 'goodmorning';
-  }
+  // 2026-08-09에 레벨 구간별 3곡 전환 방식으로 만들었다가, 트랙 바뀔 때마다 몇 초씩 무음이
+  // 생기는 문제가 나서(로딩 지연 — 프리로드로 완화는 했었음) 2026-08-10에 사용자 요청으로
+  // "아기상어처럼 애들이 좋아할 만한 곡 하나"로 단순화. 트랙 전환 자체가 없어지니 그 무음 문제도
+  // 근본적으로 사라짐. "Happy Adventure (Loop)" — TinyWorlds, opengameart.org, CC0(저작자 표시 불필요).
+  const MUSIC_SRC = 'audio/bgm-happy-adventure.mp3';
 
   const MUSIC_KEY = 'musicOn';
   const bgm = document.getElementById('bgm');
   const BGM_VOLUME = 0.35;
-  const BGM_FADE_MS = 700;
   bgm.volume = BGM_VOLUME;
-  let currentMusicTrackKey = null;
-  let bgmFadeTimer = null;
-
-  // 트랙 전환 시 몇 초씩 무음이 나던 문제 대책: 다른 구간 트랙들을 미리 백그라운드에서
-  // 버퍼링해둔다(같은 URL을 나중에 bgm.src에 넣으면 브라우저가 이미 받아둔 걸 재사용해서
-  // 훨씬 빨리 들림). 실제 재생/음소거와 무관하게 조용히 로드만 해두는 용도.
-  function warmUpTrack(key) {
-    const src = pickSrc(MUSIC_TRACKS[key]);
-    if (!src) return;
-    const a = new Audio();
-    a.preload = 'auto';
-    a.src = src;
-    try { a.load(); } catch (e) { /* 무시 */ }
-  }
+  bgm.src = MUSIC_SRC;
+  bgm.loop = true;
 
   function isMusicOn() {
     const v = localStorage.getItem(MUSIC_KEY);
@@ -2090,66 +2064,8 @@
     btnMusic.textContent = isMusicOn() ? '🎵' : '🔇';
   }
 
-  function pickSrc(track) {
-    if (track.ogg && bgm.canPlayType('audio/ogg')) return track.ogg;
-    if (track.mp3 && bgm.canPlayType('audio/mpeg')) return track.mp3;
-    return track.ogg || track.mp3 || null; // 마지막 안전장치 — canPlayType이 애매하게 답할 때도 일단 시도는 해본다
-  }
-
-  function fadeTo(targetVolume, ms, onDone) {
-    if (bgmFadeTimer) clearInterval(bgmFadeTimer);
-    const steps = 14;
-    const startVolume = bgm.volume;
-    const stepMs = ms / steps;
-    let i = 0;
-    bgmFadeTimer = setInterval(() => {
-      i++;
-      bgm.volume = startVolume + (targetVolume - startVolume) * (i / steps);
-      if (i >= steps) {
-        clearInterval(bgmFadeTimer);
-        bgmFadeTimer = null;
-        bgm.volume = targetVolume;
-        if (onDone) onDone();
-      }
-    }, stepMs);
-  }
-
-  // 레벨에 맞는 트랙으로 부드럽게 전환한다(같은 구간 안에서 도안만 바꿀 땐 트랙이 그대로라 아무 일도
-  // 안 함 — 매번 처음부터 다시 트는 게 아니라 실제로 구간이 바뀔 때만 전환됨).
-  function setMusicForLevel(level) {
-    const key = trackKeyForLevel(level);
-    if (key === currentMusicTrackKey) return;
-    const src = pickSrc(MUSIC_TRACKS[key]);
-    if (!src) return; // 이 기기가 재생 못 하는 형식뿐이면 그냥 이전 트랙 유지
-    currentMusicTrackKey = key;
-    if (!isMusicOn() || bgm.paused) {
-      // 아직 음악이 안 틀어져 있으면(꺼둔 상태거나 첫 상호작용 전) 페이드 없이 소스만 바꿔둔다 —
-      // 다음에 재생될 때 이 트랙으로 시작함.
-      bgm.src = src;
-      return;
-    }
-    fadeTo(0, BGM_FADE_MS, () => {
-      bgm.src = src;
-      bgm.volume = 0;
-      // 음량 페이드인은 "실제로 소리가 나오기 시작한 뒤"에 시작해야 자연스럽다 — play() 호출
-      // 직후엔 아직 버퍼링 중이라 무음일 수 있는데, 그 상태에서 바로 페이드를 돌리면 소리도 없이
-      // 페이드만 끝나버려서 몇 초간 무음처럼 느껴졌던 원인이었다.
-      let fadeInStarted = false;
-      const beginFadeIn = () => {
-        if (fadeInStarted) return;
-        fadeInStarted = true;
-        bgm.removeEventListener('playing', beginFadeIn);
-        fadeTo(BGM_VOLUME, BGM_FADE_MS);
-      };
-      bgm.addEventListener('playing', beginFadeIn);
-      bgm.play().catch(() => {});
-      setTimeout(beginFadeIn, 1500); // playing 이벤트가 안 오는 기기 대비 안전장치
-    });
-  }
-
   function tryPlayMusic() {
     if (!isMusicOn()) return;
-    if (!bgm.src) bgm.src = pickSrc(MUSIC_TRACKS[currentMusicTrackKey || 'sunny']);
     bgm.volume = BGM_VOLUME;
     bgm.play().catch(() => { /* 아직 사용자 상호작용 전이면 브라우저가 막음 — 다음 탭 때 다시 시도됨 */ });
   }
@@ -2168,9 +2084,7 @@
     document.removeEventListener('pointerdown', startMusicOnFirstInteraction);
   };
   document.addEventListener('pointerdown', startMusicOnFirstInteraction);
-  setMusicForLevel(1); // 첫 화면(지도)은 1구간 트랙으로 시작
   updateMusicButton();
-  Object.keys(MUSIC_TRACKS).forEach(warmUpTrack); // 나머지 구간 트랙도 미리 버퍼링(전환 시 무음 구간 줄이기)
 
   // ================= 네비게이션 =================
   btnHome.addEventListener('click', goHome);
