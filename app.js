@@ -2084,31 +2084,49 @@
     );
   }
   // 레벨 클리어 때마다 매번 "Excellent!"만 나오면 금방 질리니 여러 문구 중 랜덤으로 고른다.
+  // 감탄사(Wow/Yay/Woohoo)를 앞에 붙여서 그냥 단어 하나 읽는 것보다 "진짜 반응하는" 느낌이 나게 함
+  // (2026-08-10, "대본 읽는 것처럼 들린다"는 피드백으로 추가 — Web Speech API는 SSML/억양 세부
+  // 제어가 안 되니 톤(pitch)·속도(rate)를 매번 살짝 흔들고 감탄사로 흥을 더하는 정도가 현실적 한계).
   const LEVEL_CLEAR_PHRASES = [
-    'Excellent!', 'Awesome!', 'Great job!', 'Amazing!', 'Fantastic!',
-    'You did it!', 'Way to go!', 'Wonderful!', 'You are a star!', 'Super!'
+    'Wow, excellent!', 'Yay, awesome!', 'Wow, great job!', 'Yay, amazing!', 'Woohoo, fantastic!',
+    'Yes, you did it!', 'Woohoo, way to go!', 'Wow, wonderful!', 'Yay, you are a star!', 'Woohoo, super!'
   ];
 
-  function speakPraise(phrase) {
+  // opts.pitch/rate로 상황별 기본 톤을 다르게 줄 수 있음(칭찬은 더 신나게, 이름 안내는 차분하게).
+  // 매번 완전히 똑같은 pitch/rate면 대본 읽듯 밋밋하게 들려서 호출마다 살짝 흔들어 자연스럽게 만든다.
+  function speakPraise(phrase, opts) {
     if (!soundOn || !('speechSynthesis' in window)) return;
+    opts = opts || {};
     try {
-      window.speechSynthesis.cancel(); // 이전에 읽던 게 있으면 정리
+      // cancel()을 필요 없을 때도 매번 부르면 크롬 계열에서 음성 엔진이 멈춰버리는 알려진 버그가
+      // 있음(그림을 여러 개 연달아 열 때마다 이름을 읽어주게 되면서 cancel() 호출 빈도가 확 늘어
+      // 실제로 걸렸던 것으로 보임 — "레벨 클리어 멘트가 안 나옴" 버그의 원인). 진짜 말하는 중일
+      // 때만 정리한다.
+      if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+        window.speechSynthesis.cancel();
+      }
       const utter = new SpeechSynthesisUtterance(phrase);
       const voice = pickChildishVoice();
       if (voice) utter.voice = voice;
-      utter.pitch = 1.9;   // 높은 톤 = 아이 목소리 느낌
-      utter.rate = 1.05;
+      const basePitch = opts.pitch != null ? opts.pitch : 1.9; // 높은 톤 = 아이 목소리 느낌
+      const baseRate = opts.rate != null ? opts.rate : 1.05;
+      utter.pitch = Math.min(2, Math.max(0.5, basePitch + (Math.random() - 0.5) * 0.3));
+      utter.rate = Math.max(0.7, baseRate + (Math.random() - 0.5) * 0.15);
       utter.volume = 1;
-      window.speechSynthesis.speak(utter);
+      // cancel() 직후 바로 speak()하면 씹히는 경우가 있어(같은 이유의 크롬 버그) 한 틱 늦춰서 호출.
+      setTimeout(() => {
+        try { window.speechSynthesis.speak(utter); } catch (e) { /* 무시 */ }
+      }, 0);
     } catch (e) { /* 음성합성 미지원 브라우저는 무시 */ }
   }
 
   function playExcellent() {
-    speakPraise(LEVEL_CLEAR_PHRASES[Math.floor(Math.random() * LEVEL_CLEAR_PHRASES.length)]);
+    const phrase = LEVEL_CLEAR_PHRASES[Math.floor(Math.random() * LEVEL_CLEAR_PHRASES.length)];
+    speakPraise(phrase, { pitch: 2, rate: 1.15 }); // 칭찬은 더 높고 빠르게 = 더 신난 느낌
   }
 
   function playBossVictory() {
-    speakPraise('You defeated the final boss! You are a champion!');
+    speakPraise('Woohoo! You defeated the final boss! You are a true champion!', { pitch: 2, rate: 1.1 });
   }
 
   btnSound.addEventListener('click', () => {
