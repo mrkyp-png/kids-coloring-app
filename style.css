@@ -216,8 +216,10 @@ button:active { transform: scale(0.94); }
   position: relative;
   text-align: center;
   /* 위쪽에 모드 선택(좌상단)/랭킹(우상단)이 고정으로 얹히므로, 제목이 그 아래로 밀려서
-     겹치지 않도록 top 여백을 그 높이만큼 넉넉히 확보한다. */
-  padding: 100px 16px 8px;
+     겹치지 않도록 top 여백을 그 높이만큼 넉넉히 확보한다.
+     2026-08-11: 전체 글자 크기 확대(18px root)로 모드 버튼 2x2 블록 실측 높이가
+     93px까지 늘어나 100px 여백과 거의 붙어버림(9px 겹침 확인) — 여유 두고 128px로. */
+  padding: 128px 16px 8px;
 }
 .gallery-header h1 {
   font-size: clamp(1.6rem, 5vw, 2.2rem);
@@ -420,12 +422,6 @@ button:active { transform: scale(0.94); }
 .tpl-card .tpl-label {
   font-size: 1rem;
   font-weight: 600;
-}
-.tpl-card .tpl-score {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--muted);
-  min-height: 1em;
 }
 .tpl-card .tpl-difficulty {
   position: absolute;

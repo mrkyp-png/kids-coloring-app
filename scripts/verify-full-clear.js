@@ -79,8 +79,12 @@ async function main() {
       if (currentMode !== mode) throw new Error('모드 전환 실패: 기대=' + mode + ' 실제=' + currentMode);
 
       // 2) 레벨 1~10, 각 10장씩 정답대로 채워서 클리어
+      // 반드시 __debugOpenLevel(lv)로 먼저 그 레벨에 "진입"해야 currentLevel이 실제 UI 흐름처럼
+      // 갱신된다 — __debugOpenTemplate만으로는 recordLevelClearTime/checkFullRunClear가 전혀
+      // 발동하지 않아 isBossUnlocked()가 항상 false로 나오는 걸 놓친다(2026-08-11 확인).
       let pictureCount = 0;
       for (let lv = 1; lv <= 10; lv++) {
+        await page.evaluate((l) => window.__debugOpenLevel(l), lv);
         for (const tplId of templatesByLevel[lv]) {
           await completeOneTemplate(page, tplId);
           pictureCount++;
@@ -91,6 +95,13 @@ async function main() {
         return COLORING_TEMPLATES.every((t) => scores[t.id] === 100);
       }, mode);
       if (!scoreCheck) throw new Error(mode + ': 레벨 1~10이 전부 만점 클리어로 안 잡힘');
+
+      const timesCheck = await page.evaluate((m) => {
+        const times = JSON.parse(localStorage.getItem('levelClearTimes') || '{}')[m] || {};
+        for (let lv = 1; lv <= 10; lv++) if (times[lv] == null) return false;
+        return true;
+      }, mode);
+      if (!timesCheck) throw new Error(mode + ': levelClearTimes에 레벨 1~10 기록이 전부 안 남음 — isBossUnlocked가 이 모드에서 계속 false로 남을 수 있음');
 
       // 3) 이 모드 보스 도전 (잠금 해제 확인은 위 disabled 체크에서 이미 됨)
       const bossResult = await completeOneTemplate(page, bossIds[mode]);
@@ -110,6 +121,24 @@ async function main() {
       const bc = JSON.parse(localStorage.getItem('bossCleared') || '{}');
       return ['easy', 'normal', 'hard', 'veryhard'].every((m) => bc[m] === true);
     });
+
+    // 4-1) 맵 화면에서 4개 보스 카드가 전부 "열림+클리어(🔓)"로 보이는지 렌더링까지 확인
+    // — 예전엔 나중 모드를 다 깨면 이전에 이미 깬 보스 카드가 다시 잠김(🔒)으로 보이는 실제 버그가
+    // 있었다(levelClearTimes가 모드 구분 없이 저장되던 문제, 2026-08-11 발견/수정).
+    // 마지막 보스(veryhard) 클리어 직후 boss-fanfare-close를 누르면 goHome()이 이미 맵 화면을 띄운다.
+    const bossCardStates = await page.evaluate(() => {
+      const cards = Array.from(document.querySelectorAll('#boss-grid .boss-card'));
+      return cards.map((c) => ({
+        locked: c.classList.contains('locked'),
+        cleared: c.classList.contains('boss-cleared'),
+        icon: (c.querySelector('.boss-crown, .boss-lock') || {}).textContent,
+      }));
+    });
+    const allBossCardsOpenCleared = bossCardStates.every((s) => !s.locked && s.cleared && s.icon === '🔓');
+    if (!allBossCardsOpenCleared) {
+      console.log('보스 카드 상태:', JSON.stringify(bossCardStates));
+      throw new Error('보스 카드가 전부 열림+클리어(🔓)로 안 보임 — 이전 모드 보스 카드가 다시 잠긴 것처럼 보이는 회귀 버그 재발');
+    }
 
     console.log('');
     console.log(finalCheck ? '✅ 쉬움→보통→어려움→매우어려움 전체 체인 끝까지 정상 작동 확인' : '❌ 전체 체인 검증 실패');

@@ -45,7 +45,7 @@
   const BOSS_BUDGET_SECONDS = 5 * 60;
   const MODE_KEY = 'gameMode';
   const LEVEL_ATTEMPTS_KEY = 'levelAttempts'; // { [level]: 시작한 시각(ms) } — 타임어택 진행 중인 레벨
-  const LEVEL_TIMES_KEY = 'levelClearTimes'; // { [level]: {seconds, mode} } — 그 레벨을 완료하는 데 걸린 시간과 당시 모드
+  const LEVEL_TIMES_KEY = 'levelClearTimes'; // { [mode]: { [level]: seconds } } — 모드별로 완전히 분리 저장(아래 참고)
   const RANKING_KEY = 'rankingEntries'; // [{name, country, mode, seconds, date}] — 10레벨 전부(같은 모드로) 클리어한 기록
   const PLAYER_KEY = 'playerProfile'; // {name, country} — Start 버튼 직후 1회 입력, 이후 랭킹 등록 시 재사용
 
@@ -179,6 +179,28 @@
         localStorage.setItem(CLEARED_KEY, JSON.stringify({ easy: raw }));
       }
     } catch (e) { /* 무시 */ }
+    // levelClearTimes도 예전엔 { [level]: {seconds, mode} } 하나로 모든 모드가 뒤섞여 저장됐다 —
+    // 이 때문에 나중 모드에서 레벨 1~10을 다 깨면 그 항목들이 전부 그 모드로 덮어써져서,
+    // 이미 깬 이전 모드 보스의 isBossUnlocked()가 갑자기 false로 뒤집혀 "클리어했는데 자물쇠가
+    // 잠긴 것처럼" 보이는 버그가 있었다(2026-08-11 발견). { [mode]: { [level]: seconds } }로
+    // 모드별 분리하고, 기존 기록은 각 항목에 남아있던 mode 값(없으면 easy로 간주)에 맞게 이관.
+    try {
+      const raw = JSON.parse(localStorage.getItem(LEVEL_TIMES_KEY) || '{}');
+      const keys = Object.keys(raw);
+      const looksLegacy = keys.length > 0 && !keys.some((k) => k in MODES);
+      if (looksLegacy) {
+        const byMode = {};
+        keys.forEach((lv) => {
+          const entry = raw[lv];
+          const secs = typeof entry === 'number' ? entry : (entry && entry.seconds);
+          const mode = (entry && typeof entry === 'object' && entry.mode) || 'easy';
+          if (secs == null) return;
+          if (!byMode[mode]) byMode[mode] = {};
+          byMode[mode][lv] = secs;
+        });
+        localStorage.setItem(LEVEL_TIMES_KEY, JSON.stringify(byMode));
+      }
+    } catch (e) { /* 무시 */ }
   }
 
   // clearedTemplates: "한 번이라도 시도해서 저장한" 도안(만점 여부와 무관 — X 표시용)
@@ -222,15 +244,6 @@
     return map[tplId] === 100;
   }
 
-  // 레벨의 합산 점수 — 그 레벨에서 한 번이라도 시도한 도안들의 최고점 합계(평균 아님). 아직 하나도 없으면 null.
-  function getLevelTotalScore(level, scores) {
-    const map = scores || getScores();
-    const list = getTemplatesForLevel(level);
-    const done = list.filter((t) => t.id in map);
-    if (!done.length) return null;
-    return done.reduce((acc, t) => acc + map[t.id], 0);
-  }
-
   function isLevelCleared(level, scores) {
     const map = scores || getScores();
     const list = getTemplatesForLevel(level);
@@ -260,8 +273,9 @@
     allCleared[mode] = Array.from(cleared);
     saveAllCleared(allCleared);
 
-    const times = getLevelTimes();
-    if (level in times) { delete times[level]; saveLevelTimes(times); }
+    const allTimes = getAllLevelTimes();
+    const times = allTimes[mode] || {};
+    if (level in times) { delete times[level]; allTimes[mode] = times; saveAllLevelTimes(allTimes); }
   }
 
   // 그 모드의 진행 상황(점수/클리어/보스)만 지우고 그 모드를 처음부터 다시 시작할 수 있게 한다.
@@ -275,11 +289,9 @@
     delete allCleared[mode];
     saveAllCleared(allCleared);
 
-    const times = getLevelTimes();
-    Object.keys(times).forEach((lv) => {
-      if (getLevelTimeMode(times[lv]) === mode) delete times[lv];
-    });
-    saveLevelTimes(times);
+    const allTimes = getAllLevelTimes();
+    delete allTimes[mode];
+    saveAllLevelTimes(allTimes);
 
     clearBossAttempt(mode);
     const bc = getBossClearedMap();
@@ -290,28 +302,31 @@
   }
 
   // 레벨 10개를 다 완료하는 데 걸린 시간(초) 기록 — 메인 화면 레벨 블록 아래에 표시한다.
-  function getLevelTimes() {
+  // 점수/클리어와 마찬가지로 모드별로 완전히 분리 저장(위 migrateLegacyProgress 참고).
+  function getAllLevelTimes() {
     try { return JSON.parse(localStorage.getItem(LEVEL_TIMES_KEY) || '{}'); } catch (e) { return {}; }
   }
-
-  function saveLevelTimes(obj) {
-    try { localStorage.setItem(LEVEL_TIMES_KEY, JSON.stringify(obj)); } catch (e) { /* 무시 */ }
+  function saveAllLevelTimes(all) {
+    try { localStorage.setItem(LEVEL_TIMES_KEY, JSON.stringify(all)); } catch (e) { /* 무시 */ }
+  }
+  function getLevelTimes(mode) {
+    const all = getAllLevelTimes();
+    return all[mode || getMode()] || {};
   }
 
   function recordLevelClearTime(level, seconds) {
-    const times = getLevelTimes();
-    times[level] = { seconds: Math.round(seconds), mode: getMode() };
-    saveLevelTimes(times);
+    const mode = getMode();
+    const all = getAllLevelTimes();
+    const times = all[mode] || (all[mode] = {});
+    times[level] = Math.round(seconds);
+    saveAllLevelTimes(all);
   }
 
-  // 예전 버전은 levelClearTimes 값이 그냥 숫자(초)였다 — 옛 기록도 안 깨지게 둘 다 받아준다.
+  // 예전 버전은 levelClearTimes 값이 {seconds, mode} 객체였다 — 옛 기록(마이그레이션 누락 케이스)도
+  // 안 깨지게 숫자/객체 둘 다 받아준다.
   function getLevelTimeSeconds(entry) {
     if (entry == null) return null;
     return typeof entry === 'number' ? entry : entry.seconds;
-  }
-  function getLevelTimeMode(entry) {
-    if (entry == null || typeof entry === 'number') return null;
-    return entry.mode;
   }
 
   function formatClearTime(totalSeconds) {
@@ -341,14 +356,12 @@
   // 방금 레벨 10을 클리어한 시점에 호출 — 1~10레벨이 전부 "같은 모드"로 클리어된 기록이 남아있으면
   // (중간에 모드를 바꿔가며 깬 경우는 제외) 완주로 인정하고 이름/나이/나라 입력 모달을 띄운다.
   function checkFullRunClear() {
-    const times = getLevelTimes();
     const mode = getMode();
+    const times = getLevelTimes(mode);
     let total = 0;
     for (let lv = 1; lv <= TOTAL_LEVELS; lv++) {
-      const entry = times[lv];
-      const secs = getLevelTimeSeconds(entry);
-      const entryMode = getLevelTimeMode(entry);
-      if (secs == null || entryMode !== mode) return; // 하나라도 없거나 모드가 다르면 완주로 안 침
+      const secs = getLevelTimeSeconds(times[lv]);
+      if (secs == null) return; // 하나라도 이 모드로 클리어한 기록이 없으면 완주로 안 침
       total += secs;
     }
     openRankingEntryModal(mode, total);
@@ -546,10 +559,9 @@
 
   // 그 모드로 레벨 1~10이 전부(모드 안 섞고) 클리어돼 있어야 보스가 열린다 — checkFullRunClear와 같은 조건.
   function isBossUnlocked(mode) {
-    const times = getLevelTimes();
+    const times = getLevelTimes(mode);
     for (let lv = 1; lv <= TOTAL_LEVELS; lv++) {
-      const entry = times[lv];
-      if (getLevelTimeSeconds(entry) == null || getLevelTimeMode(entry) !== mode) return false;
+      if (getLevelTimeSeconds(times[lv]) == null) return false;
     }
     return true;
   }
@@ -890,11 +902,9 @@
     const scores = getScores();
     const list = getTemplatesForLevel(currentLevel);
     const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
-    const totalScore = getLevelTotalScore(currentLevel, scores);
 
     levelTitle.textContent = 'Level ' + currentLevel;
-    levelProgress.textContent = doneCount + ' / ' + list.length + ' perfect' +
-      (totalScore != null ? '  ·  ⭐ ' + totalScore + ' pts' : '');
+    levelProgress.textContent = doneCount + ' / ' + list.length + ' perfect';
 
     const isClear = doneCount >= list.length;
     const hasBack = currentLevel > 1;
@@ -936,7 +946,6 @@
       card.innerHTML =
         '<span class="tpl-emoji">' + tpl.emoji + '</span>' +
         '<span class="tpl-label">' + tpl.name + '</span>' +
-        '<span class="tpl-score">' + (attempted ? score + ' pts' : '') + '</span>' +
         badge;
       card.addEventListener('click', () => openTemplate(tpl));
       galleryGrid.appendChild(card);
@@ -2291,6 +2300,11 @@
 
   // 디버그/테스트용: 현재 도안의 채점 대상 영역 개수 확인
   window.__debugRegionCount = () => (currentGradableRegions ? currentGradableRegions.length : 0);
+
+  // 디버그/테스트용: 실제 openLevel(lv)을 그대로 호출 — __debugOpenTemplate만으로는 currentLevel이
+  // 갱신되지 않아 레벨 클리어 시간 기록(recordLevelClearTime)/완주 체크(checkFullRunClear)가 전혀
+  // 발동하지 않는다(2026-08-11 확인). 이 경로를 실제로 검증하려면 레벨 진입은 반드시 이 훅으로.
+  window.__debugOpenLevel = (lv) => openLevel(lv);
 
   // 디버그/테스트용: id로 도안을 열고 영역 수/난이도/팔레트 크기/정답색 목록을 반환
   window.__debugOpenTemplate = (tplId) => new Promise((resolve) => {
