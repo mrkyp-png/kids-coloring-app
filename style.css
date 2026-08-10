@@ -462,12 +462,13 @@ button:active { transform: scale(0.94); }
   padding-top: 4px;
 }
 .goal-canvas-wrap {
-  width: 22vh;
-  height: 22vh;
-  min-width: 90px;
-  min-height: 90px;
-  max-width: 150px;
-  max-height: 150px;
+  /* 2026-08-10: 작은 영역 색 구분이 어렵다는 피드백으로 기존(22vh/최대150px)보다 키움 */
+  width: 30vh;
+  height: 30vh;
+  min-width: 120px;
+  min-height: 120px;
+  max-width: 210px;
+  max-height: 210px;
   margin: 2px auto 0;
   display: flex;
   align-items: center;
@@ -477,7 +478,7 @@ button:active { transform: scale(0.94); }
   box-shadow: var(--shadow);
 }
 .goal-emoji {
-  font-size: min(15vh, 100px);
+  font-size: min(20vh, 140px);
   line-height: 1;
 }
 .goal-canvas {
