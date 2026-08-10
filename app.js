@@ -28,10 +28,10 @@
 
   // ---------- 난이도(타이머) 모드 — 레벨 하나(그 레벨의 10개 그림 전부)를 이 시간 안에 다 색칠해야 함 ----------
   const MODES = {
-    easy: { label: 'Easy', minutes: 15 },
-    normal: { label: 'Normal', minutes: 10 },
-    hard: { label: 'Hard', minutes: 5 },
-    veryhard: { label: 'Very Hard', minutes: 3 }
+    easy: { label: 'Easy', minutes: 20 },
+    normal: { label: 'Normal', minutes: 15 },
+    hard: { label: 'Hard', minutes: 10 },
+    veryhard: { label: 'Very Hard', minutes: 5 }
   };
   const MODE_KEY = 'gameMode';
   const LEVEL_ATTEMPTS_KEY = 'levelAttempts'; // { [level]: 시작한 시각(ms) } — 타임어택 진행 중인 레벨
