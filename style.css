@@ -897,7 +897,7 @@ button:active { transform: scale(0.94); }
 }
 .boss-card.locked .boss-lock { font-size: 1.6rem; }
 .boss-card.boss-cleared {
-  background: linear-gradient(160deg, #B8860B, #F1C40F);
+  background: linear-gradient(160deg, #C2185B, #F368E0);
 }
 
 /* ---------- 파이널 보스 클리어 축하 모달(팡파레 + 컨페티) ---------- */

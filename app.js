@@ -39,6 +39,10 @@
     hard: { label: 'Hard', minutes: 10 },
     veryhard: { label: 'Very Hard', minutes: 5 }
   };
+  // 2026-08-11: 보스는 예전엔 그 모드의 레벨 타이머를 그대로 물려썼는데(쉬움 보스도 20분), 도안이
+  // 훨씬 어려워진(약 50영역) 지금은 어느 모드든 보스는 무조건 5분으로 통일 — "진짜 최종보스"답게
+  // 항상 빠듯하게.
+  const BOSS_BUDGET_SECONDS = 5 * 60;
   const MODE_KEY = 'gameMode';
   const LEVEL_ATTEMPTS_KEY = 'levelAttempts'; // { [level]: 시작한 시각(ms) } — 타임어택 진행 중인 레벨
   const LEVEL_TIMES_KEY = 'levelClearTimes'; // { [level]: {seconds, mode} } — 그 레벨을 완료하는 데 걸린 시간과 당시 모드
@@ -602,7 +606,7 @@
   }
   function startOrResumeBossAttempt(mode) {
     const attempts = getBossAttempts();
-    const budget = MODES[mode].minutes * 60;
+    const budget = BOSS_BUDGET_SECONDS;
     const start = attempts[mode];
     if (start && (Date.now() - start) / 1000 < budget) return; // 아직 유효
     if (start) resetBossProgress(mode); // 만료된 이전 시도 — 점수 초기화
@@ -612,7 +616,7 @@
   function hasActiveBossAttempt(mode) {
     const attempts = getBossAttempts();
     const start = attempts[mode];
-    return !!(start && (Date.now() - start) / 1000 < MODES[mode].minutes * 60 && !isBossCleared(mode));
+    return !!(start && (Date.now() - start) / 1000 < BOSS_BUDGET_SECONDS && !isBossCleared(mode));
   }
 
   function formatMMSS(totalSeconds) {
@@ -656,6 +660,7 @@
     window.alert('⏰ 시간 초과! ' + (tpl ? tpl.name : '보스') + ' 도전이 초기화됐어요. 다시 도전해봐요!');
     if (currentBossMode === mode) {
       currentBossMode = null;
+      setBgmTrack(MUSIC_SRC);
       coloringScreen.hidden = true;
       mapScreen.hidden = false;
       renderMap();
@@ -672,7 +677,7 @@
       const attempts = getBossAttempts();
       const start = attempts[mode];
       if (!start) return;
-      const budget = MODES[mode].minutes * 60;
+      const budget = BOSS_BUDGET_SECONDS;
       const remaining = budget - (Date.now() - start) / 1000;
       if (remaining <= 0) { handleBossTimeUp(mode); return; }
       coloringTimerText.hidden = false;
@@ -820,7 +825,9 @@
       if (!unlocked) {
         inner += '<span class="boss-lock">🔒</span><span class="boss-name">' + tpl.name + '</span>';
       } else if (cleared) {
-        inner += '<span class="boss-crown">👑</span><span class="boss-name">' + tpl.name + '</span>' +
+        // 이 보스를 깨면 실제로 다음 모드 잠금이 풀리므로, 그 의미를 그대로 열린 자물쇠로 보여줌
+        // (2026-08-11, "노란색→분홍색, 자물쇠는 열린 이미지로" 요청).
+        inner += '<span class="boss-crown">🔓</span><span class="boss-name">' + tpl.name + '</span>' +
           '<span class="boss-cleared-badge">✓ Defeated!</span>';
       } else {
         inner += '<span class="boss-crown pulse">👑</span><span class="boss-name">' + tpl.name + '</span>' +
@@ -962,8 +969,10 @@
       currentBossMode = tpl.mode;
       startOrResumeBossAttempt(tpl.mode);
       startLevelTimer();
+      setBgmTrack(BOSS_MUSIC_SRC);
     } else {
       currentBossMode = null;
+      setBgmTrack(MUSIC_SRC);
       if (!isLevelCleared(tpl.difficulty)) {
         startOrResumeLevelAttempt(tpl.difficulty);
         startLevelTimer();
@@ -1673,6 +1682,7 @@
     if (currentBossMode) {
       stopLevelTimer();
       currentBossMode = null;
+      setBgmTrack(MUSIC_SRC);
       galleryScreen.hidden = true;
       mapScreen.hidden = false;
       renderMap();
@@ -2036,6 +2046,7 @@
       ' — ' + (currentBossMode && MODES[currentBossMode] ? MODES[currentBossMode].label : '') + ' mode complete!';
     spawnConfetti();
     bossFanfareModal.hidden = false;
+    playFirework();
     playBossVictory();
   }
 
@@ -2083,6 +2094,40 @@
       osc.connect(gain).connect(audioCtx.destination);
       osc.start();
       osc.stop(audioCtx.currentTime + 0.16);
+    } catch (e) { /* 오디오 미지원 브라우저는 무시 */ }
+  }
+
+  // 보스 클리어 축하용 폭죽 소리 — 낮은 "펑"(발사) 한 번 + 높은 "반짝" 크래클 여러 번(피치를 살짝
+  // 랜덤하게 섞어서 진짜 폭죽 터지는 느낌). 오디오 파일 없이 오실레이터로 합성(playPop과 같은 방식).
+  function playFirework() {
+    if (!soundOn) return;
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = audioCtx.currentTime;
+      const boom = audioCtx.createOscillator();
+      const boomGain = audioCtx.createGain();
+      boom.type = 'sine';
+      boom.frequency.setValueAtTime(160, now);
+      boom.frequency.exponentialRampToValueAtTime(60, now + 0.18);
+      boomGain.gain.setValueAtTime(0.25, now);
+      boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+      boom.connect(boomGain).connect(audioCtx.destination);
+      boom.start(now);
+      boom.stop(now + 0.22);
+      for (let i = 0; i < 6; i++) {
+        const t = now + 0.15 + i * 0.045 + Math.random() * 0.02;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        const freq = 900 + Math.random() * 900;
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, t);
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.6, t + 0.08);
+        gain.gain.setValueAtTime(0.12, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.12);
+      }
     } catch (e) { /* 오디오 미지원 브라우저는 무시 */ }
   }
 
@@ -2174,6 +2219,9 @@
   // "아기상어처럼 애들이 좋아할 만한 곡 하나"로 단순화. 트랙 전환 자체가 없어지니 그 무음 문제도
   // 근본적으로 사라짐. "Happy Adventure (Loop)" — TinyWorlds, opengameart.org, CC0(저작자 표시 불필요).
   const MUSIC_SRC = 'audio/bgm-happy-adventure.mp3';
+  // 2026-08-11: 보스 화면에 들어가면 웅장한 느낌의 전용 곡으로 바뀌었다가, 나가면 원래 곡으로
+  // 되돌아온다. "Battle RPG Theme" — Cleyton Kauffman(기존 배경음악과 같은 작곡가), CC0.
+  const BOSS_MUSIC_SRC = 'audio/bgm-boss-battle.mp3';
 
   const MUSIC_KEY = 'musicOn';
   const bgm = document.getElementById('bgm');
@@ -2181,6 +2229,7 @@
   bgm.volume = BGM_VOLUME;
   bgm.src = MUSIC_SRC;
   bgm.loop = true;
+  let currentBgmTrack = MUSIC_SRC;
 
   function isMusicOn() {
     const v = localStorage.getItem(MUSIC_KEY);
@@ -2195,6 +2244,16 @@
     if (!isMusicOn()) return;
     bgm.volume = BGM_VOLUME;
     bgm.play().catch(() => { /* 아직 사용자 상호작용 전이면 브라우저가 막음 — 다음 탭 때 다시 시도됨 */ });
+  }
+
+  // 보스 입장/퇴장 때 곡을 전환한다 — 이미 그 곡이면 아무것도 안 함(끊김/재시작 방지).
+  function setBgmTrack(src) {
+    if (currentBgmTrack === src) return;
+    currentBgmTrack = src;
+    const wasPlaying = !bgm.paused;
+    bgm.src = src;
+    bgm.volume = BGM_VOLUME;
+    if (wasPlaying) tryPlayMusic();
   }
 
   btnMusic.addEventListener('click', () => {
@@ -2229,7 +2288,9 @@
       const item = document.createElement('div');
       item.className = 'cover-boss-item';
       const img = document.createElement('img');
-      img.src = 'assets/emoji/' + tpl.id + '.svg';
+      // 시작 화면은 소품(반짝이/조개 등) 없이 캐릭터만 있는 깔끔한 아이콘을 그대로 유지
+      // (실제 색칠 화면의 boss-<id>.svg는 영역 수를 늘리려고 소품이 붙어서 따로 둠).
+      img.src = 'assets/emoji/' + tpl.id + '-icon.svg';
       img.alt = tpl.name;
       item.appendChild(img);
       coverBosses.appendChild(item);

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'coloring-app-v57';
+const CACHE_NAME = 'coloring-app-v58';
 const APP_SHELL = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const APP_SHELL = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './audio/bgm-happy-adventure.mp3',
+  './audio/bgm-boss-battle.mp3',
   './assets/emoji/airplane.svg',
   './assets/emoji/ant.svg',
   './assets/emoji/apple.svg',
@@ -21,9 +22,13 @@ const APP_SHELL = [
   './assets/emoji/bird.svg',
   './assets/emoji/boat.svg',
   './assets/emoji/boss-fairygirl.svg',
+  './assets/emoji/boss-fairygirl-icon.svg',
   './assets/emoji/boss-herogirl.svg',
+  './assets/emoji/boss-herogirl-icon.svg',
   './assets/emoji/boss-mergirl.svg',
+  './assets/emoji/boss-mergirl-icon.svg',
   './assets/emoji/boss-witchgirl.svg',
+  './assets/emoji/boss-witchgirl-icon.svg',
   './assets/emoji/bus.svg',
   './assets/emoji/butterfly.svg',
   './assets/emoji/cactus.svg',
