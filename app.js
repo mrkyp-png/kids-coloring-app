@@ -2158,13 +2158,6 @@
     if (!soundOn || !('speechSynthesis' in window)) return;
     opts = opts || {};
     try {
-      // cancel()을 필요 없을 때도 매번 부르면 크롬 계열에서 음성 엔진이 멈춰버리는 알려진 버그가
-      // 있음(그림을 여러 개 연달아 열 때마다 이름을 읽어주게 되면서 cancel() 호출 빈도가 확 늘어
-      // 실제로 걸렸던 것으로 보임 — "레벨 클리어 멘트가 안 나옴" 버그의 원인). 진짜 말하는 중일
-      // 때만 정리한다.
-      if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
-        window.speechSynthesis.cancel();
-      }
       const utter = new SpeechSynthesisUtterance(phrase);
       const voice = pickChildishVoice();
       if (voice) utter.voice = voice;
@@ -2176,10 +2169,17 @@
       utter.pitch = Math.min(2, Math.max(0.5, basePitch + (Math.random() - 0.5) * 0.3));
       utter.rate = Math.max(0.7, baseRate + (Math.random() - 0.5) * 0.15);
       utter.volume = 1;
-      // cancel() 직후 바로 speak()하면 씹히는 경우가 있어(같은 이유의 크롬 버그) 한 틱 늦춰서 호출.
-      setTimeout(() => {
-        try { window.speechSynthesis.speak(utter); } catch (e) { /* 무시 */ }
-      }, 0);
+      // 2026-08-11: "폰에서는 멘트가 안 나온다"는 제보로 발견 — 모바일(특히 iOS Safari, 안드로이드
+      // 크롬도 유사)은 speak()를 사용자 탭 이벤트 호출 스택 안에서 완전히 동기적으로 불러야만
+      // 소리가 나고, setTimeout으로 단 1틱만 늦춰도 "방금 사용자가 직접 눌렀다"는 트랜지언트
+      // 액티베이션이 풀려서 조용히 무시된다. PC 크롬은 이 제약이 없어 지금까지 안 걸렸던 것뿐.
+      // 그래서 speak()는 절대 지연 없이 바로 호출한다 — cancel()도 실제로 말하는 중일 때만
+      // 그 자리에서 호출해서(평소엔 cancel 자체가 안 불림) "cancel 직후 바로 speak하면 씹히는"
+      // 크롬 데스크톱 버그를 최대한 피한다.
+      if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+        window.speechSynthesis.cancel();
+      }
+      window.speechSynthesis.speak(utter);
     } catch (e) { /* 음성합성 미지원 브라우저는 무시 */ }
   }
 
