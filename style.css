@@ -919,7 +919,11 @@ button:active { transform: scale(0.94); }
   color: var(--brand);
   font-weight: 800;
   font-size: 0.9rem;
-  padding: 10px 20px;
+  padding: 10px 12px;
+  /* 2026-08-11: "랭킹이랑 리셋모드 크기 같게" 요청 — 텍스트 길이가 달라서(Ranking vs Reset
+     Mode) 자동폭이 서로 달랐던 걸 고정폭으로 통일(둘 다 이 클래스를 공유하므로 한 번에 적용됨). */
+  width: 148px;
+  text-align: center;
   border-radius: 999px;
   border: 2px solid var(--brand);
 }
