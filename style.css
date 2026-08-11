@@ -810,6 +810,26 @@ button:active { transform: scale(0.94); }
   color: var(--ink);
 }
 .ranking-entry-form input:focus { outline: 2px solid var(--brand); }
+.ranking-entry-form select {
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 2px solid #E6E0FF;
+  background: var(--bg);
+  color: var(--ink);
+}
+.ranking-entry-form input:disabled, .ranking-entry-form select:disabled {
+  opacity: 0.65;
+}
+.player-entry-warning, .ranking-entry-status {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.ranking-entry-status { color: var(--muted); }
+.ranking-entry-status.is-error { color: var(--bad); }
+.ranking-entry-status.is-ok { color: var(--good); }
 
 .ranking-board-card { max-width: 460px; text-align: left; }
 .ranking-board-card h2, .ranking-board-card .modal-sub { text-align: center; }

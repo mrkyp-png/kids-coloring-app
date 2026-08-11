@@ -31,7 +31,7 @@
       <h2>🔒 Before You Start</h2>
       <ul class="onboarding-consent-list">
         <li>🚫 No ads, ever</li>
-        <li>🔐 No personal data collected — your name/country stay only on this device</li>
+        <li>🔐 No real names or precise location — only a nickname &amp; flag you pick, shown on the public ranking only if you choose to save a record</li>
         <li>📶 Works fully offline</li>
       </ul>
       <p class="modal-sub"><a href="privacy.html" target="_blank" rel="noopener">Read our Privacy Policy</a></p>
@@ -141,11 +141,12 @@
 <div id="player-entry-modal" class="modal-overlay" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="player-entry-title">
     <h2 id="player-entry-title">👋 Who's playing?</h2>
-    <p class="modal-sub">Tell us your name and country!</p>
+    <p class="modal-sub">Pick a nickname and flag for the global ranking!</p>
     <div class="ranking-entry-form">
-      <input id="player-input-name" type="text" placeholder="Name" maxlength="20">
-      <input id="player-input-country" type="text" placeholder="Country" maxlength="30">
+      <input id="player-input-name" type="text" placeholder="Nickname" maxlength="16">
+      <select id="player-input-flag"></select>
     </div>
+    <p class="onboarding-gate-retry player-entry-warning">⚠️ You can't change your nickname or flag later!</p>
     <button id="player-entry-submit" class="tool-btn tool-btn-primary auto-confirm-btn">▶<span>Let's Play!</span></button>
     <button id="player-entry-skip" class="text-link-btn">Skip</button>
   </div>
@@ -157,9 +158,11 @@
     <h2 id="ranking-entry-title">🎉 All 10 Levels Clear!</h2>
     <p id="ranking-entry-time" class="modal-sub"></p>
     <div class="ranking-entry-form">
-      <input id="ranking-input-name" type="text" placeholder="Name" maxlength="20">
-      <input id="ranking-input-country" type="text" placeholder="Country" maxlength="30">
+      <input id="ranking-input-name" type="text" placeholder="Nickname" maxlength="16">
+      <select id="ranking-input-flag"></select>
     </div>
+    <p id="ranking-entry-locked-note" class="onboarding-gate-retry" hidden>⚠️ Your nickname/flag are locked in — set at the very start.</p>
+    <p id="ranking-entry-status" class="ranking-entry-status" hidden></p>
     <button id="ranking-entry-submit" class="tool-btn tool-btn-primary auto-confirm-btn">✅<span>Save my record!</span></button>
     <button id="ranking-entry-skip" class="text-link-btn">Skip</button>
   </div>

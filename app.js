@@ -49,8 +49,39 @@
   const MODE_KEY = 'gameMode';
   const LEVEL_ATTEMPTS_KEY = 'levelAttempts'; // { [level]: 시작한 시각(ms) } — 타임어택 진행 중인 레벨
   const LEVEL_TIMES_KEY = 'levelClearTimes'; // { [mode]: { [level]: seconds } } — 모드별로 완전히 분리 저장(아래 참고)
-  const RANKING_KEY = 'rankingEntries'; // [{name, country, mode, seconds, date}] — 10레벨 전부(같은 모드로) 클리어한 기록
-  const PLAYER_KEY = 'playerProfile'; // {name, country} — Start 버튼 직후 1회 입력, 이후 랭킹 등록 시 재사용
+  const PLAYER_KEY = 'playerProfile'; // {nickname, flag} — Start 버튼 직후 1회 입력, 이후 랭킹 등록 시 재사용
+
+  // 2026-08-11: "랭킹은 경쟁심 유도가 목적이라 로컬만이면 의미없다"는 피드백으로 기기별 로컬
+  // 랭킹(RANKING_KEY)을 없애고 전 세계 공용 랭킹으로 전환. 단, 실명/자유입력 국가 대신
+  // 닉네임+국기 이모지만 공개로 올려서 개인정보 노출 없이 경쟁심만 살림(privacy.html 문구와
+  // 계속 맞으려면 "실제 개인정보"는 여전히 어디에도 안 올라가야 함).
+  // 백엔드: Firebase Realtime Database — 서버 코드 없이 REST(fetch)만으로 읽고 쓸 수 있어서
+  // SDK/빌드 도구 없는 이 프로젝트 구조에 제일 가벼움. 아래 URL은 실제 프로젝트 만들고 나서
+  // Firebase 콘솔의 Realtime Database URL로 바꿔 넣어야 동작한다(그 전까진 랭킹 기능이
+  // "설정 전" 상태로 안내만 뜨고 조용히 비활성화됨).
+  const FIREBASE_DB_URL = 'https://REPLACE-ME.firebaseio.com';
+  function isRankingBackendConfigured() {
+    return FIREBASE_DB_URL.indexOf('REPLACE-ME') === -1;
+  }
+
+  // 국가 자유입력 대신 고정 목록에서 국기만 고르게 해서(1) 입력 실수/욕설 삽입 여지를 줄이고
+  // (2) 실제 거주지 특정으로 이어질 수 있는 자유 텍스트를 안 받는다.
+  const FLAG_OPTIONS = [
+    ['🇰🇷', 'Korea'], ['🇺🇸', 'USA'], ['🇯🇵', 'Japan'], ['🇨🇳', 'China'], ['🇬🇧', 'UK'],
+    ['🇫🇷', 'France'], ['🇩🇪', 'Germany'], ['🇮🇳', 'India'], ['🇧🇷', 'Brazil'], ['🇨🇦', 'Canada'],
+    ['🇦🇺', 'Australia'], ['🇪🇸', 'Spain'], ['🇮🇹', 'Italy'], ['🇲🇽', 'Mexico'], ['🇷🇺', 'Russia'],
+    ['🇻🇳', 'Vietnam'], ['🇵🇭', 'Philippines'], ['🇮🇩', 'Indonesia'], ['🇹🇭', 'Thailand'], ['🇸🇬', 'Singapore'],
+    ['🌍', 'Other']
+  ];
+  function populateFlagSelect(selectEl) {
+    if (selectEl.options.length) return; // 이미 채워져 있으면 다시 안 함
+    FLAG_OPTIONS.forEach(([flag, label]) => {
+      const opt = document.createElement('option');
+      opt.value = flag;
+      opt.textContent = flag + ' ' + label;
+      selectEl.appendChild(opt);
+    });
+  }
 
   migrateLegacyProgress(); // 모드별 분리 저장 도입 전 기존 기록을 easy 모드로 1회 이관
 
@@ -77,7 +108,7 @@
   const btnCoverStart = document.getElementById('btn-cover-start');
   const playerEntryModal = document.getElementById('player-entry-modal');
   const playerInputName = document.getElementById('player-input-name');
-  const playerInputCountry = document.getElementById('player-input-country');
+  const playerInputFlag = document.getElementById('player-input-flag');
   const playerEntrySubmit = document.getElementById('player-entry-submit');
   const playerEntrySkip = document.getElementById('player-entry-skip');
   const mapScreen = document.getElementById('map-screen');
@@ -119,7 +150,9 @@
   const rankingEntryModal = document.getElementById('ranking-entry-modal');
   const rankingEntryTime = document.getElementById('ranking-entry-time');
   const rankingInputName = document.getElementById('ranking-input-name');
-  const rankingInputCountry = document.getElementById('ranking-input-country');
+  const rankingInputFlag = document.getElementById('ranking-input-flag');
+  const rankingEntryLockedNote = document.getElementById('ranking-entry-locked-note');
+  const rankingEntryStatus = document.getElementById('ranking-entry-status');
   const rankingEntrySubmit = document.getElementById('ranking-entry-submit');
   const rankingEntrySkip = document.getElementById('ranking-entry-skip');
   const rankingBoardModal = document.getElementById('ranking-board-modal');
@@ -343,13 +376,11 @@
     return m + ':' + (s < 10 ? '0' : '') + s;
   }
 
-  // ================= 랭킹(10레벨 전부, 같은 모드로 클리어한 완주 기록) =================
-  function getRankingEntries() {
-    try { return JSON.parse(localStorage.getItem(RANKING_KEY) || '[]'); } catch (e) { return []; }
-  }
-
-  function saveRankingEntries(list) {
-    try { localStorage.setItem(RANKING_KEY, JSON.stringify(list)); } catch (e) { /* 무시 */ }
+  // ================= 랭킹(10레벨 전부, 같은 모드로 클리어한 완주 기록 — 전 세계 공용) =================
+  // Firebase Realtime Database REST API를 fetch만으로 직접 호출(SDK 없음). 문서: 각 mode 아래에
+  // 자동생성 키로 { nickname, flag, seconds, date } 하나씩 쌓임.
+  function rankingUrl(mode, extra) {
+    return FIREBASE_DB_URL + '/rankings/' + mode + '.json' + (extra || '');
   }
 
   function getPlayerProfile() {
@@ -377,13 +408,29 @@
   let pendingRunMode = null;
   let pendingRunSeconds = 0;
 
+  function setRankingEntryStatus(text, kind) {
+    rankingEntryStatus.textContent = text || '';
+    rankingEntryStatus.hidden = !text;
+    rankingEntryStatus.classList.toggle('is-error', kind === 'error');
+    rankingEntryStatus.classList.toggle('is-ok', kind === 'ok');
+  }
+
   function openRankingEntryModal(mode, totalSeconds) {
     pendingRunMode = mode;
     pendingRunSeconds = totalSeconds;
     rankingEntryTime.textContent = (MODES[mode] ? MODES[mode].label : mode) + ' mode · ' + formatClearTime(totalSeconds);
+    setRankingEntryStatus('');
     const profile = getPlayerProfile() || {};
-    rankingInputName.value = profile.name || '';
-    rankingInputCountry.value = profile.country || '';
+    populateFlagSelect(rankingInputFlag);
+    // 2026-08-11: "한 번 등록한 닉네임/국가는 수정 불가" 요청 — 이미 정해진 닉네임이 있으면
+    // (Start 화면에서 등록했거나, 예전에 여기서 등록했거나) 그 값을 그대로 잠가서 보여주고,
+    // 아직 한 번도 정한 적 없으면(Start에서 Skip한 경우) 여기서 처음이자 마지막으로 정하게 한다.
+    const alreadySet = !!(profile && profile.nickname);
+    rankingInputName.value = alreadySet ? profile.nickname : '';
+    rankingInputFlag.value = alreadySet ? (profile.flag || '🌍') : rankingInputFlag.options[0].value;
+    rankingInputName.disabled = alreadySet;
+    rankingInputFlag.disabled = alreadySet;
+    rankingEntryLockedNote.hidden = !alreadySet;
     rankingEntryModal.hidden = false;
   }
 
@@ -392,20 +439,39 @@
   }
 
   rankingEntrySubmit.addEventListener('click', () => {
-    const name = rankingInputName.value.trim() || 'Anonymous';
-    const country = rankingInputCountry.value.trim();
-    savePlayerProfile({ name, country });
-    const entries = getRankingEntries();
-    entries.push({
-      name,
-      country,
-      mode: pendingRunMode,
-      seconds: Math.round(pendingRunSeconds),
-      date: new Date().toISOString()
-    });
-    saveRankingEntries(entries);
-    closeRankingEntryModal();
-    openRankingBoard(pendingRunMode);
+    if (!isRankingBackendConfigured()) {
+      setRankingEntryStatus('Ranking isn\'t set up yet — ask a grown-up to finish setup!', 'error');
+      return;
+    }
+    let profile = getPlayerProfile() || {};
+    if (!profile.nickname) {
+      // 여기서 처음 정하는 경우에만 저장 — 그 뒤로는 절대 다시 안 바뀐다.
+      profile = {
+        nickname: rankingInputName.value.trim() || 'Anonymous',
+        flag: rankingInputFlag.value || '🌍'
+      };
+      savePlayerProfile(profile);
+    }
+    rankingEntrySubmit.disabled = true;
+    setRankingEntryStatus('Saving your record...');
+    fetch(rankingUrl(pendingRunMode), {
+      method: 'POST',
+      body: JSON.stringify({
+        nickname: profile.nickname,
+        flag: profile.flag,
+        seconds: Math.round(pendingRunSeconds),
+        date: new Date().toISOString()
+      })
+    })
+      .then((res) => { if (!res.ok) throw new Error('bad status'); })
+      .then(() => {
+        closeRankingEntryModal();
+        openRankingBoard(pendingRunMode);
+      })
+      .catch(() => {
+        setRankingEntryStatus('Couldn\'t save — check your internet and try again.', 'error');
+      })
+      .finally(() => { rankingEntrySubmit.disabled = false; });
   });
 
   rankingEntrySkip.addEventListener('click', closeRankingEntryModal);
@@ -429,30 +495,45 @@
     rankingBoardModal.hidden = false;
   }
 
+  // 2026-08-11: 로컬 저장 대신 Firebase Realtime Database에서 그 모드의 상위 기록을 가져온다.
+  // 탭을 빠르게 여러 번 누르면 먼저 보낸 요청이 나중에 도착해서 엉뚱한 탭에 그려질 수 있어
+  // (네트워크 응답 순서는 요청 순서와 다를 수 있음) currentRankingTab과 비교해서 이미 다른 탭으로
+  // 넘어갔으면 그 응답은 버린다.
   function renderRankingTab(mode) {
     currentRankingTab = mode;
     Array.from(rankingTabs.children).forEach((tab) => {
       tab.classList.toggle('active', tab.dataset.mode === mode);
     });
-    const entries = getRankingEntries()
-      .filter((e) => e.mode === mode)
-      .sort((a, b) => a.seconds - b.seconds);
-    rankingList.innerHTML = '';
-    if (!entries.length) {
-      rankingList.innerHTML = '<p class="ranking-empty">No records yet for this mode!</p>';
+    if (!isRankingBackendConfigured()) {
+      rankingList.innerHTML = '<p class="ranking-empty">Ranking isn\'t set up yet!</p>';
       return;
     }
-    entries.forEach((e, i) => {
-      const row = document.createElement('div');
-      row.className = 'ranking-row';
-      const meta = e.country || '';
-      row.innerHTML =
-        '<span class="r-rank">' + (i + 1) + '</span>' +
-        '<span class="r-info"><span class="r-name">' + escapeHtml(e.name) + '</span>' +
-        (meta ? '<br><span class="r-meta">' + escapeHtml(meta) + '</span>' : '') + '</span>' +
-        '<span class="r-time">⏱ ' + formatClearTime(e.seconds) + '</span>';
-      rankingList.appendChild(row);
-    });
+    rankingList.innerHTML = '<p class="ranking-empty">Loading…</p>';
+    fetch(rankingUrl(mode, '?orderBy="seconds"&limitToFirst=20'))
+      .then((res) => { if (!res.ok) throw new Error('bad status'); return res.json(); })
+      .then((data) => {
+        if (currentRankingTab !== mode) return;
+        const entries = data ? Object.values(data) : [];
+        entries.sort((a, b) => a.seconds - b.seconds);
+        rankingList.innerHTML = '';
+        if (!entries.length) {
+          rankingList.innerHTML = '<p class="ranking-empty">No records yet for this mode!</p>';
+          return;
+        }
+        entries.forEach((e, i) => {
+          const row = document.createElement('div');
+          row.className = 'ranking-row';
+          row.innerHTML =
+            '<span class="r-rank">' + (i + 1) + '</span>' +
+            '<span class="r-info"><span class="r-name">' + (e.flag || '') + ' ' + escapeHtml(e.nickname || 'Anonymous') + '</span></span>' +
+            '<span class="r-time">⏱ ' + formatClearTime(e.seconds) + '</span>';
+          rankingList.appendChild(row);
+        });
+      })
+      .catch(() => {
+        if (currentRankingTab !== mode) return;
+        rankingList.innerHTML = '<p class="ranking-empty">Couldn\'t load ranking — check your internet.</p>';
+      });
   }
 
   function escapeHtml(str) {
@@ -2350,27 +2431,30 @@
   }
 
   btnCoverStart.addEventListener('click', () => {
-    // 프로필(이름/나라)이 아직 없으면 맵으로 넘어가기 전에 딱 한 번만 물어본다.
+    // 프로필(닉네임/국기)이 아직 없으면 맵으로 넘어가기 전에 딱 한 번만 물어본다.
     if (getPlayerProfile()) {
       enterMapFromCover();
     } else {
       playerInputName.value = '';
-      playerInputCountry.value = '';
+      populateFlagSelect(playerInputFlag);
       playerEntryModal.hidden = false;
     }
   });
 
   playerEntrySubmit.addEventListener('click', () => {
+    // 2026-08-11: "닉네임/국가는 한 번 등록하면 수정 불가" 요청 — 여기서 저장하면 그 뒤로는
+    // (getPlayerProfile()이 항상 truthy 객체를 반환하므로) 이 모달도, 랭킹 등록 모달의 입력칸도
+    // 다시는 안 뜨고 표시만 된다.
     savePlayerProfile({
-      name: playerInputName.value.trim() || 'Anonymous',
-      country: playerInputCountry.value.trim()
+      nickname: playerInputName.value.trim() || 'Anonymous',
+      flag: playerInputFlag.value || '🌍'
     });
     playerEntryModal.hidden = true;
     enterMapFromCover();
   });
 
   playerEntrySkip.addEventListener('click', () => {
-    savePlayerProfile({ name: '', country: '' }); // 다시 묻지 않도록 빈 프로필이라도 저장
+    savePlayerProfile({ nickname: '', flag: '' }); // 다시 묻지 않도록 빈 프로필이라도 저장
     playerEntryModal.hidden = true;
     enterMapFromCover();
   });
@@ -2464,6 +2548,9 @@
   // 갱신되지 않아 레벨 클리어 시간 기록(recordLevelClearTime)/완주 체크(checkFullRunClear)가 전혀
   // 발동하지 않는다(2026-08-11 확인). 이 경로를 실제로 검증하려면 레벨 진입은 반드시 이 훅으로.
   window.__debugOpenLevel = (lv) => openLevel(lv);
+
+  // 디버그/테스트용: 10레벨 완주 없이 랭킹 등록 모달을 바로 띄운다(잠금 상태/제출 흐름 검증용).
+  window.__debugOpenRankingEntry = (mode, seconds) => openRankingEntryModal(mode, seconds);
 
   // 디버그/테스트용: id로 도안을 열고 영역 수/난이도/팔레트 크기/정답색 목록을 반환
   window.__debugOpenTemplate = (tplId) => new Promise((resolve) => {
