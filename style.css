@@ -1002,8 +1002,8 @@ button:active { transform: scale(0.94); }
     --muted: #A9A3C7;
     --brand: #A79CFF;
     --brand-soft: #35305A;
-    --cleared-bg: #4A2E3B;
-    --cleared-bezel: #6B3B52;
+    --cleared-bg: #8C3868;
+    --cleared-bezel: #6B2650;
   }
   /* #fill-canvas는 이제 배경 없음(투명) — "캔버스 지우고 물체만" 요청으로 라이트/다크 둘 다
      제거해야 함. 여기 남아있던 다크모드 전용 배경을 놓쳐서 다크모드에서만 카드가 계속 보였음. */
