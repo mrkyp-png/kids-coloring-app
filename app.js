@@ -2115,6 +2115,32 @@
     } catch (e) { /* 오디오 미지원 브라우저는 무시 */ }
   }
 
+  // 2026-08-11: "폰에 TTS 음성 자체가 안 깔려있어 음성 멘트가 전혀 안 들린다"는 제보 대응 —
+  // 시스템에 TTS 음성이 하나도 없는 기기는 speak()를 불러봐야 에러 없이 조용히 실패하기만
+  // 하므로, 그럴 땐 음성 대신 짧은 축하 차임(오실레이터 합성, 위 playPop/playFirework와 같은
+  // 방식)을 대신 틀어서 최소한 반응하는 소리는 나게 한다.
+  function playCheerChime() {
+    if (!soundOn) return;
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = audioCtx.currentTime;
+      const notes = [523.25, 659.25, 783.99, 1046.5]; // C5-E5-G5-C6, 신나는 상승 아르페지오
+      notes.forEach((freq, i) => {
+        const t = now + i * 0.09;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0.001, t);
+        gain.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.24);
+      });
+    } catch (e) { /* 오디오 미지원 브라우저는 무시 */ }
+  }
+
   // 레벨을 클리어했을 때 "Excellent!"를 아이 목소리 느낌으로 읽어준다(브라우저 내장 음성합성 사용 —
   // 실제 아이 목소리 음원은 없으므로, 밝고 높은 톤(pitch/rate 상향)으로 흉내낸다).
   let cachedVoices = [];
@@ -2161,7 +2187,11 @@
   // 빼는 게 알려진 우회법.
   let pendingUtterance = null;
   function speakPraise(phrase, opts) {
-    if (!soundOn || !('speechSynthesis' in window)) return;
+    if (!soundOn) return;
+    if (!('speechSynthesis' in window) || !cachedVoices.length) {
+      playCheerChime(); // 이 기기엔 TTS 음성이 없음 — 말 대신 차임으로 대체
+      return;
+    }
     opts = opts || {};
     try {
       const utter = new SpeechSynthesisUtterance(phrase);
