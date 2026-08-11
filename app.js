@@ -1391,7 +1391,13 @@
           if (maxCh < DARK_MERGE_MAX && r.size < DARK_MERGE_SIZE) {
             mergeLabels.add(r.label);
           } else {
-            colorBySeed.set(r.seed, snapToPaletteColor(rr, gg, bb, tpl.paletteOverride));
+            // 2026-08-11: "쉬움 모드 정답색이 원래 이모지 색과 동일하게" 요청 — 이 색은
+            // 쉬움 모드/보스에서 그대로 정답색으로 쓰이는데(renderGoalPreview의 sampled 분기),
+            // 예전엔 항상 앱 팔레트(COLORS)에서 가장 가까운 색으로 스냅해서 원본 이모지 색과
+            // 미묘하게 달라 보였다. paletteOverride가 있는 도안(커스텀 팔레트를 일부러 지정한
+            // 경우)만 계속 스냅하고, 그 외(현재 전부)는 실제 평균 색을 그대로 정답색으로 쓴다
+            // — 팔레트는 renderPalette()가 정답색 자체로부터 동적으로 만들어서 문제 없음.
+            colorBySeed.set(r.seed, tpl.paletteOverride ? snapToPaletteColor(rr, gg, bb, tpl.paletteOverride) : rgbToHex(rr, gg, bb));
           }
         });
         if (mergeLabels.size) {
@@ -1854,6 +1860,11 @@
       });
       palette.appendChild(btn);
     });
+  }
+
+  function rgbToHex(r, g, b) {
+    const clamp = (v) => Math.max(0, Math.min(255, Math.round(v)));
+    return '#' + [clamp(r), clamp(g), clamp(b)].map((v) => v.toString(16).padStart(2, '0')).join('');
   }
 
   // ================= 플러드필 =================
@@ -2565,6 +2576,9 @@
 
   // 디버그/테스트용: 현재 도안의 채점 대상 영역 개수 확인
   window.__debugRegionCount = () => (currentGradableRegions ? currentGradableRegions.length : 0);
+
+  // 디버그/테스트용: 현재 도안의 영역별 정답색(label -> hex) 확인 — 쉬움모드 실사색 정확도 검증용.
+  window.__debugLabelColors = () => (currentLabelToColor ? Array.from(currentLabelToColor.entries()) : []);
 
   // 디버그/테스트용: 실제 openLevel(lv)을 그대로 호출 — __debugOpenTemplate만으로는 currentLevel이
   // 갱신되지 않아 레벨 클리어 시간 기록(recordLevelClearTime)/완주 체크(checkFullRunClear)가 전혀
