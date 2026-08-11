@@ -96,6 +96,7 @@
   let audioCtx = null;
 
   // ---------- DOM ----------
+  const loadingScreen = document.getElementById('loading-screen');
   const onboardingModal = document.getElementById('onboarding-modal');
   const onboardingGateStep = document.getElementById('onboarding-gate-step');
   const onboardingConsentStep = document.getElementById('onboarding-consent-step');
@@ -2540,6 +2541,22 @@
   renderCoverBosses();
   renderMap();
   renderPalette();
+
+  // 2026-08-11: 로딩 화면(마스코트) 추가 — 초기화는 사실 거의 즉시 끝나지만, 뜬 즉시 사라지면
+  // 그냥 화면이 깜빡이는 것처럼 보여서 브랜딩 효과가 없다. 최소 노출시간(600ms)을 보장한 뒤
+  // 페이드아웃하고 완전히 지운다(그 아래 온보딩/표지 화면은 이미 다 그려진 상태로 대기 중).
+  const LOADING_MIN_MS = 600;
+  const pageLoadStart = Date.now();
+  function hideLoadingScreen() {
+    const elapsed = Date.now() - pageLoadStart;
+    const wait = Math.max(0, LOADING_MIN_MS - elapsed);
+    setTimeout(() => {
+      loadingScreen.classList.add('is-hiding');
+      setTimeout(() => { loadingScreen.hidden = true; }, 400); // transition(0.35s)이 끝난 뒤 완전히 제거
+    }, wait);
+  }
+  if (document.readyState === 'complete') hideLoadingScreen();
+  else window.addEventListener('load', hideLoadingScreen);
 
   // 디버그/테스트용: 현재 도안의 채점 대상 영역 개수 확인
   window.__debugRegionCount = () => (currentGradableRegions ? currentGradableRegions.length : 0);

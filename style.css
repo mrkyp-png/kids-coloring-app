@@ -61,6 +61,45 @@ button {
 }
 button:active { transform: scale(0.94); }
 
+/* ---------- 로딩 화면(마스코트) ---------- */
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100; /* 온보딩 모달(50)보다도 위 — 로딩 끝나기 전엔 뭐든 다 가림 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: linear-gradient(160deg, var(--bg), var(--brand-soft));
+  transition: opacity 0.35s ease;
+}
+.loading-screen.is-hiding { opacity: 0; pointer-events: none; }
+.loading-mascot {
+  width: clamp(72px, 22vw, 110px);
+  height: clamp(72px, 22vw, 110px);
+  border-radius: 50%;
+  background: var(--card-bg);
+  box-shadow: var(--shadow);
+  object-fit: cover;
+  animation: boss-fairy-hover 2.2s ease-in-out infinite; /* 표지 화면 요정 애니메이션 재사용 */
+}
+.loading-spinner {
+  width: 34px;
+  height: 34px;
+  border: 5px solid var(--brand-soft);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: loading-spin 0.8s linear infinite;
+}
+@keyframes loading-spin { to { transform: rotate(360deg); } }
+.loading-text {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
 .screen {
   min-height: 100dvh;
   display: flex;
