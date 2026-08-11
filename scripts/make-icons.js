@@ -16,9 +16,22 @@ function buildHtml(size) {
   const badgeSize = Math.round(size * 0.62);
   const imgSize = Math.round(size * 0.53);
   const imgPath = path.join(__dirname, '..', 'assets', 'emoji', 'boss-fairygirl-icon.svg').replace(/\\/g, '/');
+  // 2026-08-11: "캐릭터만 있으니 밋밋하다" -> 반짝이(✨) 4개로 포인트 추가(처음 2개 요청 후 "4개
+  // 정도 추가해" 추가 요청). 배지(원, 반지름 0.31*size) 바로 바깥, maskable 안전영역(반지름
+  // 0.4*size) 안쪽인 반지름 0.36*size 위치에 90도씩 4개(정사각형 대각선 방향).
+  const sparkleRadius = size * 0.36;
+  const sparkleSize = Math.round(size * 0.075);
+  const angles = [45, 135, 225, 315];
+  const sparkles = angles.map((deg, i) => {
+    const rad = (deg * Math.PI) / 180;
+    const dx = Math.round(sparkleRadius * Math.cos(rad));
+    const dy = Math.round(sparkleRadius * Math.sin(rad));
+    return `<span class="sparkle" style="top: calc(50% - ${sparkleSize / 2}px + ${dy}px); left: calc(50% - ${sparkleSize / 2}px + ${dx}px);">✨</span>`;
+  }).join('\n      ');
   return `<!DOCTYPE html><html><head><style>
     html, body { margin:0; padding:0; }
     #icon {
+      position: relative;
       width: ${size}px; height: ${size}px;
       background: #6C5CE7; /* 모서리까지 꽉 채움 — maskable 배경 규칙 */
       display: flex; align-items: center; justify-content: center;
@@ -30,8 +43,16 @@ function buildHtml(size) {
       display: flex; align-items: center; justify-content: center;
     }
     #badge img { width: ${imgSize}px; height: ${imgSize}px; object-fit: contain; }
+    .sparkle {
+      position: absolute;
+      font-size: ${sparkleSize}px;
+      line-height: 1;
+    }
   </style></head><body>
-    <div id="icon"><div id="badge"><img src="file:///${imgPath}"></div></div>
+    <div id="icon">
+      ${sparkles}
+      <div id="badge"><img src="file:///${imgPath}"></div>
+    </div>
   </body></html>`;
 }
 
