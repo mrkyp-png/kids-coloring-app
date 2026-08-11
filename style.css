@@ -26,6 +26,13 @@
   --radius-md: 18px;
   --cleared-bg: #FFE1EC;
   --cleared-bezel: #F5AFCB;
+
+  /* 2026-08-11: "박스 색깔이 촌스럽다" 개선 — 맵 화면 레벨 1~10 박스를 전부 크림/흰색 단색
+     대신 무지개처럼 색을 순환시켜서 알록달록하게(60-30-10 비율 참고 — 배경은 중성, 박스만
+     파스텔로 포인트). hue를 36도씩 10단계로 고르게 나눠서 옆 박스와 색이 안 겹치게 함. */
+  --lv-hue-1: 350; --lv-hue-2: 22; --lv-hue-3: 42; --lv-hue-4: 100; --lv-hue-5: 152;
+  --lv-hue-6: 188; --lv-hue-7: 212; --lv-hue-8: 248; --lv-hue-9: 278; --lv-hue-10: 318;
+  --lv-sat: 72%; --lv-light: 88%; --lv-bezel-light: 68%;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -391,9 +398,9 @@ button:active { transform: scale(0.94); }
    애니메이션을 준다(시작 화면 Start 버튼과 같은 방식). */
 .level-node {
   position: relative;
-  background: var(--card-bg);
+  background: var(--lv-bg, var(--card-bg));
   border-radius: var(--radius-md);
-  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.16), 0 10px 16px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  box-shadow: 0 6px 0 var(--lv-bezel, rgba(0, 0, 0, 0.16)), 0 10px 16px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   padding: 18px 10px 14px;
   display: flex;
   flex-direction: column;
@@ -403,7 +410,7 @@ button:active { transform: scale(0.94); }
 }
 .level-node:not(:disabled):active {
   transform: translateY(5px);
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  box-shadow: 0 1px 0 var(--lv-bezel, rgba(0, 0, 0, 0.16)), 0 3px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 .level-node .lv-num {
   font-size: 2.5rem;
@@ -424,6 +431,23 @@ button:active { transform: scale(0.94); }
   opacity: 0.55;
 }
 .level-node.locked .lv-num { color: var(--muted); }
+
+/* 레벨 1~10 순서대로 색을 순환. box-shadow/background를 여기서 직접 못 박지 않고 --lv-bg/--lv-bezel
+   변수만 세팅해서, 실제 칠하는 곳(.level-node 기본 규칙과 :active 규칙)이 그 값을 var()로 읽게
+   한다 — 이렇게 안 하면 :active 눌림 그림자 규칙이랑 이 규칙이 서로 우선순위(specificity) 싸움을
+   해서 누르면 색이 도로 회색으로 튀는 버그가 생긴다. 클리어 상태는 .cleared가 리터럴 값으로 또
+   덮어써서(이 변수를 안 씀) 그대로 분홍 유지. */
+.level-node-wrap:nth-child(1) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-1), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-1), var(--lv-sat), var(--lv-bezel-light)); }
+.level-node-wrap:nth-child(2) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-2), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-2), var(--lv-sat), var(--lv-bezel-light)); }
+.level-node-wrap:nth-child(3) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-3), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-3), var(--lv-sat), var(--lv-bezel-light)); }
+.level-node-wrap:nth-child(4) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-4), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-4), var(--lv-sat), var(--lv-bezel-light)); }
+.level-node-wrap:nth-child(5) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-5), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-5), var(--lv-sat), var(--lv-bezel-light)); }
+.level-node-wrap:nth-child(6) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-6), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-6), var(--lv-sat), var(--lv-bezel-light)); }
+.level-node-wrap:nth-child(7) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-7), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-7), var(--lv-sat), var(--lv-bezel-light)); }
+.level-node-wrap:nth-child(8) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-8), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-8), var(--lv-sat), var(--lv-bezel-light)); }
+.level-node-wrap:nth-child(9) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-9), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-9), var(--lv-sat), var(--lv-bezel-light)); }
+.level-node-wrap:nth-child(10) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-10), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-10), var(--lv-sat), var(--lv-bezel-light)); }
+
 .level-node.cleared {
   /* 2026-08-11: "클리어시 연한 분홍색 처리" 요청 — 기존 브랜드색(연보라) 대신 연한 분홍으로 변경 */
   background: var(--cleared-bg);
@@ -431,6 +455,20 @@ button:active { transform: scale(0.94); }
 }
 .level-node.cleared:not(:disabled):active {
   box-shadow: 0 1px 0 var(--cleared-bezel), 0 3px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+.level-node .lv-preview-emoji {
+  /* 카드 밖으로 삐져나오면 옆 카드(간격이 좁음)의 배지와 겹쳐서 안쪽 코너에 배치 */
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
 }
 .level-node .lv-clear-badge {
   position: absolute;
@@ -1082,6 +1120,7 @@ button:active { transform: scale(0.94); }
     --brand-soft: #35305A;
     --cleared-bg: #8C3868;
     --cleared-bezel: #6B2650;
+    --lv-sat: 45%; --lv-light: 30%; --lv-bezel-light: 20%;
   }
   /* #fill-canvas는 이제 배경 없음(투명) — "캔버스 지우고 물체만" 요청으로 라이트/다크 둘 다
      제거해야 함. 여기 남아있던 다크모드 전용 배경을 놓쳐서 다크모드에서만 카드가 계속 보였음. */

@@ -859,7 +859,12 @@
       node.disabled = !unlocked;
       node.setAttribute('aria-label', 'Level ' + lv + (isClear ? ' (cleared)' : unlocked ? '' : ' (locked)'));
 
-      let inner = '<span class="lv-num">' + lv + '</span><span class="lv-label">Level</span>';
+      // 2026-08-11: "레벨 박스안에 이모지 넣어도 좋아" 요청 — 그 레벨 첫 도안의 이모지를 코너에
+      // 살짝 얹어서 숫자만 있던 밋밋한 카드에 그 레벨에 뭐가 들었는지 살짝 예고해준다(잠긴
+      // 레벨도 동일하게 보여줘서 궁금증 유발 — 미리보기일 뿐 실제 색은 안 보여줌).
+      const previewEmoji = list.length ? list[0].emoji : '';
+      let inner = '<span class="lv-preview-emoji">' + previewEmoji + '</span>' +
+        '<span class="lv-num">' + lv + '</span><span class="lv-label">Level</span>';
       if (!unlocked) {
         inner += '<span class="lv-lock">🔒</span>';
       } else if (isClear) {
