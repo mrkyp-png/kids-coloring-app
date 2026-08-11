@@ -6,7 +6,7 @@
 - 저장소: `mrkyp-png/kids-coloring-app` (GitHub Pages)
 - 배포 주소: https://mrkyp-png.github.io/kids-coloring-app/
 - 로컬 미리보기: `미리보기.bat` 더블클릭 (`index.html` 직접 열면 안 됨 — 도안이 흰 화면으로 뜸)
-- 체크포인트 태그: `색칠rev.0`(2026-08-10), `색칠rev.1`(2026-08-11), `색칠rev.2`(2026-08-11)
+- 체크포인트 태그: `색칠rev.0`(2026-08-10), `색칠rev.1`(2026-08-11), `색칠rev.2`(2026-08-11), `색칠rev.3`(2026-08-11)
 
 ---
 
