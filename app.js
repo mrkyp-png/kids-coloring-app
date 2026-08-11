@@ -821,9 +821,11 @@
       statLine.hidden = true;
     }
     // 이 모드로 뭔가 한 번이라도 진행한 게 있을 때만 "이 모드 초기화" 버튼을 보여준다.
-    const mode = getMode();
+    // 2026-08-11: "reset easy progress => 모드 리셋으로 변경" 요청 — 모드 이름을 매번 붙이던
+    // 긴 문구 대신 짧게 "Reset Mode"로 통일(어떤 모드든 지금 선택된 모드를 리셋한다는 의미는
+    // Ranking 바로 밑 위치+ 모드 선택 버튼과의 맥락으로 충분히 전달됨).
     btnResetAll.hidden = doneCount === 0;
-    btnResetAll.textContent = '🔄 Reset ' + (MODES[mode] ? MODES[mode].label : mode) + ' Progress';
+    btnResetAll.textContent = '🔄 Reset Mode';
 
     // 2026-08-11: "🚀 N more levels to go!" 문구 삭제 요청 — levelsLeftLine 자체는 index.html에
     // 남아있지만 항상 숨김 처리만 한다(엘리먼트를 지우는 것보다 안전).
@@ -1381,7 +1383,7 @@
         const DARK_MERGE_MAX = 90;
         const DARK_MERGE_SIZE = 4000;
         const mergeLabels = new Set();
-        const colorBySeed = new Map(); // seed 픽셀은 병합 전후로 안 바뀌는 안정적인 식별자
+        const rawColorBySeed = new Map(); // seed -> [r,g,b] 병합 판정 전 원본 평균색
         prov.gradable.forEach((r) => {
           const n = cnt.get(r.label) || 1;
           const rr = Math.round(sumR.get(r.label) / n);
@@ -1391,13 +1393,50 @@
           if (maxCh < DARK_MERGE_MAX && r.size < DARK_MERGE_SIZE) {
             mergeLabels.add(r.label);
           } else {
-            // 2026-08-11: "쉬움 모드 정답색이 원래 이모지 색과 동일하게" 요청 — 이 색은
-            // 쉬움 모드/보스에서 그대로 정답색으로 쓰이는데(renderGoalPreview의 sampled 분기),
-            // 예전엔 항상 앱 팔레트(COLORS)에서 가장 가까운 색으로 스냅해서 원본 이모지 색과
-            // 미묘하게 달라 보였다. paletteOverride가 있는 도안(커스텀 팔레트를 일부러 지정한
-            // 경우)만 계속 스냅하고, 그 외(현재 전부)는 실제 평균 색을 그대로 정답색으로 쓴다
-            // — 팔레트는 renderPalette()가 정답색 자체로부터 동적으로 만들어서 문제 없음.
-            colorBySeed.set(r.seed, tpl.paletteOverride ? snapToPaletteColor(rr, gg, bb, tpl.paletteOverride) : rgbToHex(rr, gg, bb));
+            rawColorBySeed.set(r.seed, [rr, gg, bb]);
+          }
+        });
+        // 2026-08-11: "쉬움 모드 정답색이 원래 이모지 색과 동일하게" 요청 — 이 색은 쉬움
+        // 모드/보스에서 그대로 정답색으로 쓰이는데(renderGoalPreview의 sampled 분기), 예전엔
+        // 항상 앱 팔레트(COLORS)에서 가장 가까운 색으로 스냅해서 원본 이모지 색과 미묘하게
+        // 달랐다. paletteOverride가 있는 도안(커스텀 팔레트를 일부러 지정한 경우)만 계속
+        // 스냅하고, 그 외(현재 전부)는 실제 평균 색 기반으로 정답색을 정한다.
+        // 그런데 그대로 다 쓰면 두 가지 부작용이 생겨서 같이 처리한다:
+        // 1) "상어 이빨색이 배경과 같아 구분 안 됨" — 흰색(또는 거의 흰색)이 그대로 정답색이면
+        //    칠한 흰색과 캔버스 배경(크림색, 안 칠한 상태)이 거의 똑같아 보인다. WHITE_SUBSTITUTE
+        //    (기존엔 팔레트 패딩용으로만 쓰이던 상수)로 눈에 띄는 크림/탠 색으로 바꿔치기.
+        // 2) "롤리팝 소용돌이의 주황 3단계처럼, 원래 이모지가 음영 표현용으로 쓴 미묘하게 다른
+        //    같은 계열 색이 전부 별개의 정답색이 돼서 색칠 퍼즐이 과하게 잘게 쪼개짐" — 도안
+        //    안에서 색끼리 비교해(snapToPaletteColor와 같은 가중치의 HSL 거리) 충분히 비슷하면
+        //    먼저 나온 색 하나로 합친다.
+        const SIMILAR_COLOR_DIST = 0.07;
+        const paletteClusters = []; // [{hex, hsl:[h,s,l]}] — paletteOverride 없는 도안 전용
+        const colorBySeed = new Map();
+        rawColorBySeed.forEach(([rr, gg, bb], seed) => {
+          if (tpl.paletteOverride) {
+            colorBySeed.set(seed, snapToPaletteColor(rr, gg, bb, tpl.paletteOverride));
+            return;
+          }
+          if (rr >= 245 && gg >= 245 && bb >= 245) {
+            colorBySeed.set(seed, WHITE_SUBSTITUTE);
+            return;
+          }
+          const hsl = rgbToHsl(rr, gg, bb);
+          const [h, s, l] = hsl;
+          let match = null;
+          for (const c of paletteClusters) {
+            let dh = Math.abs(h - c.hsl[0]);
+            if (dh > 180) dh = 360 - dh;
+            const hueWeight = 0.3 + 0.7 * Math.min(s, c.hsl[1]);
+            const dist = (dh / 180) * (dh / 180) * hueWeight * 6 + (s - c.hsl[1]) * (s - c.hsl[1]) * 0.5 + (l - c.hsl[2]) * (l - c.hsl[2]) * 0.5;
+            if (dist < SIMILAR_COLOR_DIST) { match = c; break; }
+          }
+          if (match) {
+            colorBySeed.set(seed, match.hex);
+          } else {
+            const hex = rgbToHex(rr, gg, bb);
+            paletteClusters.push({ hex, hsl });
+            colorBySeed.set(seed, hex);
           }
         });
         if (mergeLabels.size) {

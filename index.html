@@ -73,26 +73,26 @@
 <!-- ===================== Map screen (home) ===================== -->
 <section id="map-screen" class="screen" hidden>
   <header class="gallery-header">
-    <div class="title-row">
-      <div id="mode-selector" class="mode-selector" role="group" aria-label="Difficulty mode">
-        <button class="mode-btn" data-mode="easy">Easy<span class="mode-btn-time">20m</span></button>
-        <button class="mode-btn" data-mode="normal">Normal<span class="mode-btn-time">15m</span><span class="mode-btn-lock">🔒</span></button>
-        <button class="mode-btn" data-mode="hard">Hard<span class="mode-btn-time">10m</span><span class="mode-btn-lock">🔒</span></button>
-        <button class="mode-btn" data-mode="veryhard">Very Hard<span class="mode-btn-time">5m</span><span class="mode-btn-lock">🔒</span></button>
-      </div>
-      <h1>🎨 Coloring Fun</h1>
+    <!-- 2026-08-11: "coloring fun / pick a level to start! 삭제, 그 자리엔 진행률 문구만" 요청 —
+         제목/부제 삭제, stat-line(진행률)만 그 위치에 남김. mode-selector는 absolute라 title-row
+         래퍼 없이도(가장 가까운 position:relative인 gallery-header 기준) 그대로 위치 유지됨. -->
+    <div id="mode-selector" class="mode-selector" role="group" aria-label="Difficulty mode">
+      <button class="mode-btn" data-mode="easy">Easy<span class="mode-btn-time">20m</span></button>
+      <button class="mode-btn" data-mode="normal">Normal<span class="mode-btn-time">15m</span><span class="mode-btn-lock">🔒</span></button>
+      <button class="mode-btn" data-mode="hard">Hard<span class="mode-btn-time">10m</span><span class="mode-btn-lock">🔒</span></button>
+      <button class="mode-btn" data-mode="veryhard">Very Hard<span class="mode-btn-time">5m</span><span class="mode-btn-lock">🔒</span></button>
     </div>
-    <p class="subtitle">Pick a level to start!</p>
     <p id="stat-line" class="stat-line" hidden></p>
     <p id="levels-left-line" class="levels-left-line" hidden></p>
     <button id="btn-ranking" class="ranking-btn">🏆 Ranking</button>
-    <!-- 2026-08-11: "음악/소리 이모티콘도 메인페이지쪽으로 옮겨, 좀 작게 만들어서 구성" 요청 —
-         원래 색칠 화면 헤더에만 있던 것을 여기로 옮김(작은 아이콘 2개, Ranking 알약 밑에). -->
+    <!-- 2026-08-11: "reset easy progress => 모드 리셋으로 변경, Ranking 아래에 같은 박스로" 요청 —
+         Ranking과 같은 알약 스타일로 그 바로 밑에 배치(reset-all-btn -> ranking-btn 스타일 재사용). -->
+    <button id="btn-reset-all" class="ranking-btn reset-all-btn" hidden>🔄 Reset Mode</button>
+    <!-- "음악/소리 이모티콘도 메인페이지쪽으로 옮겨, 좀 작게" 요청 — Reset Mode 밑에 작게. -->
     <div class="map-header-sound-group">
       <button id="btn-music" class="icon-btn icon-btn-sm" aria-label="Toggle background music">🎵</button>
       <button id="btn-sound" class="icon-btn icon-btn-sm" aria-label="Turn sound on or off">🔊</button>
     </div>
-    <button id="btn-reset-all" class="reset-all-btn" hidden>🔄 Reset All &amp; Play Again</button>
   </header>
   <div id="map-grid" class="map-grid" role="list" aria-label="Level map"></div>
   <div id="boss-section" class="boss-section">

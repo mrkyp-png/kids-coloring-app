@@ -256,15 +256,9 @@ button:active { transform: scale(0.94); }
   box-shadow: 0 1px 0 #4834a8, 0 3px 8px rgba(0, 0, 0, 0.2);
 }
 
-/* ---------- 난이도(타이머) 모드 선택 — 2x2, 칸 크기 전부 동일(고정 폭 그리드), 제목 이모지 옆 ---------- */
-.title-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.title-row h1 { margin: 0; }
+/* ---------- 난이도(타이머) 모드 선택 — 2x2, 칸 크기 전부 동일(고정 폭 그리드) ---------- */
+/* 2026-08-11: "coloring fun 삭제" 요청으로 제목(h1)이 없어져서 이 자리를 잡아주던 title-row
+   래퍼도 필요 없어짐(mode-selector는 absolute라 gallery-header 기준으로 그대로 위치 유지). */
 .mode-selector {
   position: absolute;
   top: 16px;
@@ -348,16 +342,12 @@ button:active { transform: scale(0.94); }
 .gallery-header {
   position: relative;
   text-align: center;
-  /* 위쪽에 모드 선택(좌상단)/랭킹(우상단)이 고정으로 얹히므로, 제목이 그 아래로 밀려서
-     겹치지 않도록 top 여백을 그 높이만큼 넉넉히 확보한다.
-     2026-08-11: 전체 글자 크기 확대(18px root)로 모드 버튼 2x2 블록 실측 높이가
-     93px까지 늘어나 100px 여백과 거의 붙어버림(9px 겹침 확인) — 여유 두고 128px로. */
-  padding: 128px 16px 8px;
-}
-.gallery-header h1 {
-  font-size: clamp(1.6rem, 5vw, 2.2rem);
-  margin: 0 0 4px;
-  color: var(--brand);
+  /* 위쪽에 모드 선택(좌상단)/Ranking+Reset Mode+소리버튼(우상단, 세로로 쌓임)이 고정으로
+     얹히므로, stat-line이 그 아래로 밀려서 겹치지 않도록 top 여백을 그 높이만큼 확보한다.
+     2026-08-11: "coloring fun/부제 삭제" 이후 우측 컬럼이 Ranking(40)+Reset Mode(40)+
+     소리버튼(36) 3단으로 쌓이면서(총 ~150px) 왼쪽 모드선택 2x2 블록(~109px)보다 더 커져서
+     그 기준으로 다시 계산 — 여유 두고 168px. */
+  padding: 168px 16px 8px;
 }
 .subtitle {
   margin: 0;
@@ -374,18 +364,6 @@ button:active { transform: scale(0.94); }
   border-radius: 999px;
   font-size: 0.95rem;
 }
-.reset-all-btn {
-  display: block;
-  margin: 12px auto 0;
-  background: var(--brand);
-  color: #fff;
-  font-weight: 800;
-  font-size: 0.9rem;
-  padding: 10px 20px;
-  border-radius: 999px;
-  box-shadow: var(--shadow);
-}
-
 .level-header-mid {
   flex: 1;
   text-align: center;
@@ -821,10 +799,11 @@ button:active { transform: scale(0.94); }
   gap: 6px;
   padding: 3px 14px 6px;
 }
+/* 2026-08-11: 다른 버튼들(Start, 레벨박스)과 같은 키캡 입체감을 툴바/모달 버튼에도 통일 적용. */
 .tool-btn {
   flex: 1;
-  background: var(--card-bg);
-  box-shadow: var(--shadow);
+  background: var(--lv-bg, var(--card-bg));
+  box-shadow: 0 4px 0 var(--lv-bezel, rgba(0, 0, 0, 0.14)), 0 6px 10px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   border-radius: var(--radius-md);
   padding: 7px 4px;
   display: flex;
@@ -834,14 +813,24 @@ button:active { transform: scale(0.94); }
   font-size: 0.9rem;
   min-height: 38px;
   color: var(--ink);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
 }
+.tool-btn:not(:disabled):active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--lv-bezel, rgba(0, 0, 0, 0.14)), 0 2px 4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+.tool-btn:disabled { opacity: 0.5; }
 /* 2026-08-10: "셀 안에서 안 벗어나는 수준으로 최대한 크게" — 0.4rem(거의 안 보임)이었던 걸 버튼
    폭 안에서 "Undo/Clear/Done!" 다 안 잘리고 안 줄바꿈되는 한도까지 키움. */
 .tool-btn span { font-size: 0.68rem; font-weight: 600; white-space: nowrap; }
 .tool-btn-primary {
-  background: var(--good);
+  --lv-bg: var(--good);
+  --lv-bezel: #22A857;
   color: #fff;
 }
+/* 색칠 화면 툴바의 Undo/Clear는 밋밋한 흰색이라 파스텔 포인트만 살짝(Done!과 안 헷갈리게 초록은 피함). */
+.toolbar .tool-btn:nth-child(1) { --lv-bg: #CFE3FF; --lv-bezel: #9FC1EE; }
+.toolbar .tool-btn:nth-child(2) { --lv-bg: #FFE7BF; --lv-bezel: #EFC48A; }
 
 /* ---------- 부모 평가 모달 ---------- */
 .modal-overlay {
@@ -934,9 +923,13 @@ button:active { transform: scale(0.94); }
   border-radius: 999px;
   border: 2px solid var(--brand);
 }
+/* 2026-08-11: "reset easy progress => 모드 리셋으로 변경하고, Ranking 아래에 같은 박스로" 요청 —
+   .reset-all-btn이 .ranking-btn 클래스를 같이 받아서 모양은 그대로 재사용하고, top만 그 바로
+   밑으로 내림. */
+.reset-all-btn { top: 60px; }
 .map-header-sound-group {
   position: absolute;
-  top: 62px;
+  top: 104px;
   right: 16px;
   z-index: 2;
   display: flex;
@@ -1150,10 +1143,16 @@ button:active { transform: scale(0.94); }
   border-radius: 999px;
 }
 .boss-card.locked {
-  background: var(--card-bg);
   color: var(--muted);
   opacity: 0.75;
 }
+/* 2026-08-11: 잠긴 보스 카드가 전부 똑같이 회백색이라 밋밋했음 — "잠겨있어도 이 모드 색깔은
+   살짝 보인다"는 느낌으로 모드별로 아주 옅은 색조만 살짝 입힘(채도 낮게, locked라는 인상은
+   그대로 유지). bossGrid는 항상 easy/normal/hard/veryhard 4개 고정 순서라 nth-child 안전함. */
+.boss-grid > .boss-card.locked:nth-child(1) { background: #F7DCE6; }
+.boss-grid > .boss-card.locked:nth-child(2) { background: #DCEDE6; }
+.boss-grid > .boss-card.locked:nth-child(3) { background: #E5DCF2; }
+.boss-grid > .boss-card.locked:nth-child(4) { background: #F2E3DC; }
 .boss-card.locked .boss-lock { font-size: 1.6rem; }
 .boss-card.boss-cleared {
   background: linear-gradient(160deg, #C2185B, #F368E0);
