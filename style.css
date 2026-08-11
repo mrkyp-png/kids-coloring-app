@@ -97,21 +97,68 @@ button:active { transform: scale(0.94); }
   gap: clamp(10px, 4vw, 18px);
 }
 .cover-boss-item {
+  position: relative; /* 반짝이/광선 오버레이가 원 밖으로 삐져나오게 하려고 클리핑은 img 쪽으로 옮김 */
   width: clamp(56px, 16vw, 82px);
   height: clamp(56px, 16vw, 82px);
-  background: var(--card-bg);
-  border-radius: 50%;
-  box-shadow: var(--shadow);
-  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  padding: 0;
 }
 .cover-boss-item img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  background: var(--card-bg);
+  border-radius: 50%;
+  box-shadow: var(--shadow);
+}
+
+/* 캐릭터별 애니메이션 — SVG 내부는 그대로 두고 이미지 전체에 트랜스폼만 걸어서 흉내 낸다
+   (2026-08-11, 스타트 화면 보스 4개가 움직이는 느낌을 주기 위한 요청). */
+.cover-boss-easy img {
+  animation: boss-fairy-hover 2.2s ease-in-out infinite;
+}
+@keyframes boss-fairy-hover {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-6px) rotate(3deg); }
+}
+
+.cover-boss-normal img {
+  transform-origin: 50% 85%; /* 꼬리 쪽을 축으로 좌우로 살랑거림 */
+  animation: boss-mermaid-sway 1.8s ease-in-out infinite;
+}
+@keyframes boss-mermaid-sway {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(8deg); }
+}
+
+.cover-boss-hard img {
+  animation: boss-witch-wiggle 2s ease-in-out infinite;
+}
+@keyframes boss-witch-wiggle {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+.boss-sparkle {
+  position: absolute;
+  font-size: 0.9em;
+  pointer-events: none;
+  animation: boss-sparkle-twinkle 1.4s ease-in-out infinite;
+}
+.boss-sparkle-a { top: -2px; right: -4px; animation-delay: 0s; }
+.boss-sparkle-b { bottom: 4px; right: -8px; font-size: 0.65em; animation-delay: 0.5s; }
+@keyframes boss-sparkle-twinkle {
+  0%, 100% { opacity: 0.2; transform: scale(0.6); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+.cover-boss-veryhard img {
+  animation: boss-hero-idle 1.6s ease-in-out infinite;
+}
+@keyframes boss-hero-idle {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 .cover-start-btn {
   background: var(--brand);
@@ -561,7 +608,10 @@ button:active { transform: scale(0.94); }
   width: min(100cqw, 100cqh, 420px);
   height: min(100cqw, 100cqh, 420px);
   border-radius: var(--radius-lg);
-  cursor: pointer;
+  /* PC(마우스)에서는 색칠 중이라는 게 바로 보이게 연필 커서로 — 터치 기기는 어차피 커서가
+     안 보이니 그대로 둬도 무관하다(2026-08-11 요청). 팁(끝) 좌표가 클릭 지점이 되도록 hotspot을
+     이모지 연필 끝(좌하단)에 맞춰뒀다. */
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Ctext x='0' y='28' font-size='28'%3E%E2%9C%8F%EF%B8%8F%3C/text%3E%3C/svg%3E") 3 29, pointer;
 }
 
 .palette {

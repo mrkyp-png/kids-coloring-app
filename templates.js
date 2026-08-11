@@ -135,8 +135,23 @@ const COLORING_TEMPLATES = [
 // 기본값(level||10)이 알아서 최대 11색 팔레트를 골라준다 — 일반 도안과 완전히 동일한 파이프라인.
 const BOSS_TEMPLATES = {
   easy: { id: 'boss-fairygirl', name: 'Fairy Girl', emoji: '🧚‍♀️', mode: 'easy', isBoss: true, renderMode: 'emoji' },
-  normal: { id: 'boss-mergirl', name: 'Mermaid Girl', emoji: '🧜‍♀️', mode: 'normal', isBoss: true, renderMode: 'emoji' },
-  hard: { id: 'boss-witchgirl', name: 'Witch Girl', emoji: '🧙‍♀️', mode: 'hard', isBoss: true, renderMode: 'emoji' },
+  // simplifyRects: 든 손(손가락) 부분이 얇아서 통째로 검게 뒤덮이는 문제(2026-08-11) — 그 부분만
+  // 내부 색상-경계 감지를 건너뛰게 함.
+  normal: {
+    id: 'boss-mermaidgirl', name: 'Mermaid Girl', emoji: '🧜‍♀️', mode: 'normal', isBoss: true, renderMode: 'emoji',
+    simplifyRects: [
+      { x: 380, y: 225, w: 80, h: 70 }
+    ]
+  },
+  // simplifyRects: 마법구슬(좌상단)/박쥐(우상단) 장식이 명암 차이 때문에 통째로 검게 뒤덮여
+  // 색칠 공간이 안 남는 문제(2026-08-11) — 두 장식 영역만 내부 색상-경계 감지를 건너뛰게 함.
+  hard: {
+    id: 'boss-witchgirl', name: 'Witch Girl', emoji: '🧙‍♀️', mode: 'hard', isBoss: true, renderMode: 'emoji',
+    simplifyRects: [
+      { x: 10, y: 10, w: 130, h: 130 },
+      { x: 495, y: 10, w: 130, h: 130 }
+    ]
+  },
   veryhard: { id: 'boss-herogirl', name: 'Hero Girl', emoji: '🦸‍♀️', mode: 'veryhard', isBoss: true, renderMode: 'emoji' }
 };
 

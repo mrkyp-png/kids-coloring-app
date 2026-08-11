@@ -1,4 +1,4 @@
-const CACHE_NAME = 'coloring-app-v62';
+const CACHE_NAME = 'coloring-app-v64';
 const APP_SHELL = [
   './',
   './index.html',
@@ -26,8 +26,8 @@ const APP_SHELL = [
   './assets/emoji/boss-fairygirl-icon.svg',
   './assets/emoji/boss-herogirl.svg',
   './assets/emoji/boss-herogirl-icon.svg',
-  './assets/emoji/boss-mergirl.svg',
-  './assets/emoji/boss-mergirl-icon.svg',
+  './assets/emoji/boss-mermaidgirl.svg',
+  './assets/emoji/boss-mermaidgirl-icon.svg',
   './assets/emoji/boss-witchgirl.svg',
   './assets/emoji/boss-witchgirl-icon.svg',
   './assets/emoji/bus.svg',

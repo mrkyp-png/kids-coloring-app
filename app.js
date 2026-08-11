@@ -40,9 +40,12 @@
     veryhard: { label: 'Very Hard', minutes: 5 }
   };
   // 2026-08-11: 보스는 예전엔 그 모드의 레벨 타이머를 그대로 물려썼는데(쉬움 보스도 20분), 도안이
-  // 훨씬 어려워진(약 50영역) 지금은 어느 모드든 보스는 무조건 5분으로 통일 — "진짜 최종보스"답게
-  // 항상 빠듯하게.
-  const BOSS_BUDGET_SECONDS = 5 * 60;
+  // 훨씬 어려워진(약 50영역) 지금은 모드가 올라갈수록 더 빠듯하게 줄어드는 시간으로 통일했다
+  // (요청: 보통 4분/어려움 3분/매우어려움 2분). easy는 그대로 5분 유지.
+  const BOSS_MINUTES = { easy: 5, normal: 4, hard: 3, veryhard: 2 };
+  function getBossBudgetSeconds(mode) {
+    return (BOSS_MINUTES[mode] || 5) * 60;
+  }
   const MODE_KEY = 'gameMode';
   const LEVEL_ATTEMPTS_KEY = 'levelAttempts'; // { [level]: 시작한 시각(ms) } — 타임어택 진행 중인 레벨
   const LEVEL_TIMES_KEY = 'levelClearTimes'; // { [mode]: { [level]: seconds } } — 모드별로 완전히 분리 저장(아래 참고)
@@ -609,7 +612,7 @@
   }
   function startOrResumeBossAttempt(mode) {
     const attempts = getBossAttempts();
-    const budget = BOSS_BUDGET_SECONDS;
+    const budget = getBossBudgetSeconds(mode);
     const start = attempts[mode];
     if (start && (Date.now() - start) / 1000 < budget) return; // 아직 유효
     if (start) resetBossProgress(mode); // 만료된 이전 시도 — 점수 초기화
@@ -619,7 +622,7 @@
   function hasActiveBossAttempt(mode) {
     const attempts = getBossAttempts();
     const start = attempts[mode];
-    return !!(start && (Date.now() - start) / 1000 < BOSS_BUDGET_SECONDS && !isBossCleared(mode));
+    return !!(start && (Date.now() - start) / 1000 < getBossBudgetSeconds(mode) && !isBossCleared(mode));
   }
 
   function formatMMSS(totalSeconds) {
@@ -680,7 +683,7 @@
       const attempts = getBossAttempts();
       const start = attempts[mode];
       if (!start) return;
-      const budget = BOSS_BUDGET_SECONDS;
+      const budget = getBossBudgetSeconds(mode);
       const remaining = budget - (Date.now() - start) / 1000;
       if (remaining <= 0) { handleBossTimeUp(mode); return; }
       coloringTimerText.hidden = false;
@@ -814,14 +817,19 @@
       if (!tpl) return;
       const unlocked = isBossUnlocked(mode);
       const cleared = isBossCleared(mode);
+      // cleared(실제로 한 번이라도 깬 기록)가 있으면 unlocked 재계산 결과와 무관하게 항상
+      // 열린 자물쇠로 보여준다 — isBossUnlocked()는 레벨 10개의 시간기록에 의존하는 별도 체크라
+      // 다른 이유로 그 기록이 흔들려도 "이미 깬 보스"가 다시 잠긴 것처럼 보이면 안 됨
+      // (2026-08-11, 보스 클리어 직후에도 🔒로 보이는 버그 리포트로 우선순위 변경).
+      const showAsOpen = cleared || unlocked;
       const card = document.createElement('button');
-      card.className = 'boss-card' + (unlocked ? '' : ' locked') + (cleared ? ' boss-cleared' : '');
+      card.className = 'boss-card' + (showAsOpen ? '' : ' locked') + (cleared ? ' boss-cleared' : '');
       card.setAttribute('role', 'listitem');
-      card.disabled = !unlocked;
-      card.setAttribute('aria-label', tpl.name + (unlocked ? (cleared ? ' (defeated)' : '') : ' (locked)'));
+      card.disabled = !showAsOpen;
+      card.setAttribute('aria-label', tpl.name + (showAsOpen ? (cleared ? ' (defeated)' : '') : ' (locked)'));
 
       let inner = '<span class="boss-mode-label">' + MODES[mode].label + '</span>';
-      if (!unlocked) {
+      if (!showAsOpen) {
         inner += '<span class="boss-lock">🔒</span><span class="boss-name">' + tpl.name + '</span>';
       } else if (cleared) {
         // 이 보스를 깨면 실제로 다음 모드 잠금이 풀리므로, 그 의미를 그대로 열린 자물쇠로 보여줌
@@ -833,14 +841,16 @@
           '<span class="boss-cta">Tap to challenge!</span>';
       }
       card.innerHTML = inner;
-      if (unlocked) card.addEventListener('click', () => openBoss(mode));
+      if (showAsOpen) card.addEventListener('click', () => openBoss(mode));
       bossGrid.appendChild(card);
     });
   }
 
   function openBoss(mode) {
     const tpl = getBossTemplate(mode);
-    if (!tpl || !isBossUnlocked(mode)) return;
+    // isBossUnlocked()뿐 아니라 이미 깬 기록(isBossCleared)도 인정 — 위 renderBossSection의
+    // showAsOpen과 같은 이유(클리어 기록이 있으면 다른 체크와 무관하게 항상 재도전 가능해야 함).
+    if (!tpl || !(isBossUnlocked(mode) || isBossCleared(mode))) return;
     currentLevel = null;
     mapScreen.hidden = true;
     galleryScreen.hidden = true;
@@ -1037,6 +1047,13 @@
         // 1단계: 원래 검은 선(어두운 픽셀) + 색상 경계(옆/아래 픽셀과 색이 크게 다른 곳)를 벽 후보로 표시
         const rawWall = new Uint8Array(W * H);
         const EDGE_THRESHOLD = 35; // RGB 유클리드 거리 기준
+        // tpl.simplifyRects: 미세한 명암 차이가 여러 개 겹쳐 있어(마법구슬 반짝임, 박쥐 몸통 음영 등)
+        // 색상-경계 비교만으로는 그 작은 도형 전체가 벽으로 뒤덮여 색칠할 공간이 안 남는 부위를 지정.
+        // 이 구역 안에서는 색상 경계 비교를 건너뛰어 내부를 하나의 칠할 수 있는 영역으로 남긴다
+        // (실루엣 바깥 테두리는 1.5단계 알파 기준 처리가 별도로 그대로 만들어준다).
+        // 2026-08-11: 마법사 보스 마법구슬/박쥐가 색칠영역 없이 통째로 검게 나오는 문제로 추가.
+        const simplifyRects = tpl.simplifyRects || [];
+        const inSimplifyZone = (x, y) => simplifyRects.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
         for (let y = 0; y < H; y++) {
           for (let x = 0; x < W; x++) {
             const p = y * W + x;
@@ -1052,6 +1069,7 @@
             // 잘못 뭉쳐버리는 부작용이 있었다(2026-08-10, 신데렐라 팔 안쪽 검은 부분 버그로 발견).
             const isPartialAlpha = tpl.renderMode === 'emoji' && a > ALPHA_WALL_THRESHOLD && a < 250;
             let isWall = isPartialAlpha || (a > ALPHA_WALL_THRESHOLD && maxCh < EMOJI_DARK_THRESHOLD);
+            const skipColorEdge = inSimplifyZone(x, y); // 색상 경계만 무시, 알파(실루엣) 경계는 그대로 감지
             if (!isWall && a > ALPHA_WALL_THRESHOLD) {
               // 부드러운 그라데이션 경계는 바로 옆 픽셀 차이만으론 못 잡을 수 있어 2px 떨어진 픽셀과도 비교한다.
               // 오른쪽/아래쪽뿐 아니라 왼쪽/위쪽 이웃도 반드시 봐야 한다 — 검은 테두리 선이 없는(Twemoji
@@ -1064,25 +1082,25 @@
                   const j = (p + o) * 4;
                   const dr = data[i] - data[j], dg = data[i + 1] - data[j + 1], db = data[i + 2] - data[j + 2];
                   const da = data[i + 3] - data[j + 3];
-                  if (Math.sqrt(dr * dr + dg * dg + db * db) > EDGE_THRESHOLD || Math.abs(da) > EDGE_THRESHOLD) isWall = true;
+                  if ((!skipColorEdge && Math.sqrt(dr * dr + dg * dg + db * db) > EDGE_THRESHOLD) || Math.abs(da) > EDGE_THRESHOLD) isWall = true;
                 }
                 if (!isWall && x >= o) {
                   const j = (p - o) * 4;
                   const dr = data[i] - data[j], dg = data[i + 1] - data[j + 1], db = data[i + 2] - data[j + 2];
                   const da = data[i + 3] - data[j + 3];
-                  if (Math.sqrt(dr * dr + dg * dg + db * db) > EDGE_THRESHOLD || Math.abs(da) > EDGE_THRESHOLD) isWall = true;
+                  if ((!skipColorEdge && Math.sqrt(dr * dr + dg * dg + db * db) > EDGE_THRESHOLD) || Math.abs(da) > EDGE_THRESHOLD) isWall = true;
                 }
                 if (!isWall && y < H - o) {
                   const j = (p + o * W) * 4;
                   const dr = data[i] - data[j], dg = data[i + 1] - data[j + 1], db = data[i + 2] - data[j + 2];
                   const da = data[i + 3] - data[j + 3];
-                  if (Math.sqrt(dr * dr + dg * dg + db * db) > EDGE_THRESHOLD || Math.abs(da) > EDGE_THRESHOLD) isWall = true;
+                  if ((!skipColorEdge && Math.sqrt(dr * dr + dg * dg + db * db) > EDGE_THRESHOLD) || Math.abs(da) > EDGE_THRESHOLD) isWall = true;
                 }
                 if (!isWall && y >= o) {
                   const j = (p - o * W) * 4;
                   const dr = data[i] - data[j], dg = data[i + 1] - data[j + 1], db = data[i + 2] - data[j + 2];
                   const da = data[i + 3] - data[j + 3];
-                  if (Math.sqrt(dr * dr + dg * dg + db * db) > EDGE_THRESHOLD || Math.abs(da) > EDGE_THRESHOLD) isWall = true;
+                  if ((!skipColorEdge && Math.sqrt(dr * dr + dg * dg + db * db) > EDGE_THRESHOLD) || Math.abs(da) > EDGE_THRESHOLD) isWall = true;
                 }
               }
             }
@@ -1130,7 +1148,9 @@
         // 2단계: 선 두께를 손그림 도안과 비슷하게 통일한다.
         // 이모지 폰트의 원래 굵은 테두리는 "열린 칸에서 K px 이내"만 남기고 안쪽 깊은 부분은 깎아내고(얇게),
         // 이미 얇은 색 경계선은 K보다 훨씬 얇으므로 전혀 손대지 않고 그대로 유지한다.
-        const LINE_THICKNESS_CAP = 22; // WORK_SIZE(640) 기준 픽셀 — 손그림 stroke-width 10과 비슷한 굵기
+        // 2026-08-11: 22px는 너무 굵어서 이모지 원본의 얇은 끝부분(날개 끝, 손가락 등)이 안팎 모두
+        // 벽 판정 22px 이내에 들어가 통째로 잘려나가 보이는 문제가 있었다 — 50% 줄여서 완화.
+        const LINE_THICKNESS_CAP = 3; // WORK_SIZE(640) 기준 픽셀 — 2026-08-11, 추가로 50% 더 축소 (전체 도안 공용값)
         const dist = new Int32Array(W * H).fill(-1);
         const queue = new Int32Array(W * H);
         let qHead = 0, qTail = 0;
@@ -1164,7 +1184,7 @@
         if (tpl.overlaySvg) {
           const overlayMarkup =
             '<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">' +
-            '<g fill="none" stroke="' + STROKE_COLOR + '" stroke-width="6">' + tpl.overlaySvg + '</g></svg>';
+            '<g fill="none" stroke="' + STROKE_COLOR + '" stroke-width="3">' + tpl.overlaySvg + '</g></svg>';
           const overlayUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(overlayMarkup);
           const overlayImg = new Image();
           overlayImg.onload = () => {
@@ -2250,13 +2270,27 @@
       const tpl = getBossTemplate(mode);
       if (!tpl) return;
       const item = document.createElement('div');
-      item.className = 'cover-boss-item';
+      // 모드별로 다른 CSS 애니메이션(요정=날개 퍼덕임, 인어=꼬리 흔들기, 마법사=지팡이 흔들기+
+      // 반짝임)을 걸기 위한 클래스 — SVG 내부는 안 건드리고 컨테이너 transform + 오버레이 이펙트로
+      // 흉내만 낸다(2026-08-11, "10분 안에 되는 방법" 요청). 히어로걸(veryhard)의 좌우 광선은
+      // 요청으로 삭제(2026-08-11).
+      item.className = 'cover-boss-item cover-boss-' + mode;
       const img = document.createElement('img');
       // 시작 화면은 소품(반짝이/조개 등) 없이 캐릭터만 있는 깔끔한 아이콘을 그대로 유지
       // (실제 색칠 화면의 boss-<id>.svg는 영역 수를 늘리려고 소품이 붙어서 따로 둠).
       img.src = 'assets/emoji/' + tpl.id + '-icon.svg';
       img.alt = tpl.name;
       item.appendChild(img);
+      if (mode === 'hard') {
+        const sparkle1 = document.createElement('span');
+        sparkle1.className = 'boss-sparkle boss-sparkle-a';
+        sparkle1.textContent = '✨';
+        const sparkle2 = document.createElement('span');
+        sparkle2.className = 'boss-sparkle boss-sparkle-b';
+        sparkle2.textContent = '✨';
+        item.appendChild(sparkle1);
+        item.appendChild(sparkle2);
+      }
       coverBosses.appendChild(item);
     });
   }
@@ -2291,6 +2325,19 @@
     savePlayerProfile({ name: '', country: '' }); // 다시 묻지 않도록 빈 프로필이라도 저장
     playerEntryModal.hidden = true;
     enterMapFromCover();
+  });
+
+  // 모바일 브라우저는 백그라운드에 있는 동안 setInterval을 최대한 늦게 돌린다(스로틀링) —
+  // 그래서 레벨/보스 타임어택이 백그라운드 중에 실제로 만료돼도, 앱으로 돌아온 시점과 그
+  // 만료 판정(updateLevelTimerDisplay 틱)이 실행되는 시점 사이에 잠깐 텀이 생겨서, 그 사이엔
+  // 화면이 리셋 전 상태(예: ✓ 배지가 남은 갤러리)를 그대로 보여줄 수 있다. 다시 보이는 즉시
+  // 지금 떠 있는 화면을 최신 localStorage 기준으로 강제로 다시 그려서 이 텀을 없앤다
+  // (2026-08-11, "시간초과 확인 화면에 체크표시 남음" 리포트 대응).
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    updateLevelTimerDisplay(); // 만료됐으면 즉시 handleLevelTimeUp/handleBossTimeUp을 트리거
+    if (!mapScreen.hidden) renderMap();
+    else if (!galleryScreen.hidden) renderLevelGallery();
   });
 
   // ================= 초기화 =================
