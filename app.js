@@ -2154,11 +2154,18 @@
 
   // opts.pitch/rate로 상황별 기본 톤을 다르게 줄 수 있음(칭찬은 더 신나게, 이름 안내는 차분하게).
   // 매번 완전히 똑같은 pitch/rate면 대본 읽듯 밋밋하게 들려서 호출마다 살짝 흔들어 자연스럽게 만든다.
+  // 2026-08-11: 안드로이드 크롬은 배경음악/효과음(Web Audio)은 멀쩡히 나오는데 speechSynthesis만
+  // 조용히 씹히는 경우가 있음 — 크롬의 알려진 버그로, speak()에 넘긴 SpeechSynthesisUtterance를
+  // 다른 곳에서 아무도 참조하지 않으면 speak() 호출 직후 가비지컬렉터가 먼저 수거해버려서 실제
+  // 재생 전에 사라진다(에러도 안 남). utter를 함수 스코프 밖의 변수에 붙잡아둬서 GC 대상에서
+  // 빼는 게 알려진 우회법.
+  let pendingUtterance = null;
   function speakPraise(phrase, opts) {
     if (!soundOn || !('speechSynthesis' in window)) return;
     opts = opts || {};
     try {
       const utter = new SpeechSynthesisUtterance(phrase);
+      pendingUtterance = utter;
       const voice = pickChildishVoice();
       if (voice) utter.voice = voice;
       // 2026-08-10: "성인 목소리 같다"는 피드백으로 기본값을 API 상한(pitch 2.0)까지 밀어붙임 —
@@ -2169,6 +2176,9 @@
       utter.pitch = Math.min(2, Math.max(0.5, basePitch + (Math.random() - 0.5) * 0.3));
       utter.rate = Math.max(0.7, baseRate + (Math.random() - 0.5) * 0.15);
       utter.volume = 1;
+      utter.onend = utter.onerror = () => {
+        if (pendingUtterance === utter) pendingUtterance = null;
+      };
       // 2026-08-11: "폰에서는 멘트가 안 나온다"는 제보로 발견 — 모바일(특히 iOS Safari, 안드로이드
       // 크롬도 유사)은 speak()를 사용자 탭 이벤트 호출 스택 안에서 완전히 동기적으로 불러야만
       // 소리가 나고, setTimeout으로 단 1틱만 늦춰도 "방금 사용자가 직접 눌렀다"는 트랜지언트
