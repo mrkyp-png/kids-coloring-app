@@ -319,13 +319,15 @@ button:active { transform: scale(0.94); }
   z-index: 2;
 }
 .mode-btn {
+  /* 2026-08-11: "모드 4개 아이콘도 3D 입체감" 요청 — 다른 곳과 같은 키캡 스타일(그라디언트 +
+     아래쪽 그림자 턱 + 누르면 눌리는 애니메이션) 적용. */
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   line-height: 1.15;
-  background: var(--card-bg);
+  background: linear-gradient(180deg, #fff 0%, var(--card-bg) 60%, #F3EFFF 100%);
   color: var(--muted);
   border: 2px solid #E6E0FF;
   border-radius: 10px;
@@ -333,6 +335,12 @@ button:active { transform: scale(0.94); }
   font-size: 0.72rem;
   font-weight: 700;
   white-space: nowrap;
+  box-shadow: 0 3px 0 #D8CFF5, 0 4px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.mode-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #D8CFF5, 0 2px 3px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 .mode-btn .mode-btn-time {
   font-size: 0.62rem;
@@ -354,9 +362,13 @@ button:active { transform: scale(0.94); }
   justify-content: center;
 }
 .mode-btn.active {
-  background: var(--brand);
+  background: linear-gradient(180deg, #8f82f2 0%, var(--brand) 55%, #5645c9 100%);
   border-color: var(--brand);
   color: #fff;
+  box-shadow: 0 3px 0 #4834a8, 0 4px 6px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.mode-btn.active:active {
+  box-shadow: 0 1px 0 #4834a8, 0 2px 3px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 .mode-btn.mode-locked {
   opacity: 0.4;
@@ -411,6 +423,8 @@ button:active { transform: scale(0.94); }
   padding: 6px 16px;
   border-radius: 999px;
   font-size: 0.95rem;
+  /* 2026-08-11: "완성했어요 문구 아이콘도 3D" 요청 — 알약 자체에 살짝 입체 그림자 */
+  box-shadow: 0 2px 0 rgba(108, 92, 231, 0.22), 0 3px 5px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 .level-header-mid {
   flex: 1;
@@ -513,17 +527,25 @@ button:active { transform: scale(0.94); }
 }
 .level-node .lv-preview-emoji {
   /* 카드 밖으로 삐져나오면 옆 카드(간격이 좁음)의 배지와 겹쳐서 안쪽 코너에 배치 */
+  /* 2026-08-11: "아이콘에 입체감을(3D 느낌)" 요청 — 다른 곳(cover-start-btn 등)에서 쓰는
+     키캡 스타일(위는 밝고 아래는 어두운 그라디언트 + 아래쪽 그림자 턱 + 안쪽 하이라이트)을
+     이 작은 원형 배지에도 적용해 볼록한 유리구슬처럼 보이게 함. */
   position: absolute;
   top: 6px;
   left: 6px;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.75);
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.8) 55%, rgba(255, 255, 255, 0.55) 100%);
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.16),
+    0 3px 6px rgba(0, 0, 0, 0.22),
+    inset 0 1.5px 1.5px rgba(255, 255, 255, 0.95),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.14);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 .level-node .lv-clear-badge {
   position: absolute;
@@ -640,12 +662,19 @@ button:active { transform: scale(0.94); }
 .tpl-card:nth-child(10n+9) { --lv-bg: hsl(var(--lv-hue-9), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-9), var(--lv-sat), var(--lv-bezel-light)); }
 .tpl-card:nth-child(10n+10) { --lv-bg: hsl(var(--lv-hue-10), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-10), var(--lv-sat), var(--lv-bezel-light)); }
 .tpl-card .tpl-emoji {
+  /* 2026-08-11: "레벨 안 아이콘도 동일하게" 요청 — 레벨박스 배지(.lv-preview-emoji)와 같은
+     볼록한 유리구슬 스타일 적용. */
   font-size: 2rem;
   line-height: 1;
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.7);
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.8) 55%, rgba(255, 255, 255, 0.55) 100%);
+  box-shadow:
+    0 3px 0 rgba(0, 0, 0, 0.16),
+    0 4px 8px rgba(0, 0, 0, 0.22),
+    inset 0 2px 2px rgba(255, 255, 255, 0.95),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.14);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -711,15 +740,22 @@ button:active { transform: scale(0.94); }
   color: var(--brand);
 }
 .icon-btn {
+  /* 2026-08-11: "왼쪽 상단 홈버튼도 3D 형태" 요청 — 키캡 스타일(그라디언트 + 아래쪽 그림자 턱 +
+     누르면 눌리는 애니메이션) 적용. 이 클래스를 공유하는 지도 버튼(🗺️)에도 같이 적용됨. */
   font-size: 1.8rem;
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: var(--card-bg);
-  box-shadow: var(--shadow);
+  background: linear-gradient(155deg, #fff 0%, var(--card-bg) 55%, #F3EFFF 100%);
+  box-shadow: 0 3px 0 #D8CFF5, 0 5px 8px rgba(0, 0, 0, 0.16), inset 0 1.5px 1.5px rgba(255, 255, 255, 0.9);
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.icon-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #D8CFF5, 0 2px 4px rgba(0, 0, 0, 0.12), inset 0 1.5px 1.5px rgba(255, 255, 255, 0.9);
 }
 /* 2026-08-11: "음악/소리 이모티콘도 메인페이지쪽으로 옮겨, 좀 작게 만들어서" — 맵 화면에서는
    Ranking 알약 밑에 작게 두 개만 들어가면 되므로 더 작은 사이즈 변형. */
@@ -1005,12 +1041,14 @@ button:active { transform: scale(0.94); }
 
 /* ---------- 랭킹 ---------- */
 .ranking-btn {
+  /* 2026-08-11: "랭킹/모드초기화 아이콘도 3D" 요청 — 키캡 스타일 적용(reset-all-btn도 이 클래스
+     공유라 같이 적용됨). */
   position: absolute;
   top: 16px;
   right: 16px;
   z-index: 2;
   margin: 0;
-  background: #fff;
+  background: linear-gradient(180deg, #fff 0%, #fdfcff 55%, #F3EFFF 100%);
   color: var(--brand);
   font-weight: 800;
   font-size: 0.9rem;
@@ -1021,14 +1059,22 @@ button:active { transform: scale(0.94); }
   text-align: center;
   border-radius: 999px;
   border: 2px solid var(--brand);
+  box-shadow: 0 3px 0 var(--brand), 0 5px 8px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.ranking-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--brand), 0 2px 4px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 /* 2026-08-11: "reset easy progress => 모드 리셋으로 변경하고, Ranking 아래에 같은 박스로" 요청 —
    .reset-all-btn이 .ranking-btn 클래스를 같이 받아서 모양은 그대로 재사용하고, top만 그 바로
    밑으로 내림. */
 .reset-all-btn { top: 60px; }
 .map-header-sound-group {
+  /* 2026-08-11: 리셋모드 버튼에 3D 그림자(입체감)를 추가하면서 그림자가 아래로 번져 소리 아이콘과
+     겹쳐 보이는 문제 — 여유 간격을 좀 더 줌(104 -> 118). */
   position: absolute;
-  top: 104px;
+  top: 118px;
   right: 16px;
   z-index: 2;
   display: flex;
@@ -1226,7 +1272,7 @@ button:active { transform: scale(0.94); }
   opacity: 0.85;
   text-transform: uppercase;
 }
-.boss-card .boss-crown { font-size: 2rem; }
+.boss-card .boss-crown { font-size: 2rem; text-shadow: 0 3px 2px rgba(0, 0, 0, 0.35); }
 .boss-card .boss-crown.pulse { animation: bossPulse 1.4s ease-in-out infinite; }
 @keyframes bossPulse {
   0%, 100% { transform: scale(1); }
@@ -1252,7 +1298,7 @@ button:active { transform: scale(0.94); }
 .boss-grid > .boss-card.locked:nth-child(2) { background: #DCEDE6; }
 .boss-grid > .boss-card.locked:nth-child(3) { background: #E5DCF2; }
 .boss-grid > .boss-card.locked:nth-child(4) { background: #F2E3DC; }
-.boss-card.locked .boss-lock { font-size: 1.6rem; }
+.boss-card.locked .boss-lock { font-size: 1.6rem; text-shadow: 0 2px 2px rgba(0, 0, 0, 0.3); }
 .boss-card.boss-cleared {
   background: linear-gradient(160deg, #C2185B, #F368E0);
 }
