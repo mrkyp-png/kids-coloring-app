@@ -2065,7 +2065,9 @@
   // 맞추기 힘들다(2026-08-09, 사용자가 cat 레벨에서 제보). 그림 자체는 그대로 두고, 탭한
   // 지점이 선이거나 색칠 대상이 아니면 근처(반경 TAP_SNAP_RADIUS)를 나선형으로 뒤져서
   // 가장 가까운 색칠 가능 지점을 대신 찾아준다 — 모든 도안의 얇은 부분에 공통 적용됨.
-  const TAP_SNAP_RADIUS = 16; // WORK_SIZE(640) 기준 픽셀
+  // 2026-08-11: "좁은 곳이 여전히 잘 안 된다"는 테스트 유저 피드백 — 16px(640 기준)이 실제
+  // 폰 화면(캔버스가 640보다 훨씬 작게 표시됨)에서는 손가락 오차를 못 따라가는 경우가 있어 26으로 확대.
+  const TAP_SNAP_RADIUS = 26; // WORK_SIZE(640) 기준 픽셀
   function isTappable(idx) {
     return wallMask && wallMask[idx] !== 1 && currentLabelMap && currentGradableLabelSet.has(currentLabelMap[idx]);
   }
