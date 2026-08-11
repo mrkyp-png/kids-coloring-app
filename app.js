@@ -126,9 +126,6 @@
   const bossFanfareSub = document.getElementById('boss-fanfare-sub');
   const confettiLayer = document.getElementById('confetti-layer');
   const bossFanfareClose = document.getElementById('boss-fanfare-close');
-  const btnPrintArt = document.getElementById('btn-print-art');
-  const btnPrintBlank = document.getElementById('btn-print-blank');
-  const printArea = document.getElementById('print-area');
 
   const fillCtx = fillCanvas.getContext('2d', { willReadFrequently: true });
   const lineCtx = lineCanvas.getContext('2d');
@@ -2046,29 +2043,8 @@
     goHome();
   });
 
-  // 완성작/빈 도안을 인쇄용 흰 배경 캔버스로 합성해 data URL로 반환
-  function composePrintImage(includeFill) {
-    const c = document.createElement('canvas');
-    c.width = WORK_SIZE; c.height = WORK_SIZE;
-    const ctx = c.getContext('2d');
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, WORK_SIZE, WORK_SIZE);
-    if (includeFill) ctx.drawImage(fillCanvas, 0, 0);
-    ctx.drawImage(lineCanvas, 0, 0);
-    return c.toDataURL('image/png');
-  }
-
-  function doPrint(dataUrl, title) {
-    printArea.innerHTML = '<h2>' + title + '</h2><img src="' + dataUrl + '" alt="' + title + '">';
-    window.print();
-  }
-
-  btnPrintArt.addEventListener('click', () => {
-    doPrint(composePrintImage(true), (currentTemplate ? currentTemplate.name : '') + ' - My Artwork');
-  });
-  btnPrintBlank.addEventListener('click', () => {
-    doPrint(composePrintImage(false), (currentTemplate ? currentTemplate.name : '') + ' - Coloring Page');
-  });
+  // 2026-08-11: 보스 클리어 화면의 "Print My Art / Print Blank Page" 버튼 삭제 요청 —
+  // 그 버튼들만 쓰던 인쇄 기능(composePrintImage/doPrint)이라 통째로 제거.
 
   // ================= 효과음 =================
   function playPop() {
@@ -2176,6 +2152,24 @@
       pool[0]
     );
   }
+
+  // 2026-08-11: "Next/Back 누르면 소리가 1초 정도 뒤에 나온다" 제보 — 브라우저 TTS 엔진은 한동안
+  // 안 쓰다가 처음 말할 때 엔진을 새로 띄우는 지연(콜드 스타트)이 있어서, 정작 Next/Back을 누른
+  // 그 순간엔 이미 늦음. 맵 화면에 들어가는 시점(enterMapFromCover, 실제 버튼을 누르기 한참 전)에
+  // 아무도 못 들을 만큼 작은 소리로 한 번 미리 말해서 엔진을 예열해두면, 그 뒤에 실제로 Next/Back을
+  // 눌렀을 때는 엔진이 이미 켜져 있어 지연이 사라진다.
+  let warmupUtterance = null;
+  function warmUpSpeech() {
+    if (!('speechSynthesis' in window)) return;
+    try {
+      const warm = new SpeechSynthesisUtterance('ready');
+      warm.volume = 0.01;
+      warm.rate = 10;
+      warmupUtterance = warm; // GC 방지(위 pendingUtterance와 같은 이유)
+      window.speechSynthesis.speak(warm);
+    } catch (e) { /* 무시 */ }
+  }
+
   // 레벨 클리어 때마다 매번 "Excellent!"만 나오면 금방 질리니 여러 문구 중 랜덤으로 고른다.
   // 감탄사(Wow/Yay/Woohoo)를 앞에 붙여서 그냥 단어 하나 읽는 것보다 "진짜 반응하는" 느낌이 나게 함
   // (2026-08-10, "대본 읽는 것처럼 들린다"는 피드백으로 추가 — Web Speech API는 SSML/억양 세부
@@ -2345,6 +2339,7 @@
     // 음악을 시작하도록 변경(이 클릭 자체가 브라우저 자동재생 정책이 요구하는 "사용자 상호작용"도
     // 충족시킴).
     tryPlayMusic();
+    warmUpSpeech();
   }
 
   btnCoverStart.addEventListener('click', () => {

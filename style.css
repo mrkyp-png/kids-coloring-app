@@ -953,12 +953,6 @@ button:active { transform: scale(0.94); }
 
 /* ---------- 파이널 보스 클리어 축하 모달(팡파레 + 컨페티) ---------- */
 .boss-fanfare-card { position: relative; overflow: hidden; }
-.boss-fanfare-gift { margin: 0 0 10px; font-weight: 700; color: var(--ink); }
-.boss-fanfare-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 4px;
-}
 .confetti-layer {
   position: absolute;
   inset: 0;
@@ -979,19 +973,6 @@ button:active { transform: scale(0.94); }
 @keyframes confettiFall {
   0% { transform: translateY(0) rotate(0deg); opacity: 1; }
   100% { transform: translateY(360px) rotate(540deg); opacity: 0; }
-}
-
-/* ---------- 프린트 전용 영역 ---------- */
-.print-area { display: none; }
-@media print {
-  body > *:not(.print-area) { display: none !important; }
-  .print-area {
-    display: block !important;
-    padding: 20px;
-    text-align: center;
-  }
-  .print-area h2 { margin-bottom: 16px; }
-  .print-area img { width: 100%; max-width: 640px; }
 }
 
 @media (prefers-color-scheme: dark) {
