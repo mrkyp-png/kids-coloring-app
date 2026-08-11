@@ -32,7 +32,10 @@
      파스텔로 포인트). hue를 36도씩 10단계로 고르게 나눠서 옆 박스와 색이 안 겹치게 함. */
   --lv-hue-1: 350; --lv-hue-2: 22; --lv-hue-3: 42; --lv-hue-4: 100; --lv-hue-5: 152;
   --lv-hue-6: 188; --lv-hue-7: 212; --lv-hue-8: 248; --lv-hue-9: 278; --lv-hue-10: 318;
-  --lv-sat: 72%; --lv-light: 88%; --lv-bezel-light: 68%;
+  /* 2026-08-11: "투명처럼 보이니깐 밋밋하다" 피드백으로 파스텔(88%)에서 훨씬 쨍한 원색 느낌
+     (72%)으로 명도 내리고 채도도 올림 — 숫자(--brand, 진보라)는 여전히 잘 읽힘. */
+  --lv-sat: 85%; --lv-light: 72%; --lv-bezel-light: 52%;
+  --cover-mid: #FFE8E0;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -120,12 +123,38 @@ button:active { transform: scale(0.94); }
   position: relative;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(160deg, var(--bg), var(--brand-soft));
+  background: linear-gradient(160deg, var(--bg) 0%, var(--cover-mid) 45%, var(--brand-soft) 100%);
   padding: 20px;
   text-align: center;
   overflow: hidden;
 }
+.cover-decor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0; /* cover-content(z-index:1)보다 뒤 */
+}
+.cover-decor-item {
+  position: absolute;
+  opacity: 0.55;
+  animation: cover-decor-float 3.4s ease-in-out infinite;
+}
+@keyframes cover-decor-float {
+  0%, 100% { transform: translateY(0) rotate(-6deg) scale(1); }
+  50% { transform: translateY(-10px) rotate(6deg) scale(1.12); }
+}
+.cd-1 { top: 4%;  left: 9%;  font-size: 1.7rem; animation-delay: 0s; }
+.cd-2 { top: 8%;  left: 80%; font-size: 1.3rem; animation-delay: 0.6s; }
+.cd-3 { top: 15%; left: 46%; font-size: 1.1rem; animation-delay: 1.2s; }
+.cd-4 { top: 3%;  left: 56%; font-size: 1.2rem; animation-delay: 1.8s; }
+.cd-5 { bottom: 7%;  left: 12%; font-size: 1.6rem; animation-delay: 0.3s; }
+.cd-6 { bottom: 11%; left: 72%; font-size: 1.2rem; animation-delay: 0.9s; }
+.cd-7 { bottom: 4%;  left: 42%; font-size: 1.1rem; animation-delay: 1.5s; }
+.cd-8 { bottom: 15%; left: 86%; font-size: 1.3rem; animation-delay: 2.1s; }
+
 .cover-content {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -554,19 +583,47 @@ button:active { transform: scale(0.94); }
   width: 100%;
 }
 
+/* 2026-08-11: "카드가 밋밋하고 차가운 느낌" 개선 — 맵 화면 레벨 박스와 같은 방식(키캡 입체감 +
+   무지개 순환색)을 갤러리 카드에도 적용. 카드 수가 10개보다 많을 수 있어 10개 주기로 순환
+   (:nth-child(10n+N))시켜서 팔레트를 재사용한다. */
 .tpl-card {
   position: relative;
-  background: var(--card-bg);
+  background: var(--lv-bg, var(--card-bg));
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow);
+  box-shadow: 0 5px 0 var(--lv-bezel, rgba(0, 0, 0, 0.14)), 0 8px 12px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   padding: 16px 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   min-height: 44px;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
 }
-.tpl-card .tpl-emoji { font-size: 2.6rem; line-height: 1; }
+.tpl-card:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--lv-bezel, rgba(0, 0, 0, 0.14)), 0 3px 6px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+.tpl-card:nth-child(10n+1) { --lv-bg: hsl(var(--lv-hue-1), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-1), var(--lv-sat), var(--lv-bezel-light)); }
+.tpl-card:nth-child(10n+2) { --lv-bg: hsl(var(--lv-hue-2), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-2), var(--lv-sat), var(--lv-bezel-light)); }
+.tpl-card:nth-child(10n+3) { --lv-bg: hsl(var(--lv-hue-3), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-3), var(--lv-sat), var(--lv-bezel-light)); }
+.tpl-card:nth-child(10n+4) { --lv-bg: hsl(var(--lv-hue-4), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-4), var(--lv-sat), var(--lv-bezel-light)); }
+.tpl-card:nth-child(10n+5) { --lv-bg: hsl(var(--lv-hue-5), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-5), var(--lv-sat), var(--lv-bezel-light)); }
+.tpl-card:nth-child(10n+6) { --lv-bg: hsl(var(--lv-hue-6), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-6), var(--lv-sat), var(--lv-bezel-light)); }
+.tpl-card:nth-child(10n+7) { --lv-bg: hsl(var(--lv-hue-7), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-7), var(--lv-sat), var(--lv-bezel-light)); }
+.tpl-card:nth-child(10n+8) { --lv-bg: hsl(var(--lv-hue-8), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-8), var(--lv-sat), var(--lv-bezel-light)); }
+.tpl-card:nth-child(10n+9) { --lv-bg: hsl(var(--lv-hue-9), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-9), var(--lv-sat), var(--lv-bezel-light)); }
+.tpl-card:nth-child(10n+10) { --lv-bg: hsl(var(--lv-hue-10), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-10), var(--lv-sat), var(--lv-bezel-light)); }
+.tpl-card .tpl-emoji {
+  font-size: 2rem;
+  line-height: 1;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .tpl-card .tpl-label {
   font-size: 1rem;
   font-weight: 600;
@@ -637,6 +694,13 @@ button:active { transform: scale(0.94); }
   display: flex;
   align-items: center;
   justify-content: center;
+}
+/* 2026-08-11: "음악/소리 이모티콘도 메인페이지쪽으로 옮겨, 좀 작게 만들어서" — 맵 화면에서는
+   Ranking 알약 밑에 작게 두 개만 들어가면 되므로 더 작은 사이즈 변형. */
+.icon-btn-sm {
+  font-size: 1.1rem;
+  width: 36px;
+  height: 36px;
 }
 
 .panel-label {
@@ -870,6 +934,15 @@ button:active { transform: scale(0.94); }
   border-radius: 999px;
   border: 2px solid var(--brand);
 }
+.map-header-sound-group {
+  position: absolute;
+  top: 62px;
+  right: 16px;
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+}
+
 .ranking-entry-form {
   display: flex;
   flex-direction: column;
@@ -1110,18 +1183,7 @@ button:active { transform: scale(0.94); }
   100% { transform: translateY(360px) rotate(540deg); opacity: 0; }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1E1B2E;
-    --card-bg: #2A2640;
-    --ink: #F1EFFB;
-    --muted: #A9A3C7;
-    --brand: #A79CFF;
-    --brand-soft: #35305A;
-    --cleared-bg: #8C3868;
-    --cleared-bezel: #6B2650;
-    --lv-sat: 45%; --lv-light: 30%; --lv-bezel-light: 20%;
-  }
-  /* #fill-canvas는 이제 배경 없음(투명) — "캔버스 지우고 물체만" 요청으로 라이트/다크 둘 다
-     제거해야 함. 여기 남아있던 다크모드 전용 배경을 놓쳐서 다크모드에서만 카드가 계속 보였음. */
-}
+/* 2026-08-11: "배경색도 검은색 계통이 아니라 베이지색 밝은 느낌으로" 요청 — 폰이 시스템
+   다크모드여도 이 앱은 늘 밝은 베이지 테마로 통일하기로 결정, 다크모드 대응(위에 있던
+   @media (prefers-color-scheme: dark) 블록)을 통째로 제거함. 아이용 색칠앱은 시간대와
+   무관하게 항상 밝고 화사한 느낌이 맞다는 판단. */
