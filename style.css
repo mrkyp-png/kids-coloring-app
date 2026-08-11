@@ -797,10 +797,11 @@ button:active { transform: scale(0.94); }
   padding: 2px; /* canvas-wrap과 반드시 동일해야 함(안 그러면 둘이 다시 어긋남) */
   container-type: size;
   position: relative; /* 아래 지렁이(::after)가 이 안에서 기어가도록 기준점 */
-  /* 2026-08-11: "그라디언트 움직임이 안 보인다, 선은 그대로 두고 지렁이가 기어가게" 요청 —
-     선 자체는 애니메이션 없이 고정, 대신 지렁이(::after)가 그 위를 기어감. */
-  background-image: repeating-linear-gradient(90deg, var(--brand) 0%, #8f82f2 50%, var(--brand) 100%);
-  background-size: 60px 3px;
+  /* 2026-08-11: "직선 말고 갈색으로, 길처럼 울퉁불퉁하게" 요청 — 보라 그라디언트 대신 흙길
+     느낌의 갈색 톤을 불규칙한 폭으로 반복해서 울퉁불퉁한 비포장길처럼 보이게 함. */
+  background-image: repeating-linear-gradient(90deg,
+    #C19A6B 0 5px, #A67C52 5px 9px, #8B5E34 9px 13px, #B08654 13px 19px, #966A3D 19px 24px);
+  background-size: 48px 5px;
   background-position: 0 100%;
   background-repeat: repeat-x;
 }
