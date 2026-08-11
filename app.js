@@ -988,6 +988,13 @@
     goalEmoji.textContent = tpl.emoji;
     galleryScreen.hidden = true;
     coloringScreen.hidden = false;
+    // 2026-08-11: "한 캐릭터 색칠 후 다음 물체 색칠 전에 이전 그림이 보인다" 제보 — loadTemplateSource가
+    // 이미지 로딩 때문에 비동기라서, 콜백이 오기 전까지는 아래 캔버스들이 방금 전 그림 내용을 그대로
+    // 들고 있어서 화면 전환 직후 잠깐 이전 캐릭터가 그대로 보였음. 화면 전환하는 이 시점에 바로
+    // 지워서 새 도안이 실제로 로드될 때까지는 빈 화면으로 보이게 한다.
+    lineCtx.clearRect(0, 0, WORK_SIZE, WORK_SIZE);
+    fillCtx.clearRect(0, 0, WORK_SIZE, WORK_SIZE);
+    goalCtx.clearRect(0, 0, WORK_SIZE, WORK_SIZE);
 
     loadTemplateSource(tpl, (wall, lineSource, sampledColors) => {
       // 선(윤곽선) 레이어
