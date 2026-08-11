@@ -65,6 +65,13 @@
   let audioCtx = null;
 
   // ---------- DOM ----------
+  const onboardingModal = document.getElementById('onboarding-modal');
+  const onboardingGateStep = document.getElementById('onboarding-gate-step');
+  const onboardingConsentStep = document.getElementById('onboarding-consent-step');
+  const onboardingGateQuestion = document.getElementById('onboarding-gate-question');
+  const onboardingGateChoices = document.getElementById('onboarding-gate-choices');
+  const onboardingGateRetry = document.getElementById('onboarding-gate-retry');
+  const onboardingConsentAgree = document.getElementById('onboarding-consent-agree');
   const coverScreen = document.getElementById('cover-screen');
   const coverBosses = document.getElementById('cover-bosses');
   const btnCoverStart = document.getElementById('btn-cover-start');
@@ -2393,6 +2400,57 @@
       tryPlayMusic();
     }
   });
+
+  // ================= 최초 실행 온보딩(보호자 확인 게이트 + 이용 안내 동의) =================
+  // 2026-08-11: 앱스토어 출시(특히 어린이용 카테고리) 대비 추가. 최초 1회만 뜨고, 통과/동의하면
+  // localStorage에 기록해서 다음부터는 바로 표지 화면으로 간다.
+  const ONBOARDING_KEY = 'onboardingDone';
+
+  function renderGateQuestion() {
+    const a = 10 + Math.floor(Math.random() * 10); // 10~19
+    const b = 10 + Math.floor(Math.random() * 10); // 10~19
+    const correct = a + b;
+    onboardingGateQuestion.textContent = a + ' + ' + b + ' = ?';
+    const wrongPool = new Set();
+    while (wrongPool.size < 3) {
+      const delta = (1 + Math.floor(Math.random() * 5)) * (Math.random() < 0.5 ? -1 : 1);
+      const wrong = correct + delta;
+      if (wrong !== correct && wrong > 0) wrongPool.add(wrong);
+    }
+    const choices = [correct, ...wrongPool];
+    for (let i = choices.length - 1; i > 0; i--) { // 셔플
+      const j = Math.floor(Math.random() * (i + 1));
+      [choices[i], choices[j]] = [choices[j], choices[i]];
+    }
+    onboardingGateChoices.innerHTML = '';
+    choices.forEach((n) => {
+      const btn = document.createElement('button');
+      btn.textContent = n;
+      btn.addEventListener('click', () => {
+        if (n === correct) {
+          onboardingGateRetry.hidden = true;
+          onboardingGateStep.hidden = true;
+          onboardingConsentStep.hidden = false;
+        } else {
+          onboardingGateRetry.hidden = false;
+          renderGateQuestion(); // 새 문제로 다시(정답 외워서 통과하는 것 방지)
+        }
+      });
+      onboardingGateChoices.appendChild(btn);
+    });
+  }
+
+  onboardingConsentAgree.addEventListener('click', () => {
+    try { localStorage.setItem(ONBOARDING_KEY, '1'); } catch (e) { /* 무시 */ }
+    onboardingModal.hidden = true;
+  });
+
+  let onboardingDone = false;
+  try { onboardingDone = localStorage.getItem(ONBOARDING_KEY) === '1'; } catch (e) { /* 무시 */ }
+  if (!onboardingDone) {
+    renderGateQuestion();
+    onboardingModal.hidden = false;
+  }
 
   // ================= 초기화 =================
   renderCoverBosses();

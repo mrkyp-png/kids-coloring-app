@@ -15,6 +15,31 @@
 
 <audio id="bgm" loop preload="auto"></audio>
 
+<!-- ===================== 최초 실행 온보딩(보호자 확인 게이트 + 이용 안내 동의) — 앱스토어 출시
+     대비, 2026-08-11 추가. localStorage에 완료 기록이 없으면 앱 켤 때마다(=최초 1회) 이 모달이
+     맨 위에 떠서 표지 화면을 가린다. ===================== -->
+<div id="onboarding-modal" class="modal-overlay" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+    <div id="onboarding-gate-step">
+      <h2 id="onboarding-title">👨‍👩‍👧 Parent Check</h2>
+      <p class="modal-sub">Please solve this to continue (this app is made for kids, so we make sure a grown-up is here first).</p>
+      <p id="onboarding-gate-question" class="onboarding-gate-question"></p>
+      <div id="onboarding-gate-choices" class="onboarding-gate-choices"></div>
+      <p id="onboarding-gate-retry" class="onboarding-gate-retry" hidden>Not quite — try again!</p>
+    </div>
+    <div id="onboarding-consent-step" hidden>
+      <h2>🔒 Before You Start</h2>
+      <ul class="onboarding-consent-list">
+        <li>🚫 No ads, ever</li>
+        <li>🔐 No personal data collected — your name/country stay only on this device</li>
+        <li>📶 Works fully offline</li>
+      </ul>
+      <p class="modal-sub"><a href="privacy.html" target="_blank" rel="noopener">Read our Privacy Policy</a></p>
+      <button id="onboarding-consent-agree" class="tool-btn tool-btn-primary auto-confirm-btn">✔<span>Agree &amp; Start</span></button>
+    </div>
+  </div>
+</div>
+
 <!-- ===================== Cover screen (title/start) ===================== -->
 <section id="cover-screen" class="screen cover-screen">
   <div class="cover-content">

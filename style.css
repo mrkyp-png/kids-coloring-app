@@ -725,6 +725,44 @@ button:active { transform: scale(0.94); }
 .modal-card h2 { margin: 0 0 4px; font-size: 1.4rem; color: var(--brand); }
 .modal-sub { margin: 0 0 16px; color: var(--muted); }
 
+/* ---------- 최초 실행 온보딩(보호자 확인 게이트 + 이용 안내) ---------- */
+.onboarding-gate-question {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--brand);
+  margin: 8px 0 16px;
+}
+.onboarding-gate-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.onboarding-gate-choices button {
+  background: var(--card-bg);
+  box-shadow: var(--shadow);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.onboarding-gate-retry {
+  margin: 12px 0 0;
+  color: var(--bad);
+  font-weight: 700;
+}
+.onboarding-consent-list {
+  text-align: left;
+  margin: 0 0 14px;
+  padding-left: 4px;
+  list-style: none;
+  color: var(--ink);
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .text-link-btn {
   margin-top: 14px;
   color: var(--muted);
