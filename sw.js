@@ -1,5 +1,10 @@
-const CACHE_NAME = 'coloring-app-v64';
-const APP_SHELL = [
+const CACHE_NAME = 'coloring-app-v65';
+// 2026-08-11: cache.addAll()은 원자적이라 목록 중 하나라도 못 받아오면 설치 전체가 실패한다.
+// boss-battle 배경음악(6.8MB, 다른 음악의 10배 이상 큼)이 이 목록에 있으면 네트워크가 조금만
+// 불안정해도 그 파일 하나 때문에 서비스워커 설치 자체가 실패해서 앱 전체가 계속 낡은 캐시에
+// 갇히는 문제가 있었다("보스 음악 안나옴" 제보로 발견) — 필수 셸만 원자적으로 캐싱하고,
+// 나머지(도안 그림·음악 등 용량 큰 파일들)는 하나 실패해도 설치를 막지 않게 분리했다.
+const CRITICAL_SHELL = [
   './',
   './index.html',
   './style.css',
@@ -8,7 +13,9 @@ const APP_SHELL = [
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './assets/fonts/Fredoka.ttf',
+  './assets/fonts/Fredoka.ttf'
+];
+const EXTRA_ASSETS = [
   './audio/bgm-happy-adventure.mp3',
   './audio/bgm-boss-battle.mp3',
   './assets/emoji/airplane.svg',
@@ -123,7 +130,12 @@ const APP_SHELL = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
+    caches.open(CACHE_NAME).then(async (cache) => {
+      await cache.addAll(CRITICAL_SHELL); // 필수 셸: 하나라도 실패하면 설치 재시도되게 그대로 원자적 유지
+      // 나머지는 있으면 좋지만 없어도 fetch 핸들러가 그때그때 받아와서 캐싱해주므로,
+      // 하나 실패해도(allSettled) 설치 전체를 막지 않는다.
+      await Promise.allSettled(EXTRA_ASSETS.map((url) => cache.add(url)));
+    })
   );
   self.skipWaiting();
 });
