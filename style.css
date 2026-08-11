@@ -160,14 +160,23 @@ button:active { transform: scale(0.94); }
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.05); }
 }
+/* 2026-08-11: "입체감 있는 모양으로" 요청 — 평평한 단색 대신 위는 밝고 아래는 어두운 그라디언트 +
+   버튼 아래쪽에 두툼한 "테두리"처럼 보이는 진한 그림자를 깔아서 눌러지는 물리 버튼처럼 보이게 함.
+   실제로 누르면(:active) 그 두께만큼 아래로 눌리는 애니메이션까지 줘서 촉감 있는 느낌을 살림. */
 .cover-start-btn {
-  background: var(--brand);
+  background: linear-gradient(180deg, #8f82f2 0%, var(--brand) 55%, #5645c9 100%);
   color: #fff;
   font-weight: 800;
   font-size: 1.3rem;
   padding: 16px 48px;
   border-radius: 999px;
-  box-shadow: var(--shadow);
+  border: none;
+  box-shadow: 0 6px 0 #4834a8, 0 10px 20px rgba(0, 0, 0, 0.25);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.cover-start-btn:active {
+  transform: translateY(5px);
+  box-shadow: 0 1px 0 #4834a8, 0 3px 8px rgba(0, 0, 0, 0.2);
 }
 
 /* ---------- 난이도(타이머) 모드 선택 — 2x2, 칸 크기 전부 동일(고정 폭 그리드), 제목 이모지 옆 ---------- */

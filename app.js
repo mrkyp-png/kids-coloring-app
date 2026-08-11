@@ -739,16 +739,9 @@
     btnResetAll.hidden = doneCount === 0;
     btnResetAll.textContent = '🔄 Reset ' + (MODES[mode] ? MODES[mode].label : mode) + ' Progress';
 
-    // 레벨 10까지 몇 레벨 남았는지 안내(아직 다 못 깼을 때만)
-    let clearedLevels = 0;
-    for (let lv = 1; lv <= TOTAL_LEVELS; lv++) { if (isLevelCleared(lv)) clearedLevels++; }
-    const remainingLevels = TOTAL_LEVELS - clearedLevels;
-    if (remainingLevels > 0 && clearedLevels > 0) {
-      levelsLeftLine.hidden = false;
-      levelsLeftLine.textContent = '🚀 ' + remainingLevels + ' more level' + (remainingLevels === 1 ? '' : 's') + ' to go!';
-    } else {
-      levelsLeftLine.hidden = true;
-    }
+    // 2026-08-11: "🚀 N more levels to go!" 문구 삭제 요청 — levelsLeftLine 자체는 index.html에
+    // 남아있지만 항상 숨김 처리만 한다(엘리먼트를 지우는 것보다 안전).
+    levelsLeftLine.hidden = true;
   }
 
   // ================= 도안 카드 렌더 =================
@@ -909,6 +902,13 @@
   }
 
   function renderLevelGallery() {
+    // 2026-08-11: "시간초과 확인 눌러도 체크표시 남음" 재현/원인 확인 — 아래에서 scores를 미리
+    // 캡처해두는데, 그 뒤 이 함수 안에서 updateLevelTimerDisplay()가 시간초과를 감지하면 점수를
+    // 리셋하고 이 함수를 재귀 호출해 일단 올바르게(체크표시 없이) 그리지만, 재귀 호출이 끝나고
+    // 돌아온 "바깥쪽" 호출이 리셋 전에 캡처해둔 옛 scores로 카드 목록을 다시 덮어써버리는 순서
+    // 문제였음(실제 localStorage 데이터 자체는 정상적으로 지워지고 있어서 새로고침하면 맞게
+    // 나왔던 것). scores를 읽기 전에 먼저 한 번 호출해서, 리셋이 있다면 여기서 먼저 끝낸다.
+    updateLevelTimerDisplay();
     const scores = getScores();
     const list = getTemplatesForLevel(currentLevel);
     const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
@@ -1970,7 +1970,7 @@
     praiseEmoji.textContent = r.emoji;
     const justClearedLevel = justBecameLevelCleared;
     praiseText.textContent = justClearedLevel
-      ? r.label + ' — Level ' + currentTemplate.difficulty + ' Clear! 🎉'
+      ? r.label + ' — Clear! 🎉'
       : r.label;
     praiseCount.textContent = matched + ' / ' + total + ' parts colored';
     praiseOverlay.hidden = false;
@@ -2287,13 +2287,6 @@
     if (next) tryPlayMusic(); else bgm.pause();
   });
 
-  // 브라우저는 사용자가 화면을 한 번 조작하기 전엔 소리 있는 자동재생을 막으므로,
-  // 앱을 켠 뒤 첫 탭/클릭 때 배경음악을 시작한다(메인 화면부터 계속 깔리는 느낌).
-  const startMusicOnFirstInteraction = () => {
-    tryPlayMusic();
-    document.removeEventListener('pointerdown', startMusicOnFirstInteraction);
-  };
-  document.addEventListener('pointerdown', startMusicOnFirstInteraction);
   updateMusicButton();
 
   // ================= 네비게이션 =================
@@ -2339,6 +2332,12 @@
     coverScreen.hidden = true;
     mapScreen.hidden = false;
     renderMap();
+    // 2026-08-11: "스타트 화면에서 스타트 버튼 외 다른 곳 눌러도 음악 나옴" 제보 — 이전엔 화면
+    // 아무 데나 처음 탭하면(document 전체에 pointerdown) 바로 배경음악이 시작돼서, 시작 화면을
+    // 구경만 해도 음악이 나오고 있었음. Start를 눌러 다음(맵) 화면으로 넘어가는 이 시점에만
+    // 음악을 시작하도록 변경(이 클릭 자체가 브라우저 자동재생 정책이 요구하는 "사용자 상호작용"도
+    // 충족시킴).
+    tryPlayMusic();
   }
 
   btnCoverStart.addEventListener('click', () => {
