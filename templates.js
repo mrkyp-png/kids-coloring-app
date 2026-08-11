@@ -134,7 +134,16 @@ const COLORING_TEMPLATES = [
 // (난이도가 오를수록 더 강력해지는 캐릭터 순서). paletteOverride/difficulty를 안 줘도 app.js의
 // 기본값(level||10)이 알아서 최대 11색 팔레트를 골라준다 — 일반 도안과 완전히 동일한 파이프라인.
 const BOSS_TEMPLATES = {
-  easy: { id: 'boss-fairygirl', name: 'Fairy Girl', emoji: '🧚‍♀️', mode: 'easy', isBoss: true, renderMode: 'emoji' },
+  // colorOverrideRects: "머리색이 얼굴색과 같이 나온다" 피드백(2026-08-11) — 금발 머리와 피부색이
+  // 실제로 너무 비슷해서 app.js의 같은-이미지 색 클러스터링이 둘을 하나로 합쳐버림. 머리 영역
+  // 좌표(seed 기준)만 짚어서 갈색(팔레트의 #7F5539)으로 강제 지정 — 인어/마법사 보스는 머리색이
+  // 원래 피부색과 확실히 달라서(청록/회색) 이 문제가 없음(확인 완료, 그대로 둠).
+  easy: {
+    id: 'boss-fairygirl', name: 'Fairy Girl', emoji: '🧚‍♀️', mode: 'easy', isBoss: true, renderMode: 'emoji',
+    colorOverrideRects: [
+      { x: 200, y: 130, w: 250, h: 93, hex: '#7F5539' }
+    ]
+  },
   // simplifyRects: 든 손(손가락) 부분이 얇아서 통째로 검게 뒤덮이는 문제(2026-08-11) — 그 부분만
   // 내부 색상-경계 감지를 건너뛰게 함.
   normal: {
@@ -152,7 +161,13 @@ const BOSS_TEMPLATES = {
       { x: 495, y: 10, w: 130, h: 130 }
     ]
   },
-  veryhard: { id: 'boss-herogirl', name: 'Hero Girl', emoji: '🦸‍♀️', mode: 'veryhard', isBoss: true, renderMode: 'emoji' }
+  veryhard: {
+    id: 'boss-herogirl', name: 'Hero Girl', emoji: '🦸‍♀️', mode: 'veryhard', isBoss: true, renderMode: 'emoji',
+    // 히어로걸도 요정과 같은 금발머리=피부색 문제라 동일하게 처리(위 easy 항목 주석 참고).
+    colorOverrideRects: [
+      { x: 200, y: 130, w: 280, h: 128, hex: '#7F5539' }
+    ]
+  }
 };
 
 if (typeof module !== 'undefined') {

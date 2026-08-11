@@ -20,6 +20,7 @@
   ];
   const WHITE_SUBSTITUTE = '#F2C879'; // 흰색은 배경(캔버스)과 구분이 안 돼서 크림색으로 대체
 
+  // label은 i18n 도입(2026-08-11) 전 기본값(영어) — 실제 표시는 ratingLabel()이 I18N.t('rating.N')로 가져온다.
   const RATING_LEVELS = [
     { level: 1, emoji: '🌟', label: 'Perfect! Color Master!' },
     { level: 2, emoji: '😄', label: 'Great job!' },
@@ -27,18 +28,25 @@
     { level: 4, emoji: '💪', label: 'Keep trying!' },
     { level: 5, emoji: '🌱', label: 'Try again!' }
   ];
+  function ratingLabel(level) {
+    return (window.I18N && I18N.t('rating.' + level)) || (RATING_LEVELS[level - 1] || {}).label || '';
+  }
 
   const TOTAL_LEVELS = 10;
   const CLEARED_KEY = 'clearedTemplates';
   const SCORES_KEY = 'templateScores';
 
   // ---------- 난이도(타이머) 모드 — 레벨 하나(그 레벨의 10개 그림 전부)를 이 시간 안에 다 색칠해야 함 ----------
+  // label은 i18n 도입(2026-08-11) 전 기본값(영어) — 실제 표시는 modeLabel()이 I18N.t('mode.'+key)로 가져온다.
   const MODES = {
     easy: { label: 'Easy', minutes: 20 },
     normal: { label: 'Normal', minutes: 15 },
     hard: { label: 'Hard', minutes: 10 },
     veryhard: { label: 'Very Hard', minutes: 5 }
   };
+  function modeLabel(m) {
+    return (window.I18N && I18N.t('mode.' + m)) || (MODES[m] || {}).label || m;
+  }
   // 2026-08-11: 보스는 예전엔 그 모드의 레벨 타이머를 그대로 물려썼는데(쉬움 보스도 20분), 도안이
   // 훨씬 어려워진(약 50영역) 지금은 모드가 올라갈수록 더 빠듯하게 줄어드는 시간으로 통일했다
   // (요청: 보통 4분/어려움 3분/매우어려움 2분). easy는 그대로 5분 유지.
@@ -78,7 +86,7 @@
     FLAG_OPTIONS.forEach(([flag, label]) => {
       const opt = document.createElement('option');
       opt.value = flag;
-      opt.textContent = flag + ' ' + label;
+      opt.textContent = flag + ' ' + (window.I18N ? I18N.countryName(label) : label);
       selectEl.appendChild(opt);
     });
   }
@@ -134,6 +142,9 @@
   const maskCanvas = document.getElementById('mask-canvas');
   const goalCanvas = document.getElementById('goal-canvas');
   const goalEmoji = document.getElementById('goal-emoji');
+  const goalCanvasWrap = document.getElementById('goal-canvas-wrap');
+  const goalZoomModal = document.getElementById('goal-zoom-modal');
+  const goalZoomCanvas = document.getElementById('goal-zoom-canvas');
   const tapLayer = document.getElementById('tap-layer');
   const palette = document.getElementById('palette');
   const btnHome = document.getElementById('btn-home');
@@ -172,10 +183,22 @@
   const lineCtx = lineCanvas.getContext('2d');
   const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
   const goalCtx = goalCanvas.getContext('2d');
+  const goalZoomCtx = goalZoomCanvas.getContext('2d');
 
-  [fillCanvas, lineCanvas, maskCanvas, goalCanvas].forEach((c) => {
+  [fillCanvas, lineCanvas, maskCanvas, goalCanvas, goalZoomCanvas].forEach((c) => {
     c.width = WORK_SIZE;
     c.height = WORK_SIZE;
+  });
+
+  // ================= goal 이미지 확대(2026-08-11) — 탭하면 같은 그림을 화면 꽉 차게 보여준다.
+  // 내부 해상도가 이미 WORK_SIZE(640)라 그냥 더 크게 그리기만 해도 화질 손실이 없다. =================
+  goalCanvasWrap.addEventListener('click', () => {
+    goalZoomCtx.clearRect(0, 0, WORK_SIZE, WORK_SIZE);
+    goalZoomCtx.drawImage(goalCanvas, 0, 0);
+    goalZoomModal.hidden = false;
+  });
+  goalZoomModal.addEventListener('click', () => {
+    goalZoomModal.hidden = true;
   });
 
   let wallMask = null; // Uint8Array WORK_SIZE*WORK_SIZE, 1 = 벽(선), 0 = 칠할 수 있음
@@ -419,7 +442,7 @@
   function openRankingEntryModal(mode, totalSeconds) {
     pendingRunMode = mode;
     pendingRunSeconds = totalSeconds;
-    rankingEntryTime.textContent = (MODES[mode] ? MODES[mode].label : mode) + ' mode · ' + formatClearTime(totalSeconds);
+    rankingEntryTime.textContent = I18N.t('ranking.entryTime', { mode: modeLabel(mode), time: formatClearTime(totalSeconds) });
     setRankingEntryStatus('');
     const profile = getPlayerProfile() || {};
     populateFlagSelect(rankingInputFlag);
@@ -441,20 +464,20 @@
 
   rankingEntrySubmit.addEventListener('click', () => {
     if (!isRankingBackendConfigured()) {
-      setRankingEntryStatus('Ranking isn\'t set up yet — ask a grown-up to finish setup!', 'error');
+      setRankingEntryStatus(I18N.t('ranking.setupNeeded'), 'error');
       return;
     }
     let profile = getPlayerProfile() || {};
     if (!profile.nickname) {
       // 여기서 처음 정하는 경우에만 저장 — 그 뒤로는 절대 다시 안 바뀐다.
       profile = {
-        nickname: rankingInputName.value.trim() || 'Anonymous',
+        nickname: rankingInputName.value.trim() || I18N.t('anonymous'),
         flag: rankingInputFlag.value || '🌍'
       };
       savePlayerProfile(profile);
     }
     rankingEntrySubmit.disabled = true;
-    setRankingEntryStatus('Saving your record...');
+    setRankingEntryStatus(I18N.t('ranking.saving'));
     fetch(rankingUrl(pendingRunMode), {
       method: 'POST',
       body: JSON.stringify({
@@ -470,7 +493,7 @@
         openRankingBoard(pendingRunMode);
       })
       .catch(() => {
-        setRankingEntryStatus('Couldn\'t save — check your internet and try again.', 'error');
+        setRankingEntryStatus(I18N.t('ranking.saveError'), 'error');
       })
       .finally(() => { rankingEntrySubmit.disabled = false; });
   });
@@ -486,7 +509,7 @@
     MODE_ORDER.forEach((m) => {
       const tab = document.createElement('button');
       tab.className = 'ranking-tab';
-      tab.textContent = MODES[m].label;
+      tab.textContent = modeLabel(m);
       tab.setAttribute('role', 'tab');
       tab.addEventListener('click', () => renderRankingTab(m));
       tab.dataset.mode = m;
@@ -506,10 +529,10 @@
       tab.classList.toggle('active', tab.dataset.mode === mode);
     });
     if (!isRankingBackendConfigured()) {
-      rankingList.innerHTML = '<p class="ranking-empty">Ranking isn\'t set up yet!</p>';
+      rankingList.innerHTML = '<p class="ranking-empty">' + escapeHtml(I18N.t('ranking.notSetup')) + '</p>';
       return;
     }
-    rankingList.innerHTML = '<p class="ranking-empty">Loading…</p>';
+    rankingList.innerHTML = '<p class="ranking-empty">' + escapeHtml(I18N.t('ranking.loading')) + '</p>';
     fetch(rankingUrl(mode, '?orderBy="seconds"&limitToFirst=20'))
       .then((res) => { if (!res.ok) throw new Error('bad status'); return res.json(); })
       .then((data) => {
@@ -518,7 +541,7 @@
         entries.sort((a, b) => a.seconds - b.seconds);
         rankingList.innerHTML = '';
         if (!entries.length) {
-          rankingList.innerHTML = '<p class="ranking-empty">No records yet for this mode!</p>';
+          rankingList.innerHTML = '<p class="ranking-empty">' + escapeHtml(I18N.t('ranking.emptyMode')) + '</p>';
           return;
         }
         entries.forEach((e, i) => {
@@ -526,14 +549,14 @@
           row.className = 'ranking-row';
           row.innerHTML =
             '<span class="r-rank">' + (i + 1) + '</span>' +
-            '<span class="r-info"><span class="r-name">' + (e.flag || '') + ' ' + escapeHtml(e.nickname || 'Anonymous') + '</span></span>' +
+            '<span class="r-info"><span class="r-name">' + (e.flag || '') + ' ' + escapeHtml(e.nickname || I18N.t('anonymous')) + '</span></span>' +
             '<span class="r-time">⏱ ' + formatClearTime(e.seconds) + '</span>';
           rankingList.appendChild(row);
         });
       })
       .catch(() => {
         if (currentRankingTab !== mode) return;
-        rankingList.innerHTML = '<p class="ranking-empty">Couldn\'t load ranking — check your internet.</p>';
+        rankingList.innerHTML = '<p class="ranking-empty">' + escapeHtml(I18N.t('ranking.loadError')) + '</p>';
       });
   }
 
@@ -580,11 +603,11 @@
     if (!MODES[m] || m === getMode()) return;
     if (!isModeUnlocked(m)) {
       const prevMode = MODE_ORDER[MODE_ORDER.indexOf(m) - 1];
-      window.alert('아직 잠겨 있어요! ' + (MODES[prevMode] ? MODES[prevMode].label : '이전') + ' 모드의 파이널 보스를 먼저 이겨야 열려요.');
+      window.alert(I18N.t('alert.modeLocked', { mode: prevMode ? modeLabel(prevMode) : '' }));
       return;
     }
     if (hasAnyActiveAttempt()) {
-      window.alert('진행 중인 레벨이 있어서 모드를 바꿀 수 없어요. 먼저 그 레벨을 초기화(🔄)하고 다시 시도해주세요!');
+      window.alert(I18N.t('alert.modeInProgress'));
       return;
     }
     try { localStorage.setItem(MODE_KEY, m); } catch (e) { /* 무시 */ }
@@ -734,7 +757,7 @@
     stopLevelTimer();
     clearLevelAttempt(level);
     resetLevelProgress(level);
-    window.alert('⏰ 시간 초과! Level ' + level + ' 진행 상황이 초기화됐어요. 다시 도전해봐요!');
+    window.alert(I18N.t('alert.levelTimeout', { level: level }));
     if (currentLevel === level) {
       // 색칠 화면에 있었더라도 갤러리로 돌려보낸다
       coloringScreen.hidden = true;
@@ -749,7 +772,7 @@
     clearBossAttempt(mode);
     resetBossProgress(mode);
     const tpl = getBossTemplate(mode);
-    window.alert('⏰ 시간 초과! ' + (tpl ? tpl.name : '보스') + ' 도전이 초기화됐어요. 다시 도전해봐요!');
+    window.alert(I18N.t('alert.bossTimeout', { name: tpl ? I18N.templateName(tpl) : I18N.t('boss.fallback') }));
     if (currentBossMode === mode) {
       currentBossMode = null;
       setBgmTrack(MUSIC_SRC);
@@ -816,7 +839,7 @@
     COLORING_TEMPLATES.forEach((t) => { if (cleared.has(t.id)) doneCount++; });
     if (doneCount > 0) {
       statLine.hidden = false;
-      statLine.textContent = '🎉 You finished ' + doneCount + ' of ' + total + ' pictures!';
+      statLine.textContent = I18N.t('stat.finished', { done: doneCount, total: total });
     } else {
       statLine.hidden = true;
     }
@@ -825,7 +848,7 @@
     // 긴 문구 대신 짧게 "Reset Mode"로 통일(어떤 모드든 지금 선택된 모드를 리셋한다는 의미는
     // Ranking 바로 밑 위치+ 모드 선택 버튼과의 맥락으로 충분히 전달됨).
     btnResetAll.hidden = doneCount === 0;
-    btnResetAll.textContent = '🔄 Reset Mode';
+    btnResetAll.textContent = I18N.t('resetMode.btn');
 
     // 2026-08-11: "🚀 N more levels to go!" 문구 삭제 요청 — levelsLeftLine 자체는 index.html에
     // 남아있지만 항상 숨김 처리만 한다(엘리먼트를 지우는 것보다 안전).
@@ -866,11 +889,11 @@
       // 레벨도 동일하게 보여줘서 궁금증 유발 — 미리보기일 뿐 실제 색은 안 보여줌).
       const previewEmoji = list.length ? list[0].emoji : '';
       let inner = '<span class="lv-preview-emoji">' + previewEmoji + '</span>' +
-        '<span class="lv-num">' + lv + '</span><span class="lv-label">Level</span>';
+        '<span class="lv-num">' + lv + '</span><span class="lv-label">' + escapeHtml(I18N.t('level.label')) + '</span>';
       if (!unlocked) {
         inner += '<span class="lv-lock">🔒</span>';
       } else if (isClear) {
-        inner += '<span class="lv-clear-badge">✓ CLEAR</span><span class="lv-progress">' + doneCount + ' / ' + list.length + '</span>';
+        inner += '<span class="lv-clear-badge">✓ ' + escapeHtml(I18N.t('level.clearBadge')) + '</span><span class="lv-progress">' + doneCount + ' / ' + list.length + '</span>';
       } else {
         inner += '<span class="lv-progress">' + doneCount + ' / ' + list.length + '</span>';
       }
@@ -912,19 +935,20 @@
       card.className = 'boss-card' + (showAsOpen ? '' : ' locked') + (cleared ? ' boss-cleared' : '');
       card.setAttribute('role', 'listitem');
       card.disabled = !showAsOpen;
-      card.setAttribute('aria-label', tpl.name + (showAsOpen ? (cleared ? ' (defeated)' : '') : ' (locked)'));
+      const bossName = I18N.templateName(tpl);
+      card.setAttribute('aria-label', bossName + (showAsOpen ? (cleared ? ' (defeated)' : '') : ' (locked)'));
 
-      let inner = '<span class="boss-mode-label">' + MODES[mode].label + '</span>';
+      let inner = '<span class="boss-mode-label">' + escapeHtml(modeLabel(mode)) + '</span>';
       if (!showAsOpen) {
-        inner += '<span class="boss-lock">🔒</span><span class="boss-name">' + tpl.name + '</span>';
+        inner += '<span class="boss-lock">🔒</span><span class="boss-name">' + escapeHtml(bossName) + '</span>';
       } else if (cleared) {
         // 이 보스를 깨면 실제로 다음 모드 잠금이 풀리므로, 그 의미를 그대로 열린 자물쇠로 보여줌
         // (2026-08-11, "노란색→분홍색, 자물쇠는 열린 이미지로" 요청).
-        inner += '<span class="boss-crown">🔓</span><span class="boss-name">' + tpl.name + '</span>' +
-          '<span class="boss-cleared-badge">✓ Defeated!</span>';
+        inner += '<span class="boss-crown">🔓</span><span class="boss-name">' + escapeHtml(bossName) + '</span>' +
+          '<span class="boss-cleared-badge">✓ ' + escapeHtml(I18N.t('boss.defeatedBadge')) + '</span>';
       } else {
-        inner += '<span class="boss-crown pulse">👑</span><span class="boss-name">' + tpl.name + '</span>' +
-          '<span class="boss-cta">Tap to challenge!</span>';
+        inner += '<span class="boss-crown pulse">👑</span><span class="boss-name">' + escapeHtml(bossName) + '</span>' +
+          '<span class="boss-cta">' + escapeHtml(I18N.t('boss.tapToChallenge')) + '</span>';
       }
       card.innerHTML = inner;
       if (showAsOpen) card.addEventListener('click', () => openBoss(mode));
@@ -960,8 +984,7 @@
 
   btnResetAll.addEventListener('click', () => {
     const mode = getMode();
-    const label = MODES[mode] ? MODES[mode].label : mode;
-    if (!window.confirm(label + ' 모드의 진행 상황을 전부 초기화하고 처음부터 다시 시작할까요? (다른 모드는 그대로 남아요)')) return;
+    if (!window.confirm(I18N.t('confirm.resetMode', { mode: modeLabel(mode) }))) return;
     resetModeProgress(mode);
     renderMap();
   });
@@ -1006,8 +1029,8 @@
     const list = getTemplatesForLevel(currentLevel);
     const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
 
-    levelTitle.textContent = 'Level ' + currentLevel;
-    levelProgress.textContent = doneCount + ' / ' + list.length + ' perfect';
+    levelTitle.textContent = I18N.t('level.title', { n: currentLevel });
+    levelProgress.textContent = I18N.t('level.progress', { done: doneCount, total: list.length });
 
     const isClear = doneCount >= list.length;
     const hasBack = currentLevel > 1;
@@ -1020,8 +1043,8 @@
       clearLevelAttempt(currentLevel); // 클리어했으니 이 레벨의 타임어택은 끝 — 더 이상 시간 잴 필요 없음
       if (currentLevel === TOTAL_LEVELS) checkFullRunClear(); // 마지막 레벨까지 깼으면 완주 기록 확인
       const hasNext = currentLevel < TOTAL_LEVELS;
-      levelNextText.textContent = hasNext ? '🎉 Level ' + currentLevel + ' clear!' : '🎉 All levels clear!';
-      btnLevelNext.textContent = hasNext ? 'Next ▶' : 'Map ▶';
+      levelNextText.textContent = hasNext ? I18N.t('level.clear', { n: currentLevel }) : I18N.t('level.allClear');
+      btnLevelNext.textContent = hasNext ? I18N.t('level.next') : I18N.t('level.map');
       btnLevelNext.hidden = false;
     } else {
       levelNextText.textContent = '';
@@ -1036,7 +1059,8 @@
       const card = document.createElement('button');
       card.className = 'tpl-card';
       card.setAttribute('role', 'listitem');
-      card.setAttribute('aria-label', 'Color the ' + tpl.name);
+      const displayName = I18N.templateName(tpl);
+      card.setAttribute('aria-label', 'Color the ' + displayName);
       const score = scores[tpl.id];
       const attempted = score !== undefined;
       const mastered = score === 100;
@@ -1048,7 +1072,7 @@
       }
       card.innerHTML =
         '<span class="tpl-emoji">' + tpl.emoji + '</span>' +
-        '<span class="tpl-label">' + tpl.name + '</span>' +
+        '<span class="tpl-label">' + escapeHtml(displayName) + '</span>' +
         badge;
       card.addEventListener('click', () => openTemplate(tpl));
       galleryGrid.appendChild(card);
@@ -1077,7 +1101,7 @@
         startLevelTimer();
       }
     }
-    coloringTitle.textContent = tpl.emoji + ' ' + tpl.name;
+    coloringTitle.textContent = tpl.emoji + ' ' + I18N.templateName(tpl);
     goalEmoji.textContent = tpl.emoji;
     galleryScreen.hidden = true;
     coloringScreen.hidden = false;
@@ -1134,7 +1158,7 @@
         // 예전엔 이미지 로딩이 실패하면 콜백이 영영 안 불려서 화면이 그냥 멈춘 것처럼 보였다
         // (2026-08-09, 로컬 미리보기에서 원인 불명으로 화면 전환이 안 되던 문제 조사 중 발견).
         console.error('[loadTemplateSource] 도안 이미지 로딩 실패:', tpl.id, img.src, e);
-        alert('그림을 못 불러왔어요 (' + tpl.id + '). 콘솔(F12)에서 빨간 에러 메시지를 확인해주세요.');
+        alert(I18N.t('alert.loadFail', { id: tpl.id }));
       };
       img.onload = () => {
         const rawC = document.createElement('canvas');
@@ -1572,8 +1596,19 @@
         // 실제로 쓰는 라벨링과 반드시 동일해야 하므로, 여기서 미리 같은 라벨로 정답색을 맞춰둔다.
         const final = labelRegions(wall);
         const sampledColors = new Map();
+        // 2026-08-11: "쉬움 보스 머리색이 얼굴색과 같이 나온다" 피드백 — 위 SIMILAR_COLOR_DIST
+        // 클러스터링이 롤리팝처럼 "같은 부위의 미묘한 음영"을 하나로 합치는 데는 맞지만, 요정/히어로
+        // 보스는 금발 머리와 피부색이 실제로 비슷한 색이라 서로 다른 부위인데도 합쳐져버렸다. 전체
+        // 클러스터링 기준을 건드리면 다른 99개 도안에 영향이 가므로, 문제 있는 두 보스에만
+        // tpl.colorOverrideRects(좌표 범위 → 강제 색)로 딱 그 부위만 예외 처리한다.
+        const overrideRects = tpl.colorOverrideRects || [];
         final.gradable.forEach((r) => {
-          const hex = colorBySeed.get(r.seed);
+          let hex = colorBySeed.get(r.seed);
+          if (overrideRects.length) {
+            const sx = r.seed % W, sy = (r.seed / W) | 0;
+            const ov = overrideRects.find((o) => sx >= o.x && sx < o.x + o.w && sy >= o.y && sy < o.y + o.h);
+            if (ov) hex = ov.hex;
+          }
           if (hex) sampledColors.set(r.label, hex);
         });
 
@@ -1699,18 +1734,48 @@
     return adj;
   }
 
-  // 영역마다 팔레트에서 하나씩(맞닿은 이웃과는 최대한 안 겹치게) 시드 기반으로 랜덤 배정한다.
+  // 단순 RGB 유클리드 거리 — 팔레트 순서를 정할 때 검증했던 ΔE 기준(정상 시력 15 / 색맹 8)과
+  // 같은 취지로, 이웃 영역끼리 "육안으로 구분되는 색"만 배정하기 위한 근사치.
+  function colorDistance(hexA, hexB) {
+    const [r1, g1, b1] = hexToRgba(hexA);
+    const [r2, g2, b2] = hexToRgba(hexB);
+    return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
+  }
+
+  // 2026-08-11: "5레벨부터 비슷한 색끼리 섞여 있어 구분이 어렵다" 피드백으로 추가 — 레벨이
+  // 오르면 팔레트가 4→10색으로 늘어나는데(PALETTE_SIZE_BY_LEVEL), 기존엔 "이웃과 완전히 같은
+  // 색만" 피했지 "이웃과 비슷해 보이는 색"까지는 못 걸렀음(예: 주황빛빨강↔주황, 거리 77).
+  // 팔레트 최소 티어(4색)에서도 색 사이 최소 거리가 108이라 이 값으로 잡아도 후보가 마름.
+  const MIN_NEIGHBOR_COLOR_DIST = 100;
+
+  // 영역마다 팔레트에서 하나씩, 맞닿은 이웃과 육안으로 구분되는 색으로 시드 기반 랜덤 배정한다.
   function seededRegionColors(regions, labelMap, palette, seedStr) {
     const rand = mulberry32(hashSeed(seedStr));
     const adj = buildLabelAdjacency(labelMap);
     const colorByLabel = new Map();
     regions.forEach((r) => {
-      const neighborColors = new Set();
+      const neighborHexes = [];
       (adj.get(r.label) || []).forEach((n) => {
-        if (colorByLabel.has(n)) neighborColors.add(colorByLabel.get(n));
+        if (colorByLabel.has(n)) neighborHexes.push(colorByLabel.get(n));
       });
-      let candidates = palette.filter((hex) => !neighborColors.has(hex));
-      if (!candidates.length) candidates = palette; // 팔레트가 작아 다 겹치면 어쩔 수 없이 전체에서
+      let candidates = palette.filter((hex) =>
+        neighborHexes.every((nh) => colorDistance(hex, nh) >= MIN_NEIGHBOR_COLOR_DIST));
+      if (!candidates.length) {
+        // 팔레트가 좁아서 기준을 통과하는 색이 하나도 없으면(어쩔 수 없는 경우), 그나마 이웃들과
+        // 가장 멀리 떨어진(최소 거리가 가장 큰) 색을 고른다 — 완전 동일 색만은 최후까지 피함.
+        const pool = palette.filter((hex) => !neighborHexes.includes(hex));
+        const fallbackPool = pool.length ? pool : palette;
+        let best = fallbackPool[0];
+        let bestMinDist = -1;
+        fallbackPool.forEach((hex) => {
+          const minDist = neighborHexes.length
+            ? Math.min(...neighborHexes.map((nh) => colorDistance(hex, nh)))
+            : Infinity;
+          if (minDist > bestMinDist) { bestMinDist = minDist; best = hex; }
+        });
+        colorByLabel.set(r.label, best);
+        return;
+      }
       colorByLabel.set(r.label, candidates[Math.floor(rand() * candidates.length)]);
     });
     return colorByLabel;
@@ -2118,9 +2183,9 @@
     praiseEmoji.textContent = r.emoji;
     const justClearedLevel = justBecameLevelCleared;
     praiseText.textContent = justClearedLevel
-      ? r.label + ' — Clear! 🎉'
-      : r.label;
-    praiseCount.textContent = matched + ' / ' + total + ' parts colored';
+      ? I18N.t('praise.clearSuffix', { label: ratingLabel(r.level) })
+      : ratingLabel(r.level);
+    praiseCount.textContent = I18N.t('praise.parts', { matched: matched, total: total });
     praiseOverlay.hidden = false;
     if (justClearedLevel) playExcellent();
     praiseHomeTimer = setTimeout(() => {
@@ -2136,8 +2201,8 @@
     if (praiseHomeTimer) { clearTimeout(praiseHomeTimer); praiseHomeTimer = null; }
     praiseOverlay.classList.add('fail');
     praiseEmoji.textContent = RATING_LEVELS[4].emoji;
-    praiseText.textContent = RATING_LEVELS[4].label;
-    praiseCount.textContent = matched + ' / ' + total + ' parts colored right';
+    praiseText.textContent = ratingLabel(RATING_LEVELS[4].level);
+    praiseCount.textContent = I18N.t('praise.partsRight', { matched: matched, total: total });
     praiseOverlay.hidden = false;
     praiseHomeTimer = setTimeout(() => {
       praiseHomeTimer = null;
@@ -2174,8 +2239,10 @@
   }
 
   function showBossFanfare() {
-    bossFanfareSub.textContent = (currentTemplate ? currentTemplate.name : '') +
-      ' — ' + (currentBossMode && MODES[currentBossMode] ? MODES[currentBossMode].label : '') + ' mode complete!';
+    bossFanfareSub.textContent = I18N.t('bossFanfare.sub', {
+      name: currentTemplate ? I18N.templateName(currentTemplate) : '',
+      mode: currentBossMode ? modeLabel(currentBossMode) : ''
+    });
     spawnConfetti();
     bossFanfareModal.hidden = false;
     playFirework();
@@ -2457,7 +2524,7 @@
       // 시작 화면은 소품(반짝이/조개 등) 없이 캐릭터만 있는 깔끔한 아이콘을 그대로 유지
       // (실제 색칠 화면의 boss-<id>.svg는 영역 수를 늘리려고 소품이 붙어서 따로 둠).
       img.src = 'assets/emoji/' + tpl.id + '-icon.svg';
-      img.alt = tpl.name;
+      img.alt = I18N.templateName(tpl);
       item.appendChild(img);
       if (mode === 'hard') {
         const sparkle1 = document.createElement('span');
@@ -2502,7 +2569,7 @@
     // (getPlayerProfile()이 항상 truthy 객체를 반환하므로) 이 모달도, 랭킹 등록 모달의 입력칸도
     // 다시는 안 뜨고 표시만 된다.
     savePlayerProfile({
-      nickname: playerInputName.value.trim() || 'Anonymous',
+      nickname: playerInputName.value.trim() || I18N.t('anonymous'),
       flag: playerInputFlag.value || '🌍'
     });
     playerEntryModal.hidden = true;

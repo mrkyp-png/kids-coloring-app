@@ -3,6 +3,9 @@
    .ttf 한 개만 내장하면 됨(오프라인 PWA라 CDN 대신 항상 내장하는 프로젝트 관례를 따름).
    한글은 이 폰트에 글리프가 없어서 시스템 한글 폰트로 자동 대체됨 — 지금 UI 텍스트는 전부
    영어라 문제 없음. */
+/* 2026-08-11: 다국어(i18n.js) 도입 — Fredoka는 라틴 문자만 지원하는 가변 폰트라 한글/일본어/중국어
+   문구는 자동으로 시스템 폰트(Apple SD Gothic Neo/Malgun Gothic/sans-serif 등, 아래 font-family
+   스택 참고)로 대체된다. 영어/스페인어만 Fredoka로 그려짐 — 의도된 동작, 버그 아님. */
 @font-face {
   font-family: 'Fredoka';
   src: url('assets/fonts/Fredoka.ttf') format('truetype-variations'), url('assets/fonts/Fredoka.ttf') format('truetype');
@@ -151,6 +154,51 @@ button:active { transform: scale(0.94); }
 .cd-6 { bottom: 11%; left: 72%; font-size: 1.2rem; animation-delay: 0.9s; }
 .cd-7 { bottom: 4%;  left: 42%; font-size: 1.1rem; animation-delay: 1.5s; }
 .cd-8 { bottom: 15%; left: 86%; font-size: 1.3rem; animation-delay: 2.1s; }
+
+/* 2026-08-11: 다국어 지원 — 표지 화면 우상단 🌐 버튼 + 드롭다운 언어 목록 (i18n.js가 채우고 연결). */
+.lang-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 3;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #E6E0FF;
+  background: var(--card-bg);
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow);
+}
+.lang-menu {
+  position: absolute;
+  top: 60px;
+  right: 16px;
+  z-index: 3;
+  background: var(--card-bg);
+  border: 2px solid #E6E0FF;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 130px;
+}
+.lang-menu button {
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.lang-menu button.is-active {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
 
 .cover-content {
   position: relative;
@@ -713,6 +761,25 @@ button:active { transform: scale(0.94); }
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  cursor: zoom-in;
+}
+/* 2026-08-11: "goal 이미지를 확대해서 색깔을 자세히 보고 싶다" 요청 — 탭하면 커진다는 걸
+   알려주는 작은 돋보기 배지(항상 표시, 코너에 살짝). */
+.goal-zoom-badge {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--card-bg);
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  pointer-events: none;
 }
 .goal-emoji {
   font-size: min(64vw, 340px);
@@ -854,6 +921,34 @@ button:active { transform: scale(0.94); }
 }
 .modal-card h2 { margin: 0 0 4px; font-size: 1.4rem; color: var(--brand); }
 .modal-sub { margin: 0 0 16px; color: var(--muted); }
+
+/* ---------- goal 이미지 확대 모달(2026-08-11) — 탭하면 열림/탭하면 닫힘, 텍스트 없이 그림만 ---------- */
+.goal-zoom-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.82);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 20px;
+  z-index: 60; /* 다른 모달(50)보다 위 — 색칠화면 안에서 열리므로 겹칠 일은 없지만 안전하게 */
+  cursor: zoom-out;
+}
+.goal-zoom-canvas {
+  width: min(92vw, 80vh);
+  height: min(92vw, 80vh);
+  background: #fff;
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+}
+.goal-zoom-hint {
+  margin: 0;
+  color: rgba(255,255,255,0.85);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
 
 /* ---------- 최초 실행 온보딩(보호자 확인 게이트 + 이용 안내) ---------- */
 .onboarding-gate-question {
