@@ -2343,11 +2343,24 @@
   // 화면이 리셋 전 상태(예: ✓ 배지가 남은 갤러리)를 그대로 보여줄 수 있다. 다시 보이는 즉시
   // 지금 떠 있는 화면을 최신 localStorage 기준으로 강제로 다시 그려서 이 텀을 없앤다
   // (2026-08-11, "시간초과 확인 화면에 체크표시 남음" 리포트 대응).
+  // 2026-08-11: "폰 화면 꺼도(백그라운드로 가도) 음악이 계속 나온다"는 제보 — 위 핸들러는
+  // visible로 돌아올 때만 처리하고 hidden(화면 꺼짐/다른 앱 전환)될 때는 아무것도 안 해서,
+  // <audio> 재생이 안 끊기고 배터리만 계속 소모하고 있었음. hidden이 되는 순간 직접 pause하고,
+  // 다시 visible이 됐을 때(그리고 음악 설정이 켜져 있을 때만) 이어서 재생한다.
+  let bgmWasPlayingBeforeHidden = false;
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible') return;
+    if (document.visibilityState === 'hidden') {
+      bgmWasPlayingBeforeHidden = !bgm.paused;
+      bgm.pause();
+      return;
+    }
     updateLevelTimerDisplay(); // 만료됐으면 즉시 handleLevelTimeUp/handleBossTimeUp을 트리거
     if (!mapScreen.hidden) renderMap();
     else if (!galleryScreen.hidden) renderLevelGallery();
+    if (bgmWasPlayingBeforeHidden) {
+      bgmWasPlayingBeforeHidden = false;
+      tryPlayMusic();
+    }
   });
 
   // ================= 초기화 =================
