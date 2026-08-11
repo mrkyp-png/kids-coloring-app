@@ -143,6 +143,12 @@
   const goalCanvas = document.getElementById('goal-canvas');
   const goalEmoji = document.getElementById('goal-emoji');
   const goalCanvasWrap = document.getElementById('goal-canvas-wrap');
+  const goalPanelEl = document.querySelector('.goal-panel');
+  // 2026-08-11: "지렁이 위치를 남은 시간 비율로" 요청 — goal/캔버스 경계선을 기어가는 지렁이
+  // (CSS ::after)의 좌우 위치를 실제 타이머 진행률(0=시작, 1=시간 종료)에 맞춰 옮긴다.
+  function setWormProgress(p) {
+    goalPanelEl.style.setProperty('--worm-progress', Math.max(0, Math.min(1, p)));
+  }
   const goalZoomModal = document.getElementById('goal-zoom-modal');
   const goalZoomCanvas = document.getElementById('goal-zoom-canvas');
   const tapLayer = document.getElementById('tap-layer');
@@ -786,6 +792,7 @@
   // 색칠 화면에서는 제목 밑 서브타이틀 자리(홈/사운드 아이콘과 안 겹침)에 보여준다.
   function updateLevelTimerDisplay() {
     coloringTimerText.hidden = true;
+    setWormProgress(0);
     if (currentBossMode) {
       const mode = currentBossMode;
       if (isBossCleared(mode)) return;
@@ -795,6 +802,7 @@
       const budget = getBossBudgetSeconds(mode);
       const remaining = budget - (Date.now() - start) / 1000;
       if (remaining <= 0) { handleBossTimeUp(mode); return; }
+      setWormProgress(1 - remaining / budget);
       coloringTimerText.hidden = false;
       coloringTimerText.textContent = '⏱ ' + formatMMSS(remaining);
       coloringTimerText.classList.toggle('warn', remaining <= 30);
@@ -811,6 +819,7 @@
       handleLevelTimeUp(currentLevel);
       return;
     }
+    setWormProgress(1 - remaining / budget);
     const text = '⏱ ' + formatMMSS(remaining);
     const warn = remaining <= 30;
     if (!galleryScreen.hidden) {
