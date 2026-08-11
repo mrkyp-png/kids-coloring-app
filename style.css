@@ -216,33 +216,15 @@ button:active { transform: scale(0.94); }
   font-size: clamp(2rem, 9vw, 2.8rem);
   color: var(--brand);
 }
-/* 2026-08-11: "보스는 좌우 끝에서 끝으로 왔다갔다, 서로 간섭 안 받게, 크기는 작게, 왕복 30초
-   정도로 천천히" 요청 — 4마리를 각자 세로 한 줄(레인)에 두어 서로 절대 겹치지 않게 하고,
-   각자 그 줄의 왼쪽 끝~오른쪽 끝을 왕복(alternate)한다. duration은 편도 값이라 왕복(alternate
-   1회전)은 그 2배 — 15s 안팎으로 잡아 왕복 약 30초. */
 .cover-bosses {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: min(80vw, 300px);
-  margin: 0 auto;
-}
-@keyframes cover-boss-patrol {
-  from { left: 0; }
-  to { left: calc(100% - 46px); }
+  justify-content: center;
+  gap: clamp(10px, 4vw, 18px);
 }
 .cover-boss-item {
-  position: relative;
-  width: 46px;
-  height: 46px;
-  animation: cover-boss-patrol 15s ease-in-out infinite alternate;
-}
-.cover-boss-item:nth-child(1) { animation-duration: 14s; }
-.cover-boss-item:nth-child(2) { animation-duration: 16s; animation-delay: -4s; }
-.cover-boss-item:nth-child(3) { animation-duration: 15s; animation-delay: -8s; }
-.cover-boss-item:nth-child(4) { animation-duration: 17s; animation-delay: -2s; }
-.cover-boss-item {
-  /* 반짝이/광선 오버레이가 원 밖으로 삐져나오게 하려고 클리핑은 img 쪽으로 옮김 */
+  position: relative; /* 반짝이/광선 오버레이가 원 밖으로 삐져나오게 하려고 클리핑은 img 쪽으로 옮김 */
+  width: clamp(56px, 16vw, 82px);
+  height: clamp(56px, 16vw, 82px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -814,9 +796,16 @@ button:active { transform: scale(0.94); }
   justify-content: center;
   padding: 2px; /* canvas-wrap과 반드시 동일해야 함(안 그러면 둘이 다시 어긋남) */
   container-type: size;
-  /* 2026-08-11: "goal 이미지와 색칠 이미지 사이 경계선" 요청 — 목표 그림 영역과 실제 색칠
-     영역이 위/아래로 붙어 있어 구분이 안 된다는 피드백으로 구분선 추가. */
-  border-bottom: 3px dashed var(--brand-soft);
+  /* 2026-08-11: "점선 말고 색칠에 방해 안 되는 걸로" 요청 — 뚜렷한 도형(점선/별)이 반복되면
+     시선을 끄니, 형태 없이 은은하게 흐르는 보라색 그라디언트 띠로 변경(느리고 조용한 느낌). */
+  background-image: repeating-linear-gradient(90deg, var(--brand) 0%, #8f82f2 50%, var(--brand) 100%);
+  background-size: 60px 3px;
+  background-position: 0 100%;
+  background-repeat: repeat-x;
+  animation: goal-divider-glow 4s linear infinite;
+}
+@keyframes goal-divider-glow {
+  to { background-position: -60px 100%; }
 }
 .goal-canvas-wrap {
   width: min(100cqw, 100cqh, 420px);
@@ -830,9 +819,10 @@ button:active { transform: scale(0.94); }
 /* 2026-08-11: "goal 이미지를 확대해서 색깔을 자세히 보고 싶다" 요청 — 탭하면 커진다는 걸
    알려주는 작은 돋보기 배지(항상 표시, 코너에 살짝). */
 .goal-zoom-badge {
+  /* 2026-08-11: "보스 그림이랑 겹칠 수 있으니 위로" 요청 — 하단 우측 대신 상단 우측으로 이동 */
   position: absolute;
   right: 2px;
-  bottom: 2px;
+  top: 2px;
   width: 26px;
   height: 26px;
   border-radius: 50%;
