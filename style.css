@@ -812,8 +812,8 @@ button:active { transform: scale(0.94); }
   content: '';
   position: absolute;
   bottom: 0;
-  left: calc((100% - 22px) * var(--worm-progress, 0));
-  width: 22px;
+  left: calc((100% - 36px) * var(--worm-progress, 0));
+  width: 36px;
   height: 9px;
   background:
     radial-gradient(circle at 4px 4.5px, #3E2418 2.4px, transparent 2.5px),
