@@ -216,28 +216,33 @@ button:active { transform: scale(0.94); }
   font-size: clamp(2rem, 9vw, 2.8rem);
   color: var(--brand);
 }
+/* 2026-08-11: "보스는 좌우 끝에서 끝으로 왔다갔다, 서로 간섭 안 받게, 크기는 작게, 왕복 30초
+   정도로 천천히" 요청 — 4마리를 각자 세로 한 줄(레인)에 두어 서로 절대 겹치지 않게 하고,
+   각자 그 줄의 왼쪽 끝~오른쪽 끝을 왕복(alternate)한다. duration은 편도 값이라 왕복(alternate
+   1회전)은 그 2배 — 15s 안팎으로 잡아 왕복 약 30초. */
 .cover-bosses {
   display: flex;
-  justify-content: center;
-  gap: clamp(10px, 4vw, 18px);
+  flex-direction: column;
+  gap: 6px;
+  width: min(80vw, 300px);
+  margin: 0 auto;
 }
-/* 2026-08-11: "표지 보스를 각 모드별로 좌측에서 우측으로" 요청 — easy->normal->hard->veryhard
-   순서(=화면 왼쪽부터)로 하나씩 왼쪽에서 미끄러져 들어오는 등장 애니메이션. */
-@keyframes cover-boss-slide-in {
-  from { transform: translateX(-30px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+@keyframes cover-boss-patrol {
+  from { left: 0; }
+  to { left: calc(100% - 46px); }
 }
 .cover-boss-item {
-  animation: cover-boss-slide-in 0.5s ease-out both;
+  position: relative;
+  width: 46px;
+  height: 46px;
+  animation: cover-boss-patrol 15s ease-in-out infinite alternate;
 }
-.cover-boss-item:nth-child(1) { animation-delay: 0s; }
-.cover-boss-item:nth-child(2) { animation-delay: 0.15s; }
-.cover-boss-item:nth-child(3) { animation-delay: 0.3s; }
-.cover-boss-item:nth-child(4) { animation-delay: 0.45s; }
+.cover-boss-item:nth-child(1) { animation-duration: 14s; }
+.cover-boss-item:nth-child(2) { animation-duration: 16s; animation-delay: -4s; }
+.cover-boss-item:nth-child(3) { animation-duration: 15s; animation-delay: -8s; }
+.cover-boss-item:nth-child(4) { animation-duration: 17s; animation-delay: -2s; }
 .cover-boss-item {
-  position: relative; /* 반짝이/광선 오버레이가 원 밖으로 삐져나오게 하려고 클리핑은 img 쪽으로 옮김 */
-  width: clamp(56px, 16vw, 82px);
-  height: clamp(56px, 16vw, 82px);
+  /* 반짝이/광선 오버레이가 원 밖으로 삐져나오게 하려고 클리핑은 img 쪽으로 옮김 */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -481,11 +486,14 @@ button:active { transform: scale(0.94); }
    깔아서 키보드 자판(키캡)처럼 도드라져 보이게 하고, 실제로 누르면(:active) 그만큼 눌리는
    애니메이션을 준다(시작 화면 Start 버튼과 같은 방식). */
 .level-node {
+  /* 2026-08-11: "모드 아이콘처럼 테두리도" 요청 — 모드 버튼처럼 테두리를 추가해 윤곽을 한 번 더
+     또렷하게(색은 그림자와 같은 --lv-bezel 계열이라 톤이 어긋나지 않음). */
   position: relative;
   background: var(--lv-bg, var(--card-bg));
+  border: 2px solid var(--lv-bezel, #E6E0FF);
   border-radius: var(--radius-md);
   box-shadow: 0 6px 0 var(--lv-bezel, rgba(0, 0, 0, 0.16)), 0 10px 16px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  padding: 18px 10px 14px;
+  padding: 16px 8px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -652,9 +660,10 @@ button:active { transform: scale(0.94); }
 .tpl-card {
   position: relative;
   background: var(--lv-bg, var(--card-bg));
+  border: 2px solid var(--lv-bezel, #E6E0FF);
   border-radius: var(--radius-md);
   box-shadow: 0 5px 0 var(--lv-bezel, rgba(0, 0, 0, 0.14)), 0 8px 12px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  padding: 16px 10px;
+  padding: 14px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1276,6 +1285,7 @@ button:active { transform: scale(0.94); }
      턱 + 누르면 눌리는 애니메이션) 적용. */
   background: linear-gradient(160deg, #3A2E5C, #6C5CE7);
   color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.35);
   border-radius: var(--radius-md);
   box-shadow: 0 5px 0 rgba(0, 0, 0, 0.28), 0 8px 14px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.18);
   padding: 16px 10px;
