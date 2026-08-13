@@ -1089,7 +1089,8 @@
   }
 
   // ================= 색칠 화면 진입 =================
-  function openTemplate(tpl, onReady) {
+  function openTemplate(tpl, onReady, opts) {
+    opts = opts || {};
     // 이전 그림의 "축하 후 자동으로 홈으로" 타이머가 아직 안 끝났는데 다음 그림을 벌써 열었다면
     // 그 타이머는 이제 의미가 없다 — 안 지우면 몇 초 뒤 엉뚱한 시점에 goHome()이 몰래 또 불려서
     // (지금 보고 있는 그림이 보스든 뭐든) 상태를 헝클어뜨림. praiseOverlay 클릭/showPraise 재호출
@@ -1097,7 +1098,10 @@
     if (praiseHomeTimer) { clearTimeout(praiseHomeTimer); praiseHomeTimer = null; }
     currentTemplate = tpl;
     // 실제로 그림을 열어서 색칠을 시작하는 이 순간에 그 레벨(또는 보스)의 타임어택을 시작(또는 이어감).
-    if (tpl.isBoss) {
+    if (opts.challenge) {
+      // 챌린지 모드는 자체 타이머/시도추적을 쓰므로 Child의 타임어택 시작 로직을 건너뛴다.
+      currentBossMode = null;
+    } else if (tpl.isBoss) {
       currentBossMode = tpl.mode;
       startOrResumeBossAttempt(tpl.mode);
       startLevelTimer();
@@ -2101,7 +2105,8 @@
   });
 
   // ================= 성공률 자동 채점(컬러바이넘버: 정답색 일치 여부) =================
-  function computeCompletion() {
+  function computeCompletion(tolerance) {
+    tolerance = tolerance || 0; // 0(기본값) = 기존과 동일한 완전 일치 판정. Child 모드는 항상 이 경로.
     if (!currentGradableRegions || currentGradableRegions.length === 0) {
       return { matched: 0, total: 0 };
     }
@@ -2113,7 +2118,12 @@
       const targetHex = currentLabelToColor ? currentLabelToColor.get(r.label) : null;
       if (!targetHex) return;
       const [tr, tg, tb] = hexToRgba(targetHex);
-      if (data[p] === tr && data[p + 1] === tg && data[p + 2] === tb) matched++;
+      if (tolerance > 0) {
+        const dist = Math.sqrt((data[p] - tr) ** 2 + (data[p + 1] - tg) ** 2 + (data[p + 2] - tb) ** 2);
+        if (dist <= tolerance) matched++;
+      } else if (data[p] === tr && data[p + 1] === tg && data[p + 2] === tb) {
+        matched++;
+      }
     });
     return { matched, total: currentGradableRegions.length };
   }
@@ -2756,6 +2766,29 @@
       });
     });
   });
+
+  // 디버그/테스트용: 챌린지 모드로 도안을 열어서(opts.challenge=true) 영역 수 확인
+  window.__debugChallengeOpenTemplate = (tplId) => new Promise((resolve) => {
+    const tpl = COLORING_TEMPLATES.find((t) => t.id === tplId);
+    if (!tpl) return resolve(null);
+    openTemplate(tpl, () => resolve({ regionCount: currentGradableRegions.length }), { challenge: true });
+  });
+
+  // 디버그/테스트용: tolerance 값으로 computeCompletion 직접 호출(ColorTolerance 검증용)
+  window.__debugComputeCompletion = (tolerance) => computeCompletion(tolerance);
+
+  // challenge.js(app.js와 별도 스크립트/클로저)가 필요로 하는 DOM 참조·함수를 최소한으로 export.
+  // app.js 전체가 하나의 IIFE라 goalCanvas/coloringScreen 같은 const는 물론, openTemplate/
+  // computeCompletion/getTemplatesForLevel 같은 함수 선언도 스크립트 밖에서는 안 보인다
+  // (2026-08-14 확인 — 계획 문서상 "전역 함수 선언이라 그대로 보인다"는 전제는 틀렸음). Task 4가
+  // 쓸 것으로 예상되는 항목만 최소로 올린다.
+  window.__challengeInternals = {
+    goalCanvas,
+    coloringScreen,
+    openTemplate,
+    computeCompletion,
+    getTemplatesForLevel
+  };
 
   // 디버그/테스트용: 열려 있는 도안의 모든 영역을 정답색으로 채운 뒤 성공률 계산(검증용)
   window.__debugSimulatePerfect = () => {
