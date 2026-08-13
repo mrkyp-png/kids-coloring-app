@@ -1410,3 +1410,8 @@ button:active { transform: scale(0.94); }
   font-size: 1.3rem; font-weight: 800; cursor: pointer;
 }
 .challenge-level-btn:disabled { background: #ccc; cursor: not-allowed; opacity: 0.6; }
+.challenge-hud {
+  display: flex; justify-content: space-between; gap: 8px;
+  padding: 8px 12px; font-weight: 700; font-size: 0.9rem;
+  background: #fff8f0; border-bottom: 2px solid #ffd8a8;
+}

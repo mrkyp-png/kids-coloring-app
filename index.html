@@ -150,6 +150,13 @@
 
 <!-- ===================== Coloring screen ===================== -->
 <section id="coloring-screen" class="screen" hidden>
+  <!-- 2026-08-14 챌린지 모드 HUD(Task 4). 일반 Child 모드에서는 hidden 유지, 챌린지 시작 시에만 노출. -->
+  <div id="challenge-hud" class="challenge-hud" hidden>
+    <span id="challenge-hud-problem">1 / 10</span>
+    <span id="challenge-hud-timer">⏱ 30</span>
+    <span id="challenge-hud-combo">Combo x1.0</span>
+    <span id="challenge-hud-accuracy">Acc 100%</span>
+  </div>
   <header class="coloring-header">
     <button id="btn-home" class="icon-btn" aria-label="Go home">🏠</button>
     <div class="level-header-mid">
