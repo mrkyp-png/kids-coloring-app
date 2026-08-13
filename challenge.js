@@ -9,7 +9,6 @@
   // getTemplatesForLevel 같은 함수 선언 모두 스크립트 밖에서는 안 보인다 — Task 3이 이 5개만
   // window.__challengeInternals로 최소 export 해뒀다(app.js:2785 부근). 여기서 그대로 꺼내 쓴다.
   const { goalCanvas, coloringScreen, openTemplate, computeCompletion, getTemplatesForLevel } = window.__challengeInternals;
-  const DIFFICULTIES = ['easy', 'normal', 'hard', 'veryhard'];
   const TOTAL_CHALLENGE_LEVELS = 10;
   const IMPLEMENTED_LEVELS = [1, 2]; // Phase 1에서 실제로 플레이 가능한 레벨. Phase 2에서 3~10 추가.
 
@@ -21,6 +20,10 @@
   const levelGrid = document.getElementById('challenge-level-grid');
 
   const state = { difficulty: 'easy', level: null };
+
+  // I7(최종 리뷰): 미완성 상태로 전체 배포되는 걸 막기 위해 진입 버튼을 기본 숨김.
+  // CHALLENGE_CONFIG.ENABLED를 true로 바꾸면(로컬 테스트 등) 그대로 다시 노출된다.
+  btnOpenChallenge.hidden = !CFG.ENABLED;
 
   function openSelectScreen() {
     mapScreen.hidden = true;
@@ -123,6 +126,9 @@
     difficulty: null, level: null, problems: [], index: 0,
     correctCount: 0, mistakeCount: 0, combo: 0, maxCombo: 0,
     problemTimerId: null, problemDeadline: 0, lastResult: null, level2RevealTimerId: null,
+    submitting: false, // I2: #btn-save 연타로 문제 하나를 건너뛰며 오답 처리되는 것 방지
+    totalRegionsCorrect: 0, totalRegionsAll: 0, // I1: Accuracy는 문제 단위가 아니라 영역 단위 누적
+    totalRemainingSeconds: 0, // I6: TimeBonus는 마지막 문제가 아니라 문제별 남은시간 누적
   };
 
   // 디버그/테스트용: loadNextProblem이 다음 문제를 열고 준비를 마쳤을 때 한 번 불려나가는 훅.
@@ -135,13 +141,17 @@
   let revealTimerId = null;
 
   function startLevel(level) {
+    endRun(); // C1: 방어적 재진입 — 이전 run의 타이머/goalCanvas 상태가 남아있다면 먼저 정리
     const problems = getTemplatesForLevel(level); // app.js가 이미 제공, 레벨당 10개
     Object.assign(run, {
       difficulty: state.difficulty, level, problems, index: 0,
-      correctCount: 0, mistakeCount: 0, combo: 0, maxCombo: 0,
+      correctCount: 0, mistakeCount: 0, combo: 0, maxCombo: 0, submitting: false,
+      totalRegionsCorrect: 0, totalRegionsAll: 0, totalRemainingSeconds: 0,
     });
     selectScreen.hidden = true;
     hud.root.hidden = false;
+    hud.combo.textContent = I18N.t('challenge.hud.combo', { multiplier: '1.0' });
+    hud.accuracy.textContent = I18N.t('challenge.hud.accuracy', { percent: 100 });
     loadNextProblem();
   }
 
@@ -151,6 +161,7 @@
     hud.problem.textContent = (run.index + 1) + ' / ' + run.problems.length;
 
     openTemplate(tpl, () => {
+      run.submitting = false; // I2: 다음 문제 준비가 끝난 시점에야 다시 제출 가능
       if (run.level === 1) startLevel1Reveal();
       else if (run.level === 2) startLevel2Reveal();
       startProblemTimer();
@@ -184,22 +195,33 @@
   function registerMistake() {
     run.mistakeCount++;
     run.combo = 0; // 명세서 20/23번: Wrong -> Combo 초기화
-    hud.combo.textContent = 'Combo x' + comboMultiplierFor(run.combo).toFixed(1);
+    hud.combo.textContent = I18N.t('challenge.hud.combo', { multiplier: comboMultiplierFor(run.combo).toFixed(1) });
   }
 
   function registerCorrect() {
     run.correctCount++;
     run.combo++;
     if (run.combo > run.maxCombo) run.maxCombo = run.combo;
-    hud.combo.textContent = 'Combo x' + comboMultiplierFor(run.combo).toFixed(1);
-    const accPct = Math.round((run.correctCount / run.problems.length) * 100);
-    hud.accuracy.textContent = 'Acc ' + accPct + '%';
+    hud.combo.textContent = I18N.t('challenge.hud.combo', { multiplier: comboMultiplierFor(run.combo).toFixed(1) });
+  }
+
+  // I1: Accuracy는 문제 단위 정답/오답이 아니라 명세서 19번대로 영역(region) 단위 누적으로 계산한다.
+  function updateAccuracyHud() {
+    const accPct = run.totalRegionsAll > 0 ? Math.round((run.totalRegionsCorrect / run.totalRegionsAll) * 100) : 100;
+    hud.accuracy.textContent = I18N.t('challenge.hud.accuracy', { percent: accPct });
   }
 
   // 사용자가 '완료' 버튼을 눌렀을 때 challenge.js가 직접 판정한다(Child의 #btn-save 핸들러는 건드리지 않음).
   function submitCurrentProblem() {
+    if (run.submitting) return; // I2: 다음 문제가 준비되기 전 연타 방지
+    run.submitting = true;
     const { matched, total } = computeCompletion(CFG.COLOR_TOLERANCE);
     clearInterval(run.problemTimerId);
+    run.totalRegionsCorrect += matched;
+    run.totalRegionsAll += total;
+    // I6: 이 문제에서 남은 시간을 문제별로 누적(마지막 문제 한 번만 반영되던 버그 수정)
+    run.totalRemainingSeconds += Math.max(0, Math.round((run.problemDeadline - Date.now()) / 1000));
+    updateAccuracyHud();
     if (matched === total) registerCorrect(); else registerMistake();
     advanceToNextProblem();
   }
@@ -211,22 +233,33 @@
   }
 
   function finishLevel() {
-    hud.root.hidden = true;
-    clearTimeout(revealTimerId); // 마지막 문제의 리빌-숨김 예약이 아직 안 끝났다면 취소(아래 줄을 나중에 덮어쓰지 않게)
-    goalCanvas.hidden = false; // LEVEL1 기억매칭 연출로 숨겨둔 상태였다면 Child 모드로 돌아갈 때를 위해 원상 복구
-    const accuracyPct = Math.round((run.correctCount / run.problems.length) * 100);
-    const remainingSeconds = Math.max(0, Math.round((run.problemDeadline - Date.now()) / 1000));
+    endRun(); // C1: 타이머 정리 + goalCanvas 원상복구 + HUD 숨김을 한 곳에서
+    // I1: Accuracy는 문제 단위가 아니라 영역(region) 단위 누적값 사용
+    const accuracyPct = run.totalRegionsAll > 0 ? Math.round((run.totalRegionsCorrect / run.totalRegionsAll) * 100) : 100;
     const result = computeFinalScore({
       level: run.level, difficulty: run.difficulty, accuracyPct,
-      mistakeCount: run.mistakeCount, remainingSeconds, maxCombo: run.maxCombo,
+      mistakeCount: run.mistakeCount, remainingSeconds: run.totalRemainingSeconds, maxCombo: run.maxCombo,
     });
     run.lastResult = result;
     const isNewRecord = saveBestScoreIfHigher(run.difficulty, run.level, result.finalScore);
     coloringScreen.hidden = true;
     selectScreen.hidden = false;
     renderLevelGrid();
-    alert('Score: ' + result.finalScore + (isNewRecord ? ' (NEW RECORD!)' : '') + (result.isPerfect ? ' PERFECT!' : ''));
+    let resultMsg = I18N.t('challenge.result.score', { score: result.finalScore });
+    if (isNewRecord) resultMsg += ' ' + I18N.t('challenge.result.newRecord');
+    if (result.isPerfect) resultMsg += ' ' + I18N.t('challenge.result.perfect');
+    alert(resultMsg);
     // 축하 연출/모달은 Phase 4에서 명세서 43번(Next/Back 클릭음) 작업과 함께 다듬는다. Phase 1은 결과값 저장/노출까지만.
+  }
+
+  // C1(최종 리뷰): run이 10문제를 다 풀지 않고 중간에 끝나는 모든 경로(🏠, 재진입 등)에서
+  // 공유 DOM(goalCanvas)과 타이머를 원상복구하는 단일 진입점. finishLevel()에서도 호출한다.
+  function endRun() {
+    clearInterval(run.problemTimerId);
+    clearTimeout(revealTimerId); // LEVEL1 리빌-숨김 예약
+    stopLevel2Reveal(); // LEVEL2 interval 정지 + challenge-goal-mask 클래스/clipPath 원상복구
+    goalCanvas.hidden = false; // LEVEL1이 숨겨둔 상태였다면 Child 모드를 위해 복구
+    hud.root.hidden = true;
   }
 
   function startLevel1Reveal() {
@@ -264,6 +297,23 @@
       submitCurrentProblem();
     }
   }, true); // capture:true로 등록해 app.js의 버블 단계 리스너보다 먼저 가로챈다
+
+  // C1: 🏠(홈)으로 run을 중간에 벗어나도 Child 모드가 망가지지 않도록, app.js의 goHome()이
+  // 실행되기 전에 challenge run을 먼저 정리한다. #btn-save와 달리 여기서는 전파를 막지 않는다
+  // — Child의 홈 이동 자체는 그대로 일어나야 하므로 stopImmediatePropagation은 호출하지 않는다.
+  document.getElementById('btn-home').addEventListener('click', () => {
+    if (!hud.root.hidden) endRun();
+  }, true);
+
+  // C2: 챌린지 진행 중에는 돋보기 확대(app.js:goalZoomModal)가 LEVEL1 암기/LEVEL2 마스크
+  // 메커닉을 완전히 무력화하므로, 진행 중일 때만 클릭을 가로채 무효화한다(Phase 1 최소 조치 —
+  // 명세서 19번의 "Level당 1회" 미터링은 Phase 2+ 범위).
+  document.getElementById('goal-canvas-wrap').addEventListener('click', (e) => {
+    if (!hud.root.hidden) {
+      e.stopImmediatePropagation();
+      e.preventDefault();
+    }
+  }, true);
 
   // 디버그/테스트용: 실제 색칠 조작 없이 레벨 1개(10문제)를 자동 진행. correctRate(0~1, 기본 1)
   // 확률로 각 문제를 정답 처리(window.__debugSimulatePerfect로 캔버스를 실제로 채운 뒤 제출)하고,
