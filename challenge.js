@@ -122,7 +122,7 @@
   const run = { // 한 레벨 시도(10문제) 동안의 진행 상태
     difficulty: null, level: null, problems: [], index: 0,
     correctCount: 0, mistakeCount: 0, combo: 0, maxCombo: 0,
-    problemTimerId: null, problemDeadline: 0, lastResult: null,
+    problemTimerId: null, problemDeadline: 0, lastResult: null, level2RevealTimerId: null,
   };
 
   // 디버그/테스트용: loadNextProblem이 다음 문제를 열고 준비를 마쳤을 때 한 번 불려나가는 훅.
@@ -152,6 +152,7 @@
 
     openTemplate(tpl, () => {
       if (run.level === 1) startLevel1Reveal();
+      else if (run.level === 2) startLevel2Reveal();
       startProblemTimer();
       if (debugOnReady) { const cb = debugOnReady; debugOnReady = null; cb(); }
     }, { challenge: true });
@@ -204,6 +205,7 @@
   }
 
   function advanceToNextProblem() {
+    if (run.level === 2) stopLevel2Reveal();
     run.index++;
     loadNextProblem();
   }
@@ -232,6 +234,26 @@
     clearTimeout(revealTimerId); // 이전 문제의 숨김 예약이 남아있다면 취소하고 이 문제 기준으로 다시 잡는다
     goalCanvas.hidden = false; // app.js가 이미 캐싱해 둔 전역 goalCanvas 참조를 __challengeInternals로 재사용
     revealTimerId = setTimeout(() => { goalCanvas.hidden = true; }, CFG.LEVEL1_GOAL_DISPLAY_MS);
+  }
+
+  function startLevel2Reveal() {
+    // 명세서 9번: Goal의 일부만 원형으로 노출, 노출 영역을 반복 변경
+    goalCanvas.hidden = false;
+    goalCanvas.classList.add('challenge-goal-mask');
+    const radius = CFG.LEVEL2_REVEAL_RADIUS_PX;
+    const moveReveal = () => {
+      const x = radius + Math.random() * (640 - radius * 2);
+      const y = radius + Math.random() * (640 - radius * 2);
+      goalCanvas.style.clipPath = `circle(${radius}px at ${x}px ${y}px)`;
+    };
+    moveReveal();
+    run.level2RevealTimerId = setInterval(moveReveal, CFG.LEVEL2_REVEAL_MOVE_MS);
+  }
+
+  function stopLevel2Reveal() {
+    clearInterval(run.level2RevealTimerId);
+    goalCanvas.classList.remove('challenge-goal-mask');
+    goalCanvas.style.clipPath = '';
   }
 
   // 챌린지 진행 중일 때만 #btn-save를 가로챈다. Child 모드(hud.root.hidden===true)에서는

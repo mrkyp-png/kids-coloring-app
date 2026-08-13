@@ -1415,3 +1415,6 @@ button:active { transform: scale(0.94); }
   padding: 8px 12px; font-weight: 700; font-size: 0.9rem;
   background: #fff8f0; border-bottom: 2px solid #ffd8a8;
 }
+.challenge-goal-mask {
+  clip-path: circle(90px at 50% 50%); /* JS가 매 이동마다 style.clipPath로 좌표 갱신 */
+}
