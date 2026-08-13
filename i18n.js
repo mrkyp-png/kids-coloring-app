@@ -89,7 +89,13 @@
       'anonymous': 'Anonymous',
       'langMenu.label': 'Change language',
       'goalZoom.hint': 'Tap anywhere to close',
-      'goalZoom.openLabel': 'Zoom in on the picture'
+      'goalZoom.openLabel': 'Zoom in on the picture',
+      'challenge.entryBtn': '🎮 Challenge Mode',
+      'challenge.selectTitle': 'Challenge Mode',
+      'challenge.difficulty.easy': 'EASY',
+      'challenge.difficulty.normal': 'NORMAL',
+      'challenge.difficulty.hard': 'HARD',
+      'challenge.difficulty.veryhard': 'VERY HARD'
     },
     ko: {
       'loading.text': '불러오는 중…',
@@ -167,7 +173,13 @@
       'anonymous': '무명의 색칠러',
       'langMenu.label': '언어 변경',
       'goalZoom.hint': '아무 곳이나 탭하면 닫혀요',
-      'goalZoom.openLabel': '그림 확대해서 보기'
+      'goalZoom.openLabel': '그림 확대해서 보기',
+      'challenge.entryBtn': '🎮 챌린지 모드',
+      'challenge.selectTitle': '챌린지 모드',
+      'challenge.difficulty.easy': '쉬움',
+      'challenge.difficulty.normal': '보통',
+      'challenge.difficulty.hard': '어려움',
+      'challenge.difficulty.veryhard': '매우 어려움'
     },
     ja: {
       'loading.text': '読み込み中…',
@@ -245,7 +257,13 @@
       'anonymous': '名無しさん',
       'langMenu.label': '言語を変更',
       'goalZoom.hint': 'どこかをタップすると閉じます',
-      'goalZoom.openLabel': '絵を拡大する'
+      'goalZoom.openLabel': '絵を拡大する',
+      'challenge.entryBtn': '🎮 チャレンジモード',
+      'challenge.selectTitle': 'チャレンジモード',
+      'challenge.difficulty.easy': 'かんたん',
+      'challenge.difficulty.normal': 'ふつう',
+      'challenge.difficulty.hard': 'むずかしい',
+      'challenge.difficulty.veryhard': 'とてもむずかしい'
     },
     zh: {
       'loading.text': '加载中…',
@@ -323,7 +341,13 @@
       'anonymous': '匿名玩家',
       'langMenu.label': '更改语言',
       'goalZoom.hint': '点击任意位置关闭',
-      'goalZoom.openLabel': '放大查看图片'
+      'goalZoom.openLabel': '放大查看图片',
+      'challenge.entryBtn': '🎮 挑战模式',
+      'challenge.selectTitle': '挑战模式',
+      'challenge.difficulty.easy': '简单',
+      'challenge.difficulty.normal': '普通',
+      'challenge.difficulty.hard': '困难',
+      'challenge.difficulty.veryhard': '极难'
     },
     es: {
       'loading.text': 'Cargando…',
@@ -401,7 +425,13 @@
       'anonymous': 'Anónimo',
       'langMenu.label': 'Cambiar idioma',
       'goalZoom.hint': 'Toca en cualquier lugar para cerrar',
-      'goalZoom.openLabel': 'Ampliar el dibujo'
+      'goalZoom.openLabel': 'Ampliar el dibujo',
+      'challenge.entryBtn': '🎮 Modo Desafío',
+      'challenge.selectTitle': 'Modo Desafío',
+      'challenge.difficulty.easy': 'FÁCIL',
+      'challenge.difficulty.normal': 'NORMAL',
+      'challenge.difficulty.hard': 'DIFÍCIL',
+      'challenge.difficulty.veryhard': 'MUY DIFÍCIL'
     }
   };
 

@@ -1380,3 +1380,33 @@ button:active { transform: scale(0.94); }
    다크모드여도 이 앱은 늘 밝은 베이지 테마로 통일하기로 결정, 다크모드 대응(위에 있던
    @media (prefers-color-scheme: dark) 블록)을 통째로 제거함. 아이용 색칠앱은 시간대와
    무관하게 항상 밝고 화사한 느낌이 맞다는 판단. */
+
+/* ===== 챌린지 모드 (Phase 1) ===== */
+.challenge-entry-btn {
+  display: block;
+  width: 100%;
+  margin: 12px 0;
+  padding: 14px;
+  border-radius: 16px;
+  border: none;
+  background: linear-gradient(135deg, #ff6b6b, #ffa94d);
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.challenge-select-header { display: flex; align-items: center; gap: 8px; padding: 12px; }
+.challenge-difficulty-row { display: flex; gap: 8px; padding: 0 12px; flex-wrap: wrap; }
+.challenge-diff-btn {
+  flex: 1 1 auto; min-width: 80px; padding: 10px; border-radius: 12px;
+  border: 2px solid #ddd; background: #fff; font-weight: 700; cursor: pointer;
+}
+.challenge-diff-btn.selected { border-color: #ff6b6b; background: #fff0ec; }
+.challenge-level-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; padding: 16px 12px;
+}
+.challenge-level-btn {
+  aspect-ratio: 1; border-radius: 14px; border: none; background: #4dabf7; color: #fff;
+  font-size: 1.3rem; font-weight: 800; cursor: pointer;
+}
+.challenge-level-btn:disabled { background: #ccc; cursor: not-allowed; opacity: 0.6; }

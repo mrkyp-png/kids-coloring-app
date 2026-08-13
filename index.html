@@ -91,6 +91,8 @@
       <button class="mode-btn" data-mode="hard"><span data-i18n="mode.hard">Hard</span><span class="mode-btn-time">10m</span><span class="mode-btn-lock">🔒</span></button>
       <button class="mode-btn" data-mode="veryhard"><span data-i18n="mode.veryhard">Very Hard</span><span class="mode-btn-time">5m</span><span class="mode-btn-lock">🔒</span></button>
     </div>
+    <!-- 2026-08-14 추가: 챌린지 모드 진입 버튼 -->
+    <button id="btn-open-challenge" class="challenge-entry-btn" data-i18n="challenge.entryBtn" type="button">🎮 챌린지 모드</button>
     <p id="stat-line" class="stat-line" hidden></p>
     <p id="levels-left-line" class="levels-left-line" hidden></p>
     <button id="btn-ranking" class="ranking-btn" data-i18n="ranking.btn">🏆 Ranking</button>
@@ -109,6 +111,23 @@
     <p class="boss-section-sub" data-i18n="boss.sectionSub">Clear all 10 levels in one mode to challenge that mode's boss!</p>
     <div id="boss-grid" class="boss-grid" role="list" aria-label="Final bosses"></div>
   </div>
+</section>
+
+<!-- ===================== 챌린지 모드: 난이도/레벨 선택 화면 (Phase 1, 2026-08-14 추가) ===================== -->
+<section id="challenge-select-screen" class="screen" hidden>
+  <header class="challenge-select-header">
+    <button id="btn-challenge-back" class="icon-btn" type="button" aria-label="Back">⬅️</button>
+    <h2 data-i18n="challenge.selectTitle">챌린지 모드</h2>
+  </header>
+
+  <div id="challenge-difficulty-row" class="challenge-difficulty-row">
+    <button class="challenge-diff-btn" data-difficulty="easy" data-i18n="challenge.difficulty.easy" type="button">EASY</button>
+    <button class="challenge-diff-btn" data-difficulty="normal" data-i18n="challenge.difficulty.normal" type="button">NORMAL</button>
+    <button class="challenge-diff-btn" data-difficulty="hard" data-i18n="challenge.difficulty.hard" type="button">HARD</button>
+    <button class="challenge-diff-btn" data-difficulty="veryhard" data-i18n="challenge.difficulty.veryhard" type="button">VERY HARD</button>
+  </div>
+
+  <div id="challenge-level-grid" class="challenge-level-grid"></div>
 </section>
 
 <!-- ===================== Level gallery screen ===================== -->
