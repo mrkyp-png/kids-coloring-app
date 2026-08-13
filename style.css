@@ -725,13 +725,16 @@ button:active { transform: scale(0.94); }
   /* 2026-08-10: 한 차례 1:2(캔버스 우선)로 줬다가, "목표 이미지도 최대한 키워달라"는 후속
      피드백으로 다시 1:1로 — 팔레트가 이미 별도 열로 빠지고 툴바도 반으로 줄어든 상태라
      1:1이어도 원래보다 둘 다 훨씬 큼. */
-  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+  /* 2026-08-14(I3, 최종 리뷰): 챌린지 HUD를 위해 맨 위에 1행 추가, 기존 4행은 전부 한 칸씩 밀림.
+     HUD는 평소 hidden(display:none)이라 Child 모드에서는 auto 행이 0 높이라 레이아웃 영향 없음. */
+  grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 1fr) auto;
 }
-.coloring-header { grid-column: 1 / -1; grid-row: 1; }
-.goal-panel { grid-column: 1; grid-row: 2; }
-.canvas-wrap { grid-column: 1; grid-row: 3; }
-.palette { grid-column: 2; grid-row: 2 / 4; }
-.toolbar { grid-column: 1 / -1; grid-row: 4; }
+.challenge-hud { grid-column: 1 / -1; grid-row: 1; }
+.coloring-header { grid-column: 1 / -1; grid-row: 2; }
+.goal-panel { grid-column: 1; grid-row: 3; }
+.canvas-wrap { grid-column: 1; grid-row: 4; }
+.palette { grid-column: 2; grid-row: 3 / 5; }
+.toolbar { grid-column: 1 / -1; grid-row: 5; }
 .coloring-header {
   /* 2026-08-10: "이미지를 최대한 키워달라, 아이콘과 안 겹치는 조건" — 아이콘 크기(56px, 탭 타겟)는
      그대로 두고 순수 여백만 줄여서 goal/canvas 행에 세로 공간을 더 돌려줌. */
