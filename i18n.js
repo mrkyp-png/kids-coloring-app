@@ -95,7 +95,12 @@
       'challenge.difficulty.easy': 'EASY',
       'challenge.difficulty.normal': 'NORMAL',
       'challenge.difficulty.hard': 'HARD',
-      'challenge.difficulty.veryhard': 'VERY HARD'
+      'challenge.difficulty.veryhard': 'VERY HARD',
+      'challenge.hud.combo': 'Combo x{multiplier}',
+      'challenge.hud.accuracy': 'Acc {percent}%',
+      'challenge.result.score': 'Score: {score}',
+      'challenge.result.newRecord': 'NEW RECORD!',
+      'challenge.result.perfect': 'PERFECT!'
     },
     ko: {
       'loading.text': '불러오는 중…',
@@ -179,7 +184,12 @@
       'challenge.difficulty.easy': '쉬움',
       'challenge.difficulty.normal': '보통',
       'challenge.difficulty.hard': '어려움',
-      'challenge.difficulty.veryhard': '매우 어려움'
+      'challenge.difficulty.veryhard': '매우 어려움',
+      'challenge.hud.combo': '콤보 x{multiplier}',
+      'challenge.hud.accuracy': '정확도 {percent}%',
+      'challenge.result.score': '점수: {score}',
+      'challenge.result.newRecord': '신기록!',
+      'challenge.result.perfect': '퍼펙트!'
     },
     ja: {
       'loading.text': '読み込み中…',
@@ -263,7 +273,12 @@
       'challenge.difficulty.easy': 'かんたん',
       'challenge.difficulty.normal': 'ふつう',
       'challenge.difficulty.hard': 'むずかしい',
-      'challenge.difficulty.veryhard': 'とてもむずかしい'
+      'challenge.difficulty.veryhard': 'とてもむずかしい',
+      'challenge.hud.combo': 'コンボ x{multiplier}',
+      'challenge.hud.accuracy': '正確度 {percent}%',
+      'challenge.result.score': 'スコア: {score}',
+      'challenge.result.newRecord': '新記録！',
+      'challenge.result.perfect': 'パーフェクト！'
     },
     zh: {
       'loading.text': '加载中…',
@@ -347,7 +362,12 @@
       'challenge.difficulty.easy': '简单',
       'challenge.difficulty.normal': '普通',
       'challenge.difficulty.hard': '困难',
-      'challenge.difficulty.veryhard': '极难'
+      'challenge.difficulty.veryhard': '极难',
+      'challenge.hud.combo': '连击 x{multiplier}',
+      'challenge.hud.accuracy': '准确度 {percent}%',
+      'challenge.result.score': '得分：{score}',
+      'challenge.result.newRecord': '新纪录！',
+      'challenge.result.perfect': '完美！'
     },
     es: {
       'loading.text': 'Cargando…',
@@ -431,7 +451,12 @@
       'challenge.difficulty.easy': 'FÁCIL',
       'challenge.difficulty.normal': 'NORMAL',
       'challenge.difficulty.hard': 'DIFÍCIL',
-      'challenge.difficulty.veryhard': 'MUY DIFÍCIL'
+      'challenge.difficulty.veryhard': 'MUY DIFÍCIL',
+      'challenge.hud.combo': 'Combo x{multiplier}',
+      'challenge.hud.accuracy': 'Precisión {percent}%',
+      'challenge.result.score': 'Puntuación: {score}',
+      'challenge.result.newRecord': '¡NUEVO RÉCORD!',
+      'challenge.result.perfect': '¡PERFECTO!'
     }
   };
 
