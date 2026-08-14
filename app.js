@@ -658,12 +658,11 @@
 
   // 레벨에 들어갈 때 호출 — 이미 진행 중(만료 전)인 타임어택이 있으면 이어서, 없거나 만료됐으면 새로 시작
   // (그 레벨이 이미 만점 클리어된 경우는 타이머가 필요 없으므로 호출하지 않는다).
+  // 2026-08-14: "유아용 모드는 시간 압박 없이" 요청 — 시간초과로 진행상황을 몰래 리셋하던
+  // budget 만료 판정을 제거. 이제 이 시작 시각은 오직 경과시간 표시(카운트업)용으로만 쓰인다.
   function startOrResumeLevelAttempt(level) {
     const attempts = getLevelAttempts();
-    const budget = getLevelBudgetSeconds();
-    const start = attempts[level];
-    if (start && (Date.now() - start) / 1000 < budget) return; // 아직 유효 — 그대로 이어감
-    if (start) resetLevelProgress(level); // 만료된 이전 시도가 남아있었다면 그 레벨 점수를 초기화
+    if (attempts[level]) return; // 이미 시작 시각이 있으면 그대로 이어감
     attempts[level] = Date.now();
     saveLevelAttempts(attempts);
   }
@@ -759,20 +758,6 @@
     updateLevelTimerDisplay();
   }
 
-  // 시간 초과 처리: 그 레벨 점수 초기화 + 안내 + 갤러리로
-  function handleLevelTimeUp(level) {
-    stopLevelTimer();
-    clearLevelAttempt(level);
-    resetLevelProgress(level);
-    window.alert(I18N.t('alert.levelTimeout', { level: level }));
-    if (currentLevel === level) {
-      // 색칠 화면에 있었더라도 갤러리로 돌려보낸다
-      coloringScreen.hidden = true;
-      galleryScreen.hidden = false;
-      renderLevelGallery();
-    }
-  }
-
   // 시간 초과 처리(보스): 그 보스 점수 초기화 + 안내 + 맵으로 (완주 기록 자체는 안 지워지므로 다시 도전 가능)
   function handleBossTimeUp(mode) {
     stopLevelTimer();
@@ -814,23 +799,15 @@
     const attempts = getLevelAttempts();
     const start = attempts[currentLevel];
     if (!start) return;
-    const budget = getLevelBudgetSeconds();
-    const remaining = budget - (Date.now() - start) / 1000;
-    if (remaining <= 0) {
-      handleLevelTimeUp(currentLevel);
-      return;
-    }
-    setWormProgress(1 - remaining / budget);
-    const text = '⏱ ' + formatMMSS(remaining);
-    const warn = remaining <= 30;
+    // 2026-08-14: "시간 압박 없이, 완료시간만 표기" 요청 — 남은시간 카운트다운 대신
+    // 경과시간 카운트업만 보여준다. 시간초과 리셋 없음.
+    const text = '⏱ ' + formatMMSS((Date.now() - start) / 1000);
     if (!galleryScreen.hidden) {
       levelNextBanner.hidden = false;
       levelNextText.textContent = text;
-      levelNextText.classList.toggle('timer-warn', warn);
     } else {
       coloringTimerText.hidden = false;
       coloringTimerText.textContent = text;
-      coloringTimerText.classList.toggle('warn', warn);
     }
   }
 
@@ -1054,7 +1031,7 @@
       const attemptStart = getLevelAttempts()[currentLevel];
       if (attemptStart) recordLevelClearTime(currentLevel, (Date.now() - attemptStart) / 1000);
       clearLevelAttempt(currentLevel); // 클리어했으니 이 레벨의 타임어택은 끝 — 더 이상 시간 잴 필요 없음
-      if (currentLevel === TOTAL_LEVELS) checkFullRunClear(); // 마지막 레벨까지 깼으면 완주 기록 확인
+      // 2026-08-14: "유아용 모드는 랭킹 삭제" 요청 — 완주해도 랭킹 등록 모달을 띄우지 않는다.
       const hasNext = currentLevel < TOTAL_LEVELS;
       levelNextText.textContent = hasNext ? I18N.t('level.clear', { n: currentLevel }) : I18N.t('level.allClear');
       btnLevelNext.textContent = hasNext ? I18N.t('level.next') : I18N.t('level.map');
@@ -1113,12 +1090,12 @@
     } else {
       currentBossMode = null;
       setBgmTrack(MUSIC_SRC);
-      // 2026-08-14: "유아용 모드는 시간 압박 없이 색칠만" 요청 — startOrResumeLevelAttempt는
-      // 그대로 호출한다(클리어 소요시간 기록 자체는 보스 잠금해제 판정에 쓰이므로 유지). 다만
-      // startLevelTimer()를 빼서 카운트다운 표시/시간초과-리셋(handleLevelTimeUp)이 동작하지
-      // 않게 했다 — 시간 제한 없이 색칠만 하면 됨.
+      // 2026-08-14: "유아용 모드는 시간 압박 없이, 완료시간은 표기" 요청 — startLevelTimer()가
+      // updateLevelTimerDisplay를 다시 돌리되, 그 함수 자체를 카운트업(경과시간)만 보여주고
+      // 시간초과-리셋은 안 하도록 바꿔뒀다.
       if (!isLevelCleared(tpl.difficulty)) {
         startOrResumeLevelAttempt(tpl.difficulty);
+        startLevelTimer();
       }
     }
     // 위와 같은 이유로, 타이머 진행률을 보여주던 지렁이(.goal-panel::after)도 보스가 아닐 때는 숨김.
@@ -2273,7 +2250,14 @@
     praiseText.textContent = justClearedLevel
       ? I18N.t('praise.clearSuffix', { label: ratingLabel(r.level) })
       : ratingLabel(r.level);
-    praiseCount.textContent = I18N.t('praise.parts', { matched: matched, total: total });
+    // 2026-08-14: "완료시간은 표기되게" 요청 — 보스가 아닐 때만, 이 레벨(10장) 시작부터 지금까지
+    // 걸린 경과시간을 결과창에도 같이 보여준다.
+    let countText = I18N.t('praise.parts', { matched: matched, total: total });
+    if (!currentTemplate || !currentTemplate.isBoss) {
+      const start = getLevelAttempts()[r.level];
+      if (start) countText += ' ⏱ ' + formatMMSS((Date.now() - start) / 1000);
+    }
+    praiseCount.textContent = countText;
     praiseOverlay.hidden = false;
     if (justClearedLevel) playExcellent();
     praiseHomeTimer = setTimeout(() => {
