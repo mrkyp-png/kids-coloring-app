@@ -44,6 +44,15 @@ async function main() {
     });
     if (!bestScoreOk) throw new Error('Challenge.getBestScore 실패');
 
+    // 6) LEVEL 3~10이 에러 없이 끝까지(10문제) 자동 진행되는지 확인
+    // (player-entry-skip은 스크립트 시작 시 이미 눌렀고 __debugChallengeSimulateLevel은
+    //  startLevel()을 직접 호출하므로 재클릭이 필요 없다)
+    page.on('dialog', (d) => d.accept()); // finishLevel의 alert() 자동 닫기
+    for (const lv of [3, 4, 5, 6, 7, 8, 9, 10]) {
+      const result = await page.evaluate((level) => window.__debugChallengeSimulateLevel(level, 1), lv);
+      if (!result || typeof result.finalScore !== 'number') throw new Error('LEVEL ' + lv + ' 자동 진행 실패');
+    }
+
     if (pageErrors.length) throw new Error('페이지 에러 발생: ' + pageErrors.join(' | '));
 
     console.log('✅ 챌린지 모드 Phase 1 기본 검증 통과');
