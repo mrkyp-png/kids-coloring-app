@@ -2058,9 +2058,15 @@
   }
 
   // Task2(챌린지 Phase2): floodFill과 같은 벽(wallMask) 경계 연결 채우기지만, 시스템이 자동으로
-  // 색을 바꾸는 용도(LEVEL 9/10)라 pushUndo/playPop을 호출하지 않는다 — 플레이어가 실행취소를
-  // 눌렀을 때 게임이 몰래 바꾼 색까지 취소돼버리는 걸 막기 위함. hexColor가 null이면 그 영역을
-  // 다시 미색칠(alpha 0) 상태로 되돌린다(LEVEL 9의 "랜덤 소멸").
+  // 색을 바꾸는 용도(LEVEL 9/10)라 pushUndo/playPop을 호출하지 않는다 — 이 변화 자체를 하나의
+  // 실행취소 단위로 남기지 않겠다는 뜻일 뿐, "플레이어의 Undo가 이 변화를 되돌리지 못하게 막는다"는
+  // 뜻이 아니다. 오히려 반대로, pushUndo를 안 하기 때문에 #btn-undo가 가리키는 스냅샷은 게임이
+  // 몰래 바꾸기 전 상태 그대로라서, 플레이어가 Undo를 누르면 LEVEL 9/10이 방금 만든 변화를 그냥
+  // 되돌려 버릴 수 있다(=난이도를 무력화하는 known limitation). 2026-08-14 최종 리뷰 fix wave:
+  // challenge.js에서 챌린지 진행 중 #btn-undo/#btn-clear를 가로채 이 구멍을 실제로 막았다
+  // (#btn-save/#btn-home과 동일한 capture-listener 패턴, "챌린지 진행 중일 때만 #btn-save를
+  // 가로챈다" 주석 참고). hexColor가 null이면 그 영역을 다시 미색칠(alpha 0) 상태로 되돌린다
+  // (LEVEL 9의 "랜덤 소멸").
   function paintRegionPixels(seed, hexColor) {
     if (!wallMask || wallMask[seed] === 1) return;
     const imgData = fillCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE);
@@ -2879,6 +2885,7 @@
     repaintGoalWithColors,
     paintRegionPixels,
     getChallengeRegionInfo,
+    colorDistance,
     COLORS
   };
 

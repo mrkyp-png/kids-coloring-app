@@ -11,7 +11,7 @@
   // 그대로 꺼내 쓴다.
   const {
     goalCanvas, coloringScreen, openTemplate, computeCompletion, getTemplatesForLevel,
-    repaintGoalWithColors, paintRegionPixels, getChallengeRegionInfo, COLORS,
+    repaintGoalWithColors, paintRegionPixels, getChallengeRegionInfo, colorDistance, COLORS,
   } = window.__challengeInternals;
   const goalCanvasWrap = document.getElementById('goal-canvas-wrap');
   const TOTAL_CHALLENGE_LEVELS = 10;
@@ -355,7 +355,11 @@
       info.forEach((r) => {
         const hex = COLORS[Math.floor(Math.random() * COLORS.length)];
         map.set(r.label, hex);
-        if (hex !== r.targetColor) allMatch = false;
+        // 2026-08-14 최종 리뷰 fix wave: r.targetColor는 실제 이모지에서 샘플링한 색(sampled,
+        // COLORS 안에 정확히 들어있는 경우가 사실상 없음)이라 원래 계획의 "===로 완전 일치"는
+        // Pause가 절대 안 터지는 죽은 분기였다. computeCompletion과 같은 기준(COLOR_TOLERANCE)의
+        // 색 거리 비교로 바꿔, "육안으로 정답과 구분 안 되는 상태"면 Pause가 실제로 걸리게 한다.
+        if (colorDistance(hex, r.targetColor) > CFG.COLOR_TOLERANCE) allMatch = false;
       });
       repaintGoalWithColors(map);
       run.level6TimerId = setTimeout(tick, allMatch ? CFG.LEVEL6_MATCH_PAUSE_MS : CFG.LEVEL6_COLOR_CHANGE_MS);
@@ -422,13 +426,35 @@
     clearInterval(run.level9TimerId);
   }
 
+  // 2026-08-14 최종 리뷰 fix wave: pick.targetColor는 실제 이모지에서 샘플링한 색이라 COLORS
+  // 안에 정확히 들어있는 경우가 사실상 없다 — 원래의 `wrong === pick.targetColor` 재추첨 루프는
+  // 매번 첫 시도에서 바로 통과해버려, tolerance 안쪽이라 사실상 "안 틀린" 색을 wrong으로 배정할
+  // 수 있었다(자기파괴적 가드). computeCompletion과 같은 기준(COLOR_TOLERANCE)으로 "진짜 육안으로
+  // 틀린 색"만 통과시키도록 고치되, 최대 시도 횟수를 두어 병적인 tolerance 값에서도 무한루프에
+  // 빠지지 않게 한다 — 다 실패하면 후보 중 정답과 가장 먼 색으로 폴백.
+  function pickWrongColor(targetColor) {
+    const MAX_ATTEMPTS = 20;
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      const candidate = COLORS[Math.floor(Math.random() * COLORS.length)];
+      if (colorDistance(candidate, targetColor) > CFG.COLOR_TOLERANCE) return candidate;
+    }
+    let farthest = COLORS[0];
+    let farthestDist = -1;
+    COLORS.forEach((hex) => {
+      const dist = colorDistance(hex, targetColor);
+      if (dist > farthestDist) { farthestDist = dist; farthest = hex; }
+    });
+    return farthest;
+  }
+
   function startLevel10Chaos() {
     run.level10TimerId = setInterval(() => {
+      // 단순화(위 "해석이 갈리는 지점" 2번 참고): "정답 상태인 영역"을 색상 tolerance 비교 대신
+      // "칠해져 있음(painted)"으로 판정한다.
       const painted = getChallengeRegionInfo().filter((r) => r.painted);
       if (painted.length === 0) return;
       const pick = painted[Math.floor(Math.random() * painted.length)];
-      let wrong = pick.targetColor;
-      while (wrong === pick.targetColor) wrong = COLORS[Math.floor(Math.random() * COLORS.length)];
+      const wrong = pickWrongColor(pick.targetColor);
       paintRegionPixels(pick.seed, wrong);
     }, CFG.LEVEL10_COLOR_CHANGE_INTERVAL_MS);
   }
@@ -451,6 +477,24 @@
   // — Child의 홈 이동 자체는 그대로 일어나야 하므로 stopImmediatePropagation은 호출하지 않는다.
   document.getElementById('btn-home').addEventListener('click', () => {
     if (!hud.root.hidden) endRun();
+  }, true);
+
+  // 2026-08-14 최종 리뷰 fix wave: paintRegionPixels가 pushUndo를 안 남기기 때문에(app.js 주석
+  // 참고) #btn-undo가 챌린지 진행 중에 그대로 열려 있으면 LEVEL 9/10이 방금 만든 변화(소멸/색
+  // 강제 변경)를 플레이어가 그냥 되돌려 난이도를 무력화할 수 있었다 — #btn-save와 동일한
+  // capture-listener 패턴으로 가로채 챌린지 중에는 완전히 무효화한다.
+  document.getElementById('btn-undo').addEventListener('click', (e) => {
+    if (!hud.root.hidden) {
+      e.stopImmediatePropagation();
+    }
+  }, true);
+
+  // 위와 같은 이유로 #btn-clear도 챌린지 중에는 무효화(전체 지우기로 챌린지 진행 상황을 날리는
+  // 것도 같은 종류의 구멍이라 일관성 있게 막는다).
+  document.getElementById('btn-clear').addEventListener('click', (e) => {
+    if (!hud.root.hidden) {
+      e.stopImmediatePropagation();
+    }
   }, true);
 
   // C2: 챌린지 진행 중에는 돋보기 확대(app.js:goalZoomModal)가 LEVEL1 암기/LEVEL2 마스크
