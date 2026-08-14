@@ -842,13 +842,19 @@ button:active { transform: scale(0.94); }
   width: 36px;
   height: 9px;
   background:
-    radial-gradient(circle at 4px 4.5px, #3E2418 2.4px, transparent 2.5px),
-    repeating-linear-gradient(90deg, #7F5539 0 4px, #5c3d28 4px 5px);
+    radial-gradient(circle at 4px 4.5px, var(--worm-color-dot, #3E2418) 2.4px, transparent 2.5px),
+    repeating-linear-gradient(90deg, var(--worm-color-a, #7F5539) 0 4px, var(--worm-color-b, #5c3d28) 4px 5px);
   border-radius: 5px;
   z-index: 3;
   transform-origin: center bottom;
   transition: left 0.6s linear;
   animation: goal-divider-worm-gait 2s ease-in-out infinite;
+}
+/* 2026-08-14: "60초 끝나면 지렁이가 오른쪽으로 사라지고, 다음 문제는 다른 색 지렁이" 요청 —
+   새 문제로 넘어가며 진행률을 0으로 되돌릴 때는(직전 문제 지렁이가 오른쪽 밖으로 나간 뒤)
+   이 슬라이드 애니메이션 없이 순간이동시켜야 왼쪽 끝에서 "새로" 나타나는 것처럼 보인다. */
+.goal-panel.worm-no-transition::after {
+  transition: none;
 }
 /* 2026-08-11: "쭉 늘어났다 몸을 모았다가 다시 쭉 — 자벌레처럼" 요청 — 좌우 이동(위 left, 시간
    진행률 연동)과는 별개로 몸통만 계속 늘었다 줄었다 하는 자벌레 걸음걸이 루프를 추가. */
@@ -1431,21 +1437,67 @@ button:active { transform: scale(0.94); }
   clip-path: circle(90px at 50% 50%); /* JS가 매 이동마다 style.clipPath로 좌표 갱신 */
 }
 
-/* ===== 챌린지 LEVEL 3: Goal을 완전히 가리지 않는 날씨 오클루션 ===== */
-.challenge-occlude::after {
-  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 2;
-  opacity: var(--challenge-occlude-opacity, 0.35);
+/* ===== 챌린지 LEVEL 3: 구름/비/눈이 실제로 움직이는 날씨 효과 =====
+   2026-08-14 피드백: 정적인 오버레이 대신 실제로 움직이게, Goal 실루엣 안쪽에만 보이게 변경.
+   challenge.js가 매 문제 시작 시 goal 이미지 스냅샷을 mask-image로 씌우고(캐릭터 모양 안쪽만
+   보임), 타입에 맞는 자식 엘리먼트(구름 span 여러 개 / 비·눈 div)를 채워 넣는다. */
+.challenge-weather-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: var(--challenge-occlude-opacity, 0.55);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-mode: alpha;
+  mask-mode: alpha;
 }
-.challenge-occlude-cloud::after {
-  background: radial-gradient(circle at 30% 30%, #fff 0 40%, transparent 41%),
-              radial-gradient(circle at 68% 45%, #fff 0 34%, transparent 35%);
+
+.challenge-cloud {
+  position: absolute;
+  top: var(--cloud-top, 20%);
+  width: var(--cloud-size, 40%);
+  height: var(--cloud-size, 40%);
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 60%, transparent 72%);
+  filter: blur(1px);
+  animation: challenge-cloud-drift linear infinite;
+  animation-duration: var(--cloud-duration, 4s);
+  animation-delay: var(--cloud-delay, 0s);
 }
-.challenge-occlude-rain::after {
-  background: repeating-linear-gradient(115deg, rgba(120,170,255,0.9) 0 3px, transparent 3px 22px);
+@keyframes challenge-cloud-drift {
+  from { transform: translateX(-70%); }
+  to { transform: translateX(170%); }
 }
-.challenge-occlude-snow::after {
-  background: radial-gradient(circle, #fff 2px, transparent 3px) 0 0/18px 18px,
-              radial-gradient(circle, #fff 2px, transparent 3px) 9px 9px/18px 18px;
+
+.challenge-rain {
+  position: absolute;
+  inset: -50% -20% -50% -20%;
+  background:
+    repeating-linear-gradient(115deg, rgba(90,150,240,0.95) 0 2px, transparent 2px 20px),
+    repeating-linear-gradient(115deg, rgba(140,190,255,0.7) 0 4px, transparent 4px 34px);
+  animation: challenge-rain-fall 0.5s linear infinite;
+}
+@keyframes challenge-rain-fall {
+  from { background-position: 0 -30%, 0 -30%; }
+  to { background-position: -14% 30%, -22% 30%; }
+}
+
+.challenge-snow {
+  position: absolute;
+  inset: -30% 0 -30% 0;
+  background:
+    radial-gradient(circle, #fff 3px, transparent 4px) 0 0/44px 44px,
+    radial-gradient(circle, #fff 1.5px, transparent 2.5px) 15px 12px/30px 30px,
+    radial-gradient(circle, #fff 2.2px, transparent 3px) 28px 24px/54px 54px;
+  animation: challenge-snow-fall 4s linear infinite;
+}
+@keyframes challenge-snow-fall {
+  from { background-position: 0 0, 15px 12px, 28px 24px; }
+  to { background-position: 10px 130%, 0px 130%, 42px 130%; }
 }
 
 /* ===== 챌린지 LEVEL 4: Goal이 사라지는 3가지 연출 ===== */

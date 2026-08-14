@@ -12,8 +12,10 @@
   const {
     goalCanvas, coloringScreen, openTemplate, computeCompletion, getTemplatesForLevel,
     repaintGoalWithColors, paintRegionPixels, getChallengeRegionInfo, colorDistance, COLORS,
+    setWormProgress, setWormExit, resetWormForNewProblem,
   } = window.__challengeInternals;
   const goalCanvasWrap = document.getElementById('goal-canvas-wrap');
+  const weatherLayer = document.getElementById('challenge-weather-layer');
   const TOTAL_CHALLENGE_LEVELS = 10;
   const IMPLEMENTED_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // Phase 1에서 실제로 플레이 가능한 레벨. Phase 2에서 3~10 추가.
 
@@ -135,7 +137,7 @@
     totalRegionsCorrect: 0, totalRegionsAll: 0, // I1: Accuracy는 문제 단위가 아니라 영역 단위 누적
     totalRemainingSeconds: 0, // I6: TimeBonus는 마지막 문제가 아니라 문제별 남은시간 누적
     level3OccludeClass: null, level5AnimFrame: null, level6TimerId: null,
-    level8TimerId: null, level9TimerId: null, level10TimerId: null,
+    level7TimerId: null, level8TimerId: null, level9TimerId: null, level10TimerId: null,
   };
 
   // 디버그/테스트용: loadNextProblem이 다음 문제를 열고 준비를 마쳤을 때 한 번 불려나가는 훅.
@@ -176,17 +178,40 @@
     }, { challenge: true });
   }
 
+  // 2026-08-14: "60초 끝나면 지렁이가 오른쪽으로 사라지고, 다음 문제는 다른 색 지렁이" —
+  // 문제마다 이전과 다른 색을 랜덤으로 골라 배정한다.
+  const WORM_COLORS = [
+    ['#3E2418', '#7F5539', '#5c3d28'], // 갈색(기존 기본값)
+    ['#7a1f1f', '#e05a5a', '#b23a3a'], // 빨강
+    ['#1f4d2e', '#4caf7d', '#2e7d4f'], // 초록
+    ['#1f3a5f', '#5b9bd5', '#2f6aa8'], // 파랑
+    ['#4a1f5f', '#b06fd6', '#7a3ba3'], // 보라
+    ['#5f4a1f', '#e0b04a', '#b28a2f'], // 노랑
+  ];
+  let lastWormColorIndex = -1;
+  function pickNextWormColor() {
+    let idx;
+    do { idx = Math.floor(Math.random() * WORM_COLORS.length); } while (idx === lastWormColorIndex);
+    lastWormColorIndex = idx;
+    resetWormForNewProblem(WORM_COLORS[idx][0], WORM_COLORS[idx][1], WORM_COLORS[idx][2]);
+  }
+
   function startProblemTimer() {
     const seconds = CFG.DIFFICULTY_TIME[run.difficulty];
     run.problemDeadline = Date.now() + seconds * 1000;
+    pickNextWormColor();
     clearInterval(run.problemTimerId);
     run.problemTimerId = setInterval(tickProblemTimer, 250);
     tickProblemTimer();
   }
 
+  // 2026-08-14: "지렁이가 없어졌다, 왼쪽에서 오른쪽으로 기어가는 거 복귀" 피드백 — 문제별
+  // 제한시간 진행률(0=시작/왼쪽, 1=시간 다 됨/오른쪽)을 지렁이 진행률로도 같이 반영한다.
   function tickProblemTimer() {
+    const seconds = CFG.DIFFICULTY_TIME[run.difficulty];
     const remaining = Math.max(0, Math.ceil((run.problemDeadline - Date.now()) / 1000));
     hud.timer.textContent = '⏱ ' + remaining;
+    setWormProgress(1 - remaining / seconds);
     if (remaining <= 0) {
       clearInterval(run.problemTimerId);
       handleProblemTimeout();
@@ -236,6 +261,7 @@
   function advanceToNextProblem() {
     const effect = LEVEL_EFFECTS[run.level];
     if (effect && effect.stop) effect.stop();
+    setWormExit(); // 이번 문제의 지렁이는 오른쪽으로 사라짐 — 다음 문제 시작 시 새 색으로 리셋됨
     run.index++;
     loadNextProblem();
   }
@@ -272,6 +298,7 @@
     goalCanvas.style.transform = '';
     goalCanvas.style.transition = '';
     goalCanvasWrap.style.overflow = '';
+    setWormProgress(0); // 다음(또는 Child) 진입 시 지렁이가 이전 진행률로 남아있지 않게
     hud.root.hidden = true;
   }
 
@@ -282,38 +309,81 @@
     revealTimerId = setTimeout(() => { goalCanvas.hidden = true; }, CFG.LEVEL1_GOAL_DISPLAY_MS);
   }
 
+  // 2026-08-14: "랜덤 점프 대신 원이 지그재그로 화면을 훑고, 30초 안에 전체를 한 번 다 보여주게"
+  // 요청 — 위→아래로 줄을 내려가며 왼↔오 지그재그로 훑어서, LEVEL2_SWEEP_CYCLE_MS(30초) 안에
+  // 640x640 전체가 원 반경만큼씩 빠짐없이 지나가게 한다.
   function startLevel2Reveal() {
-    // 명세서 9번: Goal의 일부만 원형으로 노출, 노출 영역을 반복 변경
     goalCanvas.hidden = false;
     goalCanvas.classList.add('challenge-goal-mask');
     const radius = CFG.LEVEL2_REVEAL_RADIUS_PX;
-    const moveReveal = () => {
-      const x = radius + Math.random() * (640 - radius * 2);
-      const y = radius + Math.random() * (640 - radius * 2);
+    const rowStep = radius * 2; // 원 지름만큼 내려가야 위아래 줄이 딱 맞닿아 빈틈이 안 생김
+    const rows = Math.max(1, Math.ceil((640 - radius * 2) / rowStep) + 1);
+    const xStart = radius;
+    const xEnd = 640 - radius;
+    const rowWidth = Math.max(1, xEnd - xStart);
+    const perRowMs = CFG.LEVEL2_SWEEP_CYCLE_MS / rows;
+    const startTime = Date.now();
+    function tick() {
+      const elapsed = (Date.now() - startTime) % CFG.LEVEL2_SWEEP_CYCLE_MS;
+      const rowIndex = Math.min(rows - 1, Math.floor(elapsed / perRowMs));
+      const rowProgress = (elapsed % perRowMs) / perRowMs;
+      const y = radius + rowIndex * rowStep;
+      const goingRight = rowIndex % 2 === 0; // 지그재그: 짝수 줄은 왼->오, 홀수 줄은 오->왼
+      const x = goingRight ? xStart + rowWidth * rowProgress : xEnd - rowWidth * rowProgress;
       goalCanvas.style.clipPath = `circle(${radius}px at ${x}px ${y}px)`;
-    };
-    moveReveal();
-    run.level2RevealTimerId = setInterval(moveReveal, CFG.LEVEL2_REVEAL_MOVE_MS);
+      run.level2RevealTimerId = requestAnimationFrame(tick);
+    }
+    tick();
   }
 
   function stopLevel2Reveal() {
-    clearInterval(run.level2RevealTimerId);
+    cancelAnimationFrame(run.level2RevealTimerId);
     goalCanvas.classList.remove('challenge-goal-mask');
     goalCanvas.style.clipPath = '';
   }
+
+  // 2026-08-14 피드백: 정적 오버레이 대신 실제로 움직이는 구름/비/눈으로 변경, goal 실루엣
+  // 안쪽에만 보이게(mask) + 이동 자체는 네모 박스 전체 범위를 가로지르게(마스크가 보이는
+  // 부분만 잘라줌). 구름/빗줄기/눈송이 크기는 매번 랜덤해서 일정하지 않게 한다.
+  function rand(min, max) { return min + Math.random() * (max - min); }
 
   function startLevel3Occlusion() {
     const problemNum = run.index + 1;
     const type = problemNum <= 3 ? 'cloud' : problemNum <= 6 ? 'rain' : 'snow';
     goalCanvasWrap.style.setProperty('--challenge-occlude-opacity', CFG.LEVEL3_OCCLUSION_OPACITY);
-    goalCanvasWrap.classList.add('challenge-occlude', 'challenge-occlude-' + type);
-    run.level3OccludeClass = 'challenge-occlude-' + type;
+
+    // 지금 문제의 goal 이미지 실루엣(알파 채널)을 그대로 mask로 씌워서, 날씨 효과가 캐릭터
+    // 모양 안쪽에만 보이게 한다(배경 빈 공간은 안 덮임).
+    const maskUrl = 'url(' + goalCanvas.toDataURL() + ')';
+    weatherLayer.style.webkitMaskImage = maskUrl;
+    weatherLayer.style.maskImage = maskUrl;
+
+    weatherLayer.innerHTML = '';
+    if (type === 'cloud') {
+      const count = 5 + Math.floor(Math.random() * 3); // 5~7개, 크기/속도/위치 제각각
+      for (let i = 0; i < count; i++) {
+        const cloud = document.createElement('span');
+        cloud.className = 'challenge-cloud';
+        cloud.style.setProperty('--cloud-size', rand(22, 48) + '%');
+        cloud.style.setProperty('--cloud-top', rand(5, 70) + '%');
+        cloud.style.setProperty('--cloud-duration', rand(3, 6) + 's');
+        cloud.style.setProperty('--cloud-delay', rand(-4, 0) + 's');
+        weatherLayer.appendChild(cloud);
+      }
+    } else if (type === 'rain') {
+      weatherLayer.appendChild(document.createElement('div')).className = 'challenge-rain';
+    } else {
+      weatherLayer.appendChild(document.createElement('div')).className = 'challenge-snow';
+    }
+    weatherLayer.hidden = false;
+    run.level3OccludeClass = type;
   }
 
   function stopLevel3Occlusion() {
-    if (run.level3OccludeClass) {
-      goalCanvasWrap.classList.remove('challenge-occlude', run.level3OccludeClass);
-    }
+    weatherLayer.hidden = true;
+    weatherLayer.innerHTML = '';
+    weatherLayer.style.webkitMaskImage = '';
+    weatherLayer.style.maskImage = '';
     run.level3OccludeClass = null;
   }
 
@@ -330,13 +400,16 @@
     }, CFG.LEVEL1_GOAL_DISPLAY_MS);
   }
 
+  // 2026-08-14 피드백: 평면(Z축) 회전이 아니라 "상단/하단은 고정된 채 Y축(세로축)으로 도는"
+  // 3D 회전이어야 함 — 동전을 세로로 세워 돌리는 느낌. rotateY로 돌리면 180도 지점에서
+  // 뒷면(backface-visibility 기본값 visible)이 자동으로 좌우반전(거울상)으로 보여서, 스펙의
+  // "NORMAL -> MIRROR -> NORMAL -> MIRROR"가 별도 로직 없이 자연스럽게 나온다.
   function startLevel5Rotation() {
     const startTime = Date.now();
     function tick() {
       const elapsed = Date.now() - startTime;
       const deg = (elapsed % CFG.LEVEL5_ROTATION_MS) / CFG.LEVEL5_ROTATION_MS * 360;
-      const mirrored = Math.floor(elapsed / CFG.LEVEL5_MIRROR_INTERVAL_MS) % 2 === 1;
-      goalCanvas.style.transform = 'rotate(' + deg + 'deg)' + (mirrored ? ' scaleX(-1)' : '');
+      goalCanvas.style.transform = 'perspective(800px) rotateY(' + deg + 'deg)';
       run.level5AnimFrame = requestAnimationFrame(tick);
     }
     tick();
@@ -347,24 +420,29 @@
     run.level5AnimFrame = null;
   }
 
+  // 2026-08-14 피드백: 15초 주기 반복 — 처음 3초는 진짜 정답 이미지를 보여주고(암기 구간),
+  // 나머지 12초는 색을 계속 랜덤으로 바꾼다(헷갈리는 구간). 문제 시간이 끝날 때까지 반복.
   function startLevel6Flicker() {
-    function tick() {
+    function showReal() {
+      repaintGoalWithColors(null); // null = 실제 정답색(currentLabelToColor)
+      run.level6TimerId = setTimeout(startScramble, CFG.LEVEL6_REAL_DISPLAY_MS);
+    }
+    function startScramble() {
+      const scrambleEnd = Date.now() + (CFG.LEVEL6_CYCLE_MS - CFG.LEVEL6_REAL_DISPLAY_MS);
+      scrambleTick(scrambleEnd);
+    }
+    function scrambleTick(scrambleEnd) {
       const info = getChallengeRegionInfo();
       const map = new Map();
-      let allMatch = info.length > 0;
-      info.forEach((r) => {
-        const hex = COLORS[Math.floor(Math.random() * COLORS.length)];
-        map.set(r.label, hex);
-        // 2026-08-14 최종 리뷰 fix wave: r.targetColor는 실제 이모지에서 샘플링한 색(sampled,
-        // COLORS 안에 정확히 들어있는 경우가 사실상 없음)이라 원래 계획의 "===로 완전 일치"는
-        // Pause가 절대 안 터지는 죽은 분기였다. computeCompletion과 같은 기준(COLOR_TOLERANCE)의
-        // 색 거리 비교로 바꿔, "육안으로 정답과 구분 안 되는 상태"면 Pause가 실제로 걸리게 한다.
-        if (colorDistance(hex, r.targetColor) > CFG.COLOR_TOLERANCE) allMatch = false;
-      });
+      info.forEach((r) => map.set(r.label, COLORS[Math.floor(Math.random() * COLORS.length)]));
       repaintGoalWithColors(map);
-      run.level6TimerId = setTimeout(tick, allMatch ? CFG.LEVEL6_MATCH_PAUSE_MS : CFG.LEVEL6_COLOR_CHANGE_MS);
+      if (Date.now() < scrambleEnd) {
+        run.level6TimerId = setTimeout(() => scrambleTick(scrambleEnd), CFG.LEVEL6_COLOR_CHANGE_MS);
+      } else {
+        showReal(); // 사이클 반복
+      }
     }
-    tick();
+    showReal();
   }
 
   function stopLevel6Flicker() {
@@ -372,21 +450,30 @@
     repaintGoalWithColors(null); // 실제 정답색으로 복원
   }
 
+  // 2026-08-14 피드백: 문제당 한 번만 지나가고 끝이 아니라, 왼->오->퇴장 사이클을
+  // LEVEL7_CYCLE_MS(15초)마다 문제 시간 내내 반복한다.
   function startLevel7Slide() {
     const problemNum = run.index + 1;
     const t = (problemNum - 1) / (TOTAL_CHALLENGE_LEVELS - 1);
     const sweepMs = CFG.LEVEL7_SWEEP_START_MS - (CFG.LEVEL7_SWEEP_START_MS - CFG.LEVEL7_SWEEP_END_MS) * t;
     goalCanvasWrap.style.overflow = 'hidden';
-    goalCanvas.hidden = false;
-    goalCanvas.style.transition = 'none';
-    goalCanvas.style.transform = 'translateX(-100%)'; // LEFT에서 시작
-    void goalCanvas.offsetWidth; // transition:none 적용을 강제로 반영(다음 transform이 즉시 안 튀도록)
-    goalCanvas.style.transition = 'transform ' + sweepMs + 'ms linear';
-    goalCanvas.style.transform = 'translateX(100%)'; // RIGHT까지 쓸고 지나감
-    clearTimeout(revealTimerId);
-    revealTimerId = setTimeout(() => {
-      goalCanvas.style.transform = 'translateX(220%)'; // OUT — 화면 밖으로 완전히 벗어난 채 유지
-    }, sweepMs);
+    function runOneSweep() {
+      goalCanvas.hidden = false;
+      goalCanvas.style.transition = 'none';
+      goalCanvas.style.transform = 'translateX(-100%)'; // LEFT에서 시작
+      void goalCanvas.offsetWidth; // transition:none 적용을 강제로 반영(다음 transform이 즉시 안 튀도록)
+      goalCanvas.style.transition = 'transform ' + sweepMs + 'ms linear';
+      goalCanvas.style.transform = 'translateX(100%)'; // RIGHT까지 쓸고 지나감
+      run.level7TimerId = setTimeout(() => {
+        goalCanvas.style.transform = 'translateX(220%)'; // OUT — 다음 사이클까지 화면 밖에 머무름
+        run.level7TimerId = setTimeout(runOneSweep, Math.max(0, CFG.LEVEL7_CYCLE_MS - sweepMs));
+      }, sweepMs);
+    }
+    runOneSweep();
+  }
+
+  function stopLevel7Slide() {
+    clearTimeout(run.level7TimerId);
   }
 
   function startLevel8Blink() {
@@ -535,7 +622,10 @@
   // 레벨별 시작/정지 효과 디스패치 테이블. loadNextProblem/advanceToNextProblem/endRun이 레벨을
   // if/else로 분기하지 않고 이 테이블을 조회한다. 레벨3~10은 각 담당 Task가 자기 항목만 채운다.
   const LEVEL_EFFECTS = {
-    1: { start: startLevel1Reveal, stop: null },
+    // 2026-08-14: "레벨1 사라짐 vs 레벨8 깜빡임, 깜빡임이 더 쉬움" 피드백으로 1과 8을 서로 교체
+    // (함수/Config 이름은 그대로, 배정만 바꿈 — startLevel1Reveal/startLevel8Blink 내부 로직은
+    // 어느 레벨 번호에 붙어도 그대로 동작함).
+    1: { start: startLevel8Blink, stop: stopLevel8Blink },
     2: { start: startLevel2Reveal, stop: stopLevel2Reveal },
     3: null, 4: null, 5: null, 6: null, 7: null, 8: null, 9: null, 10: null,
   };
@@ -544,8 +634,8 @@
   LEVEL_EFFECTS[4] = { start: startLevel4Vanish, stop: null };
   LEVEL_EFFECTS[5] = { start: startLevel5Rotation, stop: stopLevel5Rotation };
   LEVEL_EFFECTS[6] = { start: startLevel6Flicker, stop: stopLevel6Flicker };
-  LEVEL_EFFECTS[7] = { start: startLevel7Slide, stop: null };
-  LEVEL_EFFECTS[8] = { start: startLevel8Blink, stop: stopLevel8Blink };
+  LEVEL_EFFECTS[7] = { start: startLevel7Slide, stop: stopLevel7Slide };
+  LEVEL_EFFECTS[8] = { start: startLevel1Reveal, stop: null };
   LEVEL_EFFECTS[9] = { start: startLevel9Vanish, stop: stopLevel9Vanish };
   LEVEL_EFFECTS[10] = { start: startLevel10Chaos, stop: stopLevel10Chaos };
 

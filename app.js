@@ -151,6 +151,22 @@
   function setWormProgress(p) {
     goalPanelEl.style.setProperty('--worm-progress', Math.max(0, Math.min(1, p)));
   }
+  // 2026-08-14 챌린지 모드 피드백: "60초 끝나면 지렁이가 오른쪽으로 사라지고, 다음 문제는
+  // 다른 색 지렁이" — setWormExit()이 진행률을 1 밖으로 밀어서(overflow:hidden에 가려짐)
+  // 오른쪽으로 빠져나가는 것처럼 보이게 하고, resetWormForNewProblem()이 새 색을 입힌 뒤
+  // transition 없이 순간이동으로 왼쪽 끝(0)에 다시 세운다.
+  function setWormExit() {
+    goalPanelEl.style.setProperty('--worm-progress', 1.6);
+  }
+  function resetWormForNewProblem(dot, a, b) {
+    goalPanelEl.style.setProperty('--worm-color-dot', dot);
+    goalPanelEl.style.setProperty('--worm-color-a', a);
+    goalPanelEl.style.setProperty('--worm-color-b', b);
+    goalPanelEl.classList.add('worm-no-transition');
+    goalPanelEl.style.setProperty('--worm-progress', 0);
+    void goalPanelEl.offsetWidth; // 강제 리플로우 — transition 없이 이 위치로 순간이동
+    goalPanelEl.classList.remove('worm-no-transition');
+  }
   const goalZoomModal = document.getElementById('goal-zoom-modal');
   const goalZoomCanvas = document.getElementById('goal-zoom-canvas');
   const tapLayer = document.getElementById('tap-layer');
@@ -1105,8 +1121,10 @@
         startLevelTimer();
       }
     }
-    // 위와 같은 이유로, 타이머 진행률을 보여주던 지렁이(.goal-panel::after)도 보스가 아닐 때는 숨김.
-    goalPanelEl.classList.toggle('no-timer', !tpl.isBoss);
+    // 위와 같은 이유로, 타이머 진행률을 보여주던 지렁이(.goal-panel::after)는 일반 Child 레벨만
+    // 숨긴다 — 보스는 원래도 유지, 챌린지 모드는 자체 문제별 타이머가 있으니 지렁이도 그대로 보여준다
+    // (2026-08-14: "지렁이가 없어졌다" 피드백 — 챌린지 모드까지 같이 숨겨진 게 회귀였음).
+    goalPanelEl.classList.toggle('no-timer', !tpl.isBoss && !opts.challenge);
     coloringTitle.textContent = tpl.emoji + ' ' + I18N.templateName(tpl);
     goalEmoji.textContent = tpl.emoji;
     galleryScreen.hidden = true;
@@ -1601,6 +1619,35 @@
         // 최종(final) 라벨링: 병합으로 벽이 늘어난 뒤 다시 매긴 라벨 — 이후 openTemplate이
         // 실제로 쓰는 라벨링과 반드시 동일해야 하므로, 여기서 미리 같은 라벨로 정답색을 맞춰둔다.
         const final = labelRegions(wall);
+        // 2026-08-14 피드백: "칠할 영역이 2개 이상인데 색이 1개로 뭉쳐서 밋밋함" — 위
+        // SIMILAR_COLOR_DIST 클러스터링이 색조가 비슷한 도안(회색 쥐, 베이지색 달 등)에서
+        // 실제 채점 영역이 여러 개인데도 전부 한 색으로 합쳐버릴 수 있다. 칠할 영역이 진짜
+        // 1개뿐인 도안은 그대로 두고, 2개 이상인데 색이 1개로 뭉쳐진 경우에만 원래(클러스터링
+        // 전) 색이 그 클러스터에서 가장 멀었던 영역 하나를 원본 샘플색으로 되돌려 최소 2색을
+        // 보장한다.
+        if (!tpl.paletteOverride && paletteClusters.length === 1 && final.gradable.length >= 2) {
+          let farthestSeed = null;
+          let farthestDist = -1;
+          const cluster = paletteClusters[0];
+          final.gradable.forEach((r) => {
+            const raw = rawColorBySeed.get(r.seed);
+            if (!raw) return;
+            const [rr, gg, bb] = raw;
+            if (rr >= 245 && gg >= 245 && bb >= 245) return; // 흰색 대체 대상은 건드리지 않음
+            const [h, s, l] = rgbToHsl(rr, gg, bb);
+            let dh = Math.abs(h - cluster.hsl[0]);
+            if (dh > 180) dh = 360 - dh;
+            const hueWeight = 0.3 + 0.7 * Math.min(s, cluster.hsl[1]);
+            const dist = (dh / 180) * (dh / 180) * hueWeight * 6
+              + (s - cluster.hsl[1]) * (s - cluster.hsl[1]) * 0.5
+              + (l - cluster.hsl[2]) * (l - cluster.hsl[2]) * 0.5;
+            if (dist > farthestDist) { farthestDist = dist; farthestSeed = r.seed; }
+          });
+          if (farthestSeed != null && farthestDist > 0) {
+            const [rr, gg, bb] = rawColorBySeed.get(farthestSeed);
+            colorBySeed.set(farthestSeed, rgbToHex(rr, gg, bb));
+          }
+        }
         const sampledColors = new Map();
         // 2026-08-11: "쉬움 보스 머리색이 얼굴색과 같이 나온다" 피드백 — 위 SIMILAR_COLOR_DIST
         // 클러스터링이 롤리팝처럼 "같은 부위의 미묘한 음영"을 하나로 합치는 데는 맞지만, 요정/히어로
@@ -2872,6 +2919,9 @@
     coloringScreen,
     openTemplate,
     computeCompletion,
+    setWormProgress,
+    setWormExit,
+    resetWormForNewProblem,
     getTemplatesForLevel,
     repaintGoalWithColors,
     paintRegionPixels,

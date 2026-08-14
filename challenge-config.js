@@ -11,7 +11,7 @@
     ENABLED: true,
 
     // ---- DIFFICULTY: 문제 1개당 제한시간(초), 명세서 4번 ----
-    DIFFICULTY_TIME: { easy: 30, normal: 20, hard: 15, veryhard: 10 },
+    DIFFICULTY_TIME: { easy: 60, normal: 20, hard: 15, veryhard: 10 },
     // ---- DIFFICULTY: Ranking 점수 배율, 명세서 5번 ----
     DIFFICULTY_SCORE_MULTIPLIER: { easy: 1.0, normal: 1.5, hard: 2.0, veryhard: 3.0 },
 
@@ -35,8 +35,8 @@
     LEVEL1_GOAL_DISPLAY_MS: 1000,
 
     // ---- LEVEL 2, 명세서 9번: 원형 노출 반경/이동 간격 (명세서에 구체값 없음 - 임시값) ----
-    LEVEL2_REVEAL_RADIUS_PX: 90, // 임시값 - 밸런스 테스트 후 조정 (WORK_SIZE=640 기준)
-    LEVEL2_REVEAL_MOVE_MS: 900, // 임시값 - 밸런스 테스트 후 조정
+    LEVEL2_REVEAL_RADIUS_PX: 45, // 2026-08-14 피드백: 90 -> 45로 절반 축소 (WORK_SIZE=640 기준)
+    LEVEL2_SWEEP_CYCLE_MS: 30000, // 2026-08-14 피드백: 30초 안에 지그재그로 전체 화면을 한 번 다 훑음
 
     // ---- Perfect 조건, 명세서 28번 (구체값 없음 - 임시값) ----
     PERFECT_ACCURACY: 100, // 임시값 - 밸런스 테스트 후 조정 (%, 이 이상이어야 Perfect)
@@ -50,23 +50,26 @@
     MAGNIFIER_MAX_LEVEL: 6,
 
     // ---- LEVEL 3, 명세서 8번: Cloud/Rain/Snow 가림 불투명도 (Goal을 완전히 가리지 않음) ----
-    LEVEL3_OCCLUSION_OPACITY: 0.35, // 임시값 - 밸런스 테스트 후 조정
+    LEVEL3_OCCLUSION_OPACITY: 1, // 2026-08-14 피드백: 반투명이면 구름인지 잘 안 보여서 완전 불투명으로
 
     // ---- LEVEL 4, 명세서 9번: Fade/Shrink/Fragment 사라짐 애니메이션 길이(ms) ----
     LEVEL4_TRANSITION_MS: 600, // 임시값 - 밸런스 테스트 후 조정
 
     // ---- LEVEL 5, 명세서 10번: 360도 회전 1바퀴 시간 / Mirror 전환 간격(ms) ----
     LEVEL5_ROTATION_MS: 4000, // 임시값 - 밸런스 테스트 후 조정
-    LEVEL5_MIRROR_INTERVAL_MS: 4000, // 임시값 - 밸런스 테스트 후 조정
 
     // ---- LEVEL 6, 명세서 11번: 영역별 색상 랜덤 변경 주기 / 실제 정답과 일치 시 Pause 길이(ms) ----
-    LEVEL6_COLOR_CHANGE_MS: 800, // 임시값 - 밸런스 테스트 후 조정
-    LEVEL6_MATCH_PAUSE_MS: 1000, // 명세서 11번에 "1초"로 명시됨
+    LEVEL6_COLOR_CHANGE_MS: 800, // 임시값 - 밸런스 테스트 후 조정 (랜덤 변경 구간에서 색 바뀌는 주기)
+    // 2026-08-14 피드백으로 전면 교체: 15초 주기로 "3초간 진짜 정답 보여주기 -> 12초간 랜덤
+    // 변경" 반복. 우연히 색이 다 맞아야 멈추는 방식(LEVEL6_MATCH_PAUSE_MS)은 폐기.
+    LEVEL6_CYCLE_MS: 15000,
+    LEVEL6_REAL_DISPLAY_MS: 3000,
 
     // ---- LEVEL 7, 명세서 12번: Goal이 LEFT->RIGHT로 쓸고 지나가는 시간(ms). 문제 1->10로 갈수록
     // SWEEP_START_MS에서 SWEEP_END_MS로 짧아진다(=속도 증가). ----
     LEVEL7_SWEEP_START_MS: 3000, // 임시값 - 밸런스 테스트 후 조정
     LEVEL7_SWEEP_END_MS: 900, // 임시값 - 밸런스 테스트 후 조정
+    LEVEL7_CYCLE_MS: 15000, // 2026-08-14 피드백: 왼->오->퇴장 사이클을 15초마다 반복
 
     // ---- LEVEL 8, 명세서 13번: Goal Blink Show/Hide 시간(ms). 문제 1->10로 갈수록 START에서 END로 짧아짐 ----
     LEVEL8_SHOW_START_MS: 1500, // 임시값 - 밸런스 테스트 후 조정
