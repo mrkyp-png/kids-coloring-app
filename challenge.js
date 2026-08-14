@@ -472,11 +472,17 @@
     }
   }, true); // capture:true로 등록해 app.js의 버블 단계 리스너보다 먼저 가로챈다
 
-  // C1: 🏠(홈)으로 run을 중간에 벗어나도 Child 모드가 망가지지 않도록, app.js의 goHome()이
-  // 실행되기 전에 challenge run을 먼저 정리한다. #btn-save와 달리 여기서는 전파를 막지 않는다
-  // — Child의 홈 이동 자체는 그대로 일어나야 하므로 stopImmediatePropagation은 호출하지 않는다.
-  document.getElementById('btn-home').addEventListener('click', () => {
-    if (!hud.root.hidden) endRun();
+  // 2026-08-14: "챌린지 모드에서 첫화면으로 돌아가는 버튼 필요" 요청 — 예전엔 챌린지 중 🏠을
+  // 눌러도 challenge run만 정리하고 app.js의 goHome()(Child용, 갤러리/맵 화면으로 이동)이
+  // 그대로 이어져서 챌린지 도중에 엉뚱한 Child 화면으로 튀는 버그가 있었다. 이제 여기서
+  // 전파를 막고 챌린지 선택 화면으로 직접 돌려보낸다.
+  document.getElementById('btn-home').addEventListener('click', (e) => {
+    if (!hud.root.hidden) {
+      e.stopImmediatePropagation();
+      endRun();
+      coloringScreen.hidden = true;
+      selectScreen.hidden = false;
+    }
   }, true);
 
   // 2026-08-14 최종 리뷰 fix wave: paintRegionPixels가 pushUndo를 안 남기기 때문에(app.js 주석

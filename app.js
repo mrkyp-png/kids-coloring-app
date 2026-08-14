@@ -122,6 +122,7 @@
   const playerEntrySubmit = document.getElementById('player-entry-submit');
   const playerEntrySkip = document.getElementById('player-entry-skip');
   const mapScreen = document.getElementById('map-screen');
+  const btnMapToCover = document.getElementById('btn-map-to-cover');
   const mapGrid = document.getElementById('map-grid');
   const galleryScreen = document.getElementById('gallery-screen');
   const coloringScreen = document.getElementById('coloring-screen');
@@ -971,6 +972,12 @@
     btn.addEventListener('click', () => setMode(btn.dataset.mode));
   });
   renderModeButtons();
+
+  // 2026-08-14: "유아모드에서 첫화면으로 돌아가는 버튼 필요" 요청
+  btnMapToCover.addEventListener('click', () => {
+    mapScreen.hidden = true;
+    coverScreen.hidden = false;
+  });
 
   btnResetAll.addEventListener('click', () => {
     const mode = getMode();
