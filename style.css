@@ -1447,3 +1447,11 @@ button:active { transform: scale(0.94); }
   background: radial-gradient(circle, #fff 2px, transparent 3px) 0 0/18px 18px,
               radial-gradient(circle, #fff 2px, transparent 3px) 9px 9px/18px 18px;
 }
+
+/* ===== 챌린지 LEVEL 4: Goal이 사라지는 3가지 연출 ===== */
+.challenge-vanish-fade { transition: opacity var(--challenge-vanish-ms, 600ms) ease-out; }
+.challenge-vanish-fade.is-vanishing { opacity: 0; }
+.challenge-vanish-shrink { transition: transform var(--challenge-vanish-ms, 600ms) ease-in; }
+.challenge-vanish-shrink.is-vanishing { transform: scale(0); }
+.challenge-vanish-fragment { transition: transform var(--challenge-vanish-ms, 600ms) ease-in, opacity var(--challenge-vanish-ms, 600ms) ease-in; }
+.challenge-vanish-fragment.is-vanishing { transform: translateY(60%) rotate(25deg); opacity: 0; }
