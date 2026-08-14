@@ -6,9 +6,14 @@
 
   const CFG = window.CHALLENGE_CONFIG;
   // app.js는 하나의 IIFE라 goalCanvas/coloringScreen 같은 const, openTemplate/computeCompletion/
-  // getTemplatesForLevel 같은 함수 선언 모두 스크립트 밖에서는 안 보인다 — Task 3이 이 5개만
-  // window.__challengeInternals로 최소 export 해뒀다(app.js:2785 부근). 여기서 그대로 꺼내 쓴다.
-  const { goalCanvas, coloringScreen, openTemplate, computeCompletion, getTemplatesForLevel } = window.__challengeInternals;
+  // getTemplatesForLevel 같은 함수 선언 모두 스크립트 밖에서는 안 보인다 — Task 2가 레벨3~10
+  // 구현에 필요한 항목까지 window.__challengeInternals로 export 해뒀다(app.js:2873 부근). 여기서
+  // 그대로 꺼내 쓴다.
+  const {
+    goalCanvas, coloringScreen, openTemplate, computeCompletion, getTemplatesForLevel,
+    repaintGoalWithColors, paintRegionPixels, getChallengeRegionInfo, COLORS,
+  } = window.__challengeInternals;
+  const goalCanvasWrap = document.getElementById('goal-canvas-wrap');
   const TOTAL_CHALLENGE_LEVELS = 10;
   const IMPLEMENTED_LEVELS = [1, 2]; // Phase 1에서 실제로 플레이 가능한 레벨. Phase 2에서 3~10 추가.
 
@@ -129,6 +134,8 @@
     submitting: false, // I2: #btn-save 연타로 문제 하나를 건너뛰며 오답 처리되는 것 방지
     totalRegionsCorrect: 0, totalRegionsAll: 0, // I1: Accuracy는 문제 단위가 아니라 영역 단위 누적
     totalRemainingSeconds: 0, // I6: TimeBonus는 마지막 문제가 아니라 문제별 남은시간 누적
+    level3OccludeClass: null, level5AnimFrame: null, level6TimerId: null,
+    level8TimerId: null, level9TimerId: null, level10TimerId: null,
   };
 
   // 디버그/테스트용: loadNextProblem이 다음 문제를 열고 준비를 마쳤을 때 한 번 불려나가는 훅.
@@ -162,8 +169,8 @@
 
     openTemplate(tpl, () => {
       run.submitting = false; // I2: 다음 문제 준비가 끝난 시점에야 다시 제출 가능
-      if (run.level === 1) startLevel1Reveal();
-      else if (run.level === 2) startLevel2Reveal();
+      const effect = LEVEL_EFFECTS[run.level];
+      if (effect) effect.start();
       startProblemTimer();
       if (debugOnReady) { const cb = debugOnReady; debugOnReady = null; cb(); }
     }, { challenge: true });
@@ -227,7 +234,8 @@
   }
 
   function advanceToNextProblem() {
-    if (run.level === 2) stopLevel2Reveal();
+    const effect = LEVEL_EFFECTS[run.level];
+    if (effect && effect.stop) effect.stop();
     run.index++;
     loadNextProblem();
   }
@@ -257,8 +265,13 @@
   function endRun() {
     clearInterval(run.problemTimerId);
     clearTimeout(revealTimerId); // LEVEL1 리빌-숨김 예약
-    stopLevel2Reveal(); // LEVEL2 interval 정지 + challenge-goal-mask 클래스/clipPath 원상복구
+    const effect = LEVEL_EFFECTS[run.level];
+    if (effect && effect.stop) effect.stop();
     goalCanvas.hidden = false; // LEVEL1이 숨겨둔 상태였다면 Child 모드를 위해 복구
+    goalCanvas.className = 'goal-canvas'; // 레벨별로 붙였던 클래스(회전/슬라이드/가림 등) 전부 제거
+    goalCanvas.style.transform = '';
+    goalCanvas.style.transition = '';
+    goalCanvasWrap.style.overflow = '';
     hud.root.hidden = true;
   }
 
@@ -333,6 +346,14 @@
 
   // 디버그/테스트용: 진행 중인 run 상태 스냅샷(콤보/미스카운트 등 HUD 텍스트만으로 확인하기 어려운 값 검증용)
   window.__debugChallengeRunState = () => ({ ...run });
+
+  // 레벨별 시작/정지 효과 디스패치 테이블. loadNextProblem/advanceToNextProblem/endRun이 레벨을
+  // if/else로 분기하지 않고 이 테이블을 조회한다. 레벨3~10은 각 담당 Task가 자기 항목만 채운다.
+  const LEVEL_EFFECTS = {
+    1: { start: startLevel1Reveal, stop: null },
+    2: { start: startLevel2Reveal, stop: stopLevel2Reveal },
+    3: null, 4: null, 5: null, 6: null, 7: null, 8: null, 9: null, 10: null,
+  };
 
   window.Challenge = { state, openSelectScreen, closeSelectScreen, startLevel, getBestScore };
 })();
