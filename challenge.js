@@ -311,7 +311,9 @@
   }
 
   function stopLevel3Occlusion() {
-    goalCanvasWrap.classList.remove('challenge-occlude', run.level3OccludeClass || '');
+    if (run.level3OccludeClass) {
+      goalCanvasWrap.classList.remove('challenge-occlude', run.level3OccludeClass);
+    }
     run.level3OccludeClass = null;
   }
 
