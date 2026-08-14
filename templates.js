@@ -55,7 +55,7 @@ const COLORING_TEMPLATES = [
   // ===== Level 5: 바다생물 =====
   { id: 'fish', name: 'Fish', emoji: '🐟', difficulty: 4, renderMode: 'emoji' },
   { id: 'whale', name: 'Whale', emoji: '🐳', difficulty: 2, renderMode: 'emoji' },
-  { id: 'turtle', name: 'Turtle', emoji: '🐢', difficulty: 7, renderMode: 'emoji' },
+  { id: 'turtle', name: 'Turtle', emoji: '🐢', difficulty: 7, renderMode: 'emoji', faceLeft: true }, // 2026-08-14: 머리가 왼쪽 — LEVEL7 슬라이드가 우->좌로 가야 머리부터 나옴
   { id: 'octopus', name: 'Octopus', emoji: '🐙', difficulty: 4, renderMode: 'emoji' },
   { id: 'crab', name: 'Crab', emoji: '🦀', difficulty: 10, renderMode: 'emoji' },
   { id: 'dolphin', name: 'Dolphin', emoji: '🐬', difficulty: 2, renderMode: 'emoji' },

@@ -486,20 +486,28 @@
 
   // 2026-08-14 피드백: 문제당 한 번만 지나가고 끝이 아니라, 왼->오->퇴장 사이클을
   // LEVEL7_CYCLE_MS(15초)마다 문제 시간 내내 반복한다.
+  // 2026-08-14 피드백: 거북이처럼 머리/꼬리가 있는 도안은 슬라이드 방향이 틀리면 꼬리부터
+  // 나와 뒤로 가는 것처럼 보인다 — tpl.faceLeft(머리가 왼쪽)면 우->좌로, 아니면(대칭/기본)
+  // 기존대로 좌->우로 슬라이드한다.
   function startLevel7Slide() {
     const problemNum = run.index + 1;
     const t = (problemNum - 1) / (TOTAL_CHALLENGE_LEVELS - 1);
     const sweepMs = CFG.LEVEL7_SWEEP_START_MS - (CFG.LEVEL7_SWEEP_START_MS - CFG.LEVEL7_SWEEP_END_MS) * t;
+    const tpl = run.problems[run.index];
+    const reverse = !!(tpl && tpl.faceLeft);
+    const fromPct = reverse ? 100 : -100;
+    const toPct = reverse ? -100 : 100;
+    const outPct = reverse ? -220 : 220;
     goalCanvasWrap.style.overflow = 'hidden';
     function runOneSweep() {
       goalCanvas.hidden = false;
       goalCanvas.style.transition = 'none';
-      goalCanvas.style.transform = 'translateX(-100%)'; // LEFT에서 시작
+      goalCanvas.style.transform = 'translateX(' + fromPct + '%)'; // 시작 지점
       void goalCanvas.offsetWidth; // transition:none 적용을 강제로 반영(다음 transform이 즉시 안 튀도록)
       goalCanvas.style.transition = 'transform ' + sweepMs + 'ms linear';
-      goalCanvas.style.transform = 'translateX(100%)'; // RIGHT까지 쓸고 지나감
+      goalCanvas.style.transform = 'translateX(' + toPct + '%)'; // 반대편까지 쓸고 지나감
       run.level7TimerId = setTimeout(() => {
-        goalCanvas.style.transform = 'translateX(220%)'; // OUT — 다음 사이클까지 화면 밖에 머무름
+        goalCanvas.style.transform = 'translateX(' + outPct + '%)'; // OUT — 다음 사이클까지 화면 밖에 머무름
         run.level7TimerId = setTimeout(runOneSweep, Math.max(0, CFG.LEVEL7_CYCLE_MS - sweepMs));
       }, sweepMs);
     }
