@@ -138,6 +138,7 @@
     totalRemainingSeconds: 0, // I6: TimeBonus는 마지막 문제가 아니라 문제별 남은시간 누적
     level3OccludeClass: null, level5AnimFrame: null, level6TimerId: null,
     level7TimerId: null, level8TimerId: null, level9TimerId: null, level10TimerId: null,
+    wormResetTimerId: null, wormSuppressUntil: 0,
   };
 
   // 디버그/테스트용: loadNextProblem이 다음 문제를 열고 준비를 마쳤을 때 한 번 불려나가는 훅.
@@ -199,7 +200,12 @@
   function startProblemTimer() {
     const seconds = CFG.DIFFICULTY_TIME[run.difficulty];
     run.problemDeadline = Date.now() + seconds * 1000;
-    pickNextWormColor();
+    // 2026-08-14: "지렁이가 우측으로 사라지는 게 안 보인다" 피드백 — 다음 도안 로딩이 빨라서
+    // setWormExit() 애니메이션(0.6초)이 끝나기도 전에 여기서 바로 리셋해버려 순간적으로
+    // 바뀌는 것처럼 보였다. 퇴장 애니메이션이 끝날 시간을 준 뒤에 새 지렁이를 등장시킨다.
+    clearTimeout(run.wormResetTimerId);
+    run.wormSuppressUntil = Date.now() + 650; // 이 시점까지는 tickProblemTimer가 진행률을 안 건드림
+    run.wormResetTimerId = setTimeout(pickNextWormColor, 650);
     clearInterval(run.problemTimerId);
     run.problemTimerId = setInterval(tickProblemTimer, 250);
     tickProblemTimer();
@@ -211,7 +217,13 @@
     const seconds = CFG.DIFFICULTY_TIME[run.difficulty];
     const remaining = Math.max(0, Math.ceil((run.problemDeadline - Date.now()) / 1000));
     hud.timer.textContent = '⏱ ' + remaining;
-    setWormProgress(1 - remaining / seconds);
+    // 2026-08-14: 이 틱이 곧바로 --worm-progress를 (남은시간 기준으로) 다시 써버려서, 방금
+    // setWormExit()으로 오른쪽으로 내보낸 지렁이가 새 문제 타이머가 시작되자마자(다음 틱에서)
+    // 바로 0으로 되돌아와 버렸다 — 실제 제한시간(remaining)은 그대로 정상 진행시키되, 지렁이
+    // 진행률 갱신만 wormSuppressUntil까지 잠깐 멈춰서 퇴장 애니메이션이 끝날 시간을 준다.
+    if (Date.now() >= run.wormSuppressUntil) {
+      setWormProgress(1 - remaining / seconds);
+    }
     if (remaining <= 0) {
       clearInterval(run.problemTimerId);
       handleProblemTimeout();
@@ -290,6 +302,7 @@
   // 공유 DOM(goalCanvas)과 타이머를 원상복구하는 단일 진입점. finishLevel()에서도 호출한다.
   function endRun() {
     clearInterval(run.problemTimerId);
+    clearTimeout(run.wormResetTimerId); // 예약된 지렁이 색상 리셋(있다면) 취소
     clearTimeout(revealTimerId); // LEVEL1 리빌-숨김 예약
     const effect = LEVEL_EFFECTS[run.level];
     if (effect && effect.stop) effect.stop();
