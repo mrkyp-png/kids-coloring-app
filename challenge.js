@@ -15,7 +15,7 @@
   } = window.__challengeInternals;
   const goalCanvasWrap = document.getElementById('goal-canvas-wrap');
   const TOTAL_CHALLENGE_LEVELS = 10;
-  const IMPLEMENTED_LEVELS = [1, 2, 3, 4, 5, 6, 7]; // Phase 1에서 실제로 플레이 가능한 레벨. Phase 2에서 3~10 추가.
+  const IMPLEMENTED_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8]; // Phase 1에서 실제로 플레이 가능한 레벨. Phase 2에서 3~10 추가.
 
   const coverScreen = document.getElementById('cover-screen');
   const selectScreen = document.getElementById('challenge-select-screen');
@@ -385,6 +385,27 @@
     }, sweepMs);
   }
 
+  function startLevel8Blink() {
+    const problemNum = run.index + 1;
+    const t = (problemNum - 1) / (TOTAL_CHALLENGE_LEVELS - 1);
+    const showMs = CFG.LEVEL8_SHOW_START_MS - (CFG.LEVEL8_SHOW_START_MS - CFG.LEVEL8_SHOW_END_MS) * t;
+    const hideMs = CFG.LEVEL8_HIDE_START_MS - (CFG.LEVEL8_HIDE_START_MS - CFG.LEVEL8_HIDE_END_MS) * t;
+    goalCanvas.hidden = false;
+    function blinkOff() {
+      goalCanvas.hidden = true;
+      run.level8TimerId = setTimeout(blinkOn, hideMs);
+    }
+    function blinkOn() {
+      goalCanvas.hidden = false;
+      run.level8TimerId = setTimeout(blinkOff, showMs);
+    }
+    run.level8TimerId = setTimeout(blinkOff, showMs);
+  }
+
+  function stopLevel8Blink() {
+    clearTimeout(run.level8TimerId);
+  }
+
   // 챌린지 진행 중일 때만 #btn-save를 가로챈다. Child 모드(hud.root.hidden===true)에서는
   // 아무 것도 하지 않고 app.js의 기존 버블 단계 핸들러가 그대로 실행된다.
   document.getElementById('btn-save').addEventListener('click', (e) => {
@@ -443,6 +464,7 @@
   LEVEL_EFFECTS[5] = { start: startLevel5Rotation, stop: stopLevel5Rotation };
   LEVEL_EFFECTS[6] = { start: startLevel6Flicker, stop: stopLevel6Flicker };
   LEVEL_EFFECTS[7] = { start: startLevel7Slide, stop: null };
+  LEVEL_EFFECTS[8] = { start: startLevel8Blink, stop: stopLevel8Blink };
 
   window.Challenge = { state, openSelectScreen, closeSelectScreen, startLevel, getBestScore };
 })();
