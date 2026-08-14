@@ -15,7 +15,7 @@
   } = window.__challengeInternals;
   const goalCanvasWrap = document.getElementById('goal-canvas-wrap');
   const TOTAL_CHALLENGE_LEVELS = 10;
-  const IMPLEMENTED_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9]; // Phase 1에서 실제로 플레이 가능한 레벨. Phase 2에서 3~10 추가.
+  const IMPLEMENTED_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // Phase 1에서 실제로 플레이 가능한 레벨. Phase 2에서 3~10 추가.
 
   const coverScreen = document.getElementById('cover-screen');
   const selectScreen = document.getElementById('challenge-select-screen');
@@ -422,6 +422,21 @@
     clearInterval(run.level9TimerId);
   }
 
+  function startLevel10Chaos() {
+    run.level10TimerId = setInterval(() => {
+      const painted = getChallengeRegionInfo().filter((r) => r.painted);
+      if (painted.length === 0) return;
+      const pick = painted[Math.floor(Math.random() * painted.length)];
+      let wrong = pick.targetColor;
+      while (wrong === pick.targetColor) wrong = COLORS[Math.floor(Math.random() * COLORS.length)];
+      paintRegionPixels(pick.seed, wrong);
+    }, CFG.LEVEL10_COLOR_CHANGE_INTERVAL_MS);
+  }
+
+  function stopLevel10Chaos() {
+    clearInterval(run.level10TimerId);
+  }
+
   // 챌린지 진행 중일 때만 #btn-save를 가로챈다. Child 모드(hud.root.hidden===true)에서는
   // 아무 것도 하지 않고 app.js의 기존 버블 단계 핸들러가 그대로 실행된다.
   document.getElementById('btn-save').addEventListener('click', (e) => {
@@ -482,6 +497,7 @@
   LEVEL_EFFECTS[7] = { start: startLevel7Slide, stop: null };
   LEVEL_EFFECTS[8] = { start: startLevel8Blink, stop: stopLevel8Blink };
   LEVEL_EFFECTS[9] = { start: startLevel9Vanish, stop: stopLevel9Vanish };
+  LEVEL_EFFECTS[10] = { start: startLevel10Chaos, stop: stopLevel10Chaos };
 
   window.Challenge = { state, openSelectScreen, closeSelectScreen, startLevel, getBestScore };
 })();
