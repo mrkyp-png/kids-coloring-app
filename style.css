@@ -306,6 +306,23 @@ button:active { transform: scale(0.94); }
   box-shadow: 0 1px 0 #4834a8, 0 3px 8px rgba(0, 0, 0, 0.2);
 }
 
+/* 2026-08-14: 표지에서 유아모드/챌린지모드로 갈라짐 — 버튼 2개를 세로로 쌓고,
+   챌린지 쪽은 색만 달리해서(주황 계열) 구분한다. */
+.cover-mode-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.cover-start-btn-challenge {
+  background: linear-gradient(180deg, #ff9d6b 0%, #ff6b6b 55%, #d1483f 100%);
+  box-shadow: 0 6px 0 #a83a32, 0 10px 20px rgba(0, 0, 0, 0.25);
+}
+.cover-start-btn-challenge:active {
+  box-shadow: 0 1px 0 #a83a32, 0 3px 8px rgba(0, 0, 0, 0.2);
+}
+
 /* ---------- 난이도(타이머) 모드 선택 — 2x2, 칸 크기 전부 동일(고정 폭 그리드) ---------- */
 /* 2026-08-11: "coloring fun 삭제" 요청으로 제목(h1)이 없어져서 이 자리를 잡아주던 title-row
    래퍼도 필요 없어짐(mode-selector는 absolute라 gallery-header 기준으로 그대로 위치 유지). */
@@ -807,6 +824,11 @@ button:active { transform: scale(0.94); }
   background-size: 48px 5px;
   background-position: 0 100%;
   background-repeat: repeat-x;
+}
+/* 2026-08-14: "유아용 모드는 타이머/지렁이 없이" 요청 — 보스가 아닌 색칠 화면(app.js가
+   goalPanelEl에 no-timer 클래스를 붙임)에서는 지렁이 자체를 렌더링하지 않는다. */
+.goal-panel.no-timer::after {
+  display: none;
 }
 .goal-panel::after {
   /* 2026-08-11: "지렁이 위치 = 남은 시간 총 타이머 개념" 요청 — 랜덤 왕복 대신 app.js가
@@ -1385,19 +1407,6 @@ button:active { transform: scale(0.94); }
    무관하게 항상 밝고 화사한 느낌이 맞다는 판단. */
 
 /* ===== 챌린지 모드 (Phase 1) ===== */
-.challenge-entry-btn {
-  display: block;
-  width: 100%;
-  margin: 12px 0;
-  padding: 14px;
-  border-radius: 16px;
-  border: none;
-  background: linear-gradient(135deg, #ff6b6b, #ffa94d);
-  color: #fff;
-  font-size: 1.1rem;
-  font-weight: 700;
-  cursor: pointer;
-}
 .challenge-select-header { display: flex; align-items: center; gap: 8px; padding: 12px; }
 .challenge-difficulty-row { display: flex; gap: 8px; padding: 0 12px; flex-wrap: wrap; }
 .challenge-diff-btn {

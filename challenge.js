@@ -12,9 +12,9 @@
   const TOTAL_CHALLENGE_LEVELS = 10;
   const IMPLEMENTED_LEVELS = [1, 2]; // Phase 1에서 실제로 플레이 가능한 레벨. Phase 2에서 3~10 추가.
 
-  const mapScreen = document.getElementById('map-screen');
+  const coverScreen = document.getElementById('cover-screen');
   const selectScreen = document.getElementById('challenge-select-screen');
-  const btnOpenChallenge = document.getElementById('btn-open-challenge');
+  const btnCoverStartChallenge = document.getElementById('btn-cover-start-challenge');
   const btnChallengeBack = document.getElementById('btn-challenge-back');
   const diffRow = document.getElementById('challenge-difficulty-row');
   const levelGrid = document.getElementById('challenge-level-grid');
@@ -23,10 +23,11 @@
 
   // I7(최종 리뷰): 미완성 상태로 전체 배포되는 걸 막기 위해 진입 버튼을 기본 숨김.
   // CHALLENGE_CONFIG.ENABLED를 true로 바꾸면(로컬 테스트 등) 그대로 다시 노출된다.
-  btnOpenChallenge.hidden = !CFG.ENABLED;
+  // 2026-08-14: 진입 버튼이 맵 화면 -> 표지 화면(btn-cover-start-challenge)으로 이동.
+  btnCoverStartChallenge.hidden = !CFG.ENABLED;
 
   function openSelectScreen() {
-    mapScreen.hidden = true;
+    coverScreen.hidden = true;
     selectScreen.hidden = false;
     renderDifficultyRow();
     renderLevelGrid();
@@ -34,7 +35,7 @@
 
   function closeSelectScreen() {
     selectScreen.hidden = true;
-    mapScreen.hidden = false;
+    coverScreen.hidden = false;
   }
 
   function renderDifficultyRow() {
@@ -63,7 +64,6 @@
     renderDifficultyRow();
   });
 
-  btnOpenChallenge.addEventListener('click', openSelectScreen);
   btnChallengeBack.addEventListener('click', closeSelectScreen);
 
   // ---- Score 계산 (명세서 21~27번 공식 그대로) ----

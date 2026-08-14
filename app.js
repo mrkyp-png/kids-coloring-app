@@ -115,6 +115,7 @@
   const coverScreen = document.getElementById('cover-screen');
   const coverBosses = document.getElementById('cover-bosses');
   const btnCoverStart = document.getElementById('btn-cover-start');
+  const btnCoverStartChallenge = document.getElementById('btn-cover-start-challenge');
   const playerEntryModal = document.getElementById('player-entry-modal');
   const playerInputName = document.getElementById('player-input-name');
   const playerInputFlag = document.getElementById('player-input-flag');
@@ -930,7 +931,10 @@
   // ================= 파이널 보스 카드(모드별) =================
   function renderBossSection() {
     bossGrid.innerHTML = '';
-    MODE_ORDER.forEach((mode) => {
+    // 2026-08-14: 난이도 selector를 없애서 유아용 모드는 이제 easy 하나만 실제로 도달 가능하다.
+    // MODE_ORDER(4개) 그대로 돌리면 normal/hard/veryhard 보스 카드가 영원히 잠긴 채로만 보여서
+    // easy만 순회하도록 범위를 좁힌다(표지 화면의 장식용 보스 4종 로우는 순수 장식이라 그대로 둠).
+    ['easy'].forEach((mode) => {
       const tpl = getBossTemplate(mode);
       if (!tpl) return;
       const unlocked = isBossUnlocked(mode);
@@ -1109,11 +1113,16 @@
     } else {
       currentBossMode = null;
       setBgmTrack(MUSIC_SRC);
+      // 2026-08-14: "유아용 모드는 시간 압박 없이 색칠만" 요청 — startOrResumeLevelAttempt는
+      // 그대로 호출한다(클리어 소요시간 기록 자체는 보스 잠금해제 판정에 쓰이므로 유지). 다만
+      // startLevelTimer()를 빼서 카운트다운 표시/시간초과-리셋(handleLevelTimeUp)이 동작하지
+      // 않게 했다 — 시간 제한 없이 색칠만 하면 됨.
       if (!isLevelCleared(tpl.difficulty)) {
         startOrResumeLevelAttempt(tpl.difficulty);
-        startLevelTimer();
       }
     }
+    // 위와 같은 이유로, 타이머 진행률을 보여주던 지렁이(.goal-panel::after)도 보스가 아닐 때는 숨김.
+    goalPanelEl.classList.toggle('no-timer', !tpl.isBoss);
     coloringTitle.textContent = tpl.emoji + ' ' + I18N.templateName(tpl);
     goalEmoji.textContent = tpl.emoji;
     galleryScreen.hidden = true;
@@ -2574,10 +2583,37 @@
     warmUpSpeech();
   }
 
+  // 2026-08-14: 표지에서 유아모드/챌린지모드 두 갈래로 갈라짐 — 프로필 입력 모달은 공용이라,
+  // 어느 버튼으로 열렸는지 기억해뒀다가 모달 완료 후 그 갈래로 이어준다.
+  let coverEntryTarget = 'map';
+
+  function enterChallengeFromCover() {
+    window.Challenge.openSelectScreen(); // 표지 화면을 숨기고 챌린지 선택 화면을 여는 것까지 포함
+    tryPlayMusic();
+    warmUpSpeech();
+  }
+
+  function goCoverEntry() {
+    if (coverEntryTarget === 'challenge') enterChallengeFromCover();
+    else enterMapFromCover();
+  }
+
   btnCoverStart.addEventListener('click', () => {
+    coverEntryTarget = 'map';
     // 프로필(닉네임/국기)이 아직 없으면 맵으로 넘어가기 전에 딱 한 번만 물어본다.
     if (getPlayerProfile()) {
       enterMapFromCover();
+    } else {
+      playerInputName.value = '';
+      populateFlagSelect(playerInputFlag);
+      playerEntryModal.hidden = false;
+    }
+  });
+
+  btnCoverStartChallenge.addEventListener('click', () => {
+    coverEntryTarget = 'challenge';
+    if (getPlayerProfile()) {
+      enterChallengeFromCover();
     } else {
       playerInputName.value = '';
       populateFlagSelect(playerInputFlag);
@@ -2594,13 +2630,13 @@
       flag: playerInputFlag.value || '🌍'
     });
     playerEntryModal.hidden = true;
-    enterMapFromCover();
+    goCoverEntry();
   });
 
   playerEntrySkip.addEventListener('click', () => {
     savePlayerProfile({ nickname: '', flag: '' }); // 다시 묻지 않도록 빈 프로필이라도 저장
     playerEntryModal.hidden = true;
-    enterMapFromCover();
+    goCoverEntry();
   });
 
   // 모바일 브라우저는 백그라운드에 있는 동안 setInterval을 최대한 늦게 돌린다(스로틀링) —

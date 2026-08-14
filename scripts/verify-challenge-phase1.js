@@ -15,11 +15,14 @@ async function main() {
     await page.goto(INDEX_URL, { waitUntil: 'load' });
     await page.evaluate(() => { localStorage.clear(); });
     await page.reload({ waitUntil: 'load' });
-    await page.evaluate(() => document.getElementById('btn-cover-start').click());
+    // 2026-08-14: 챌린지 진입점이 맵 화면 -> 표지 화면(btn-cover-start-challenge)으로 이동.
+    // 프로필이 없으면 이름 입력 모달을 거치므로 skip으로 넘긴 뒤 선택 화면 노출을 확인한다.
+    await page.evaluate(() => document.getElementById('btn-cover-start-challenge').click());
+    await page.evaluate(() => document.getElementById('player-entry-skip').click());
 
-    // 1) 챌린지 진입 UI 존재 확인
-    const hasEntryBtn = await page.evaluate(() => !!document.getElementById('btn-open-challenge'));
-    if (!hasEntryBtn) throw new Error('챌린지 진입 버튼 없음');
+    // 1) 챌린지 선택 화면이 실제로 열리는지 확인
+    const selectScreenOpen = await page.evaluate(() => !document.getElementById('challenge-select-screen').hidden);
+    if (!selectScreenOpen) throw new Error('챌린지 선택 화면이 열리지 않음');
 
     // 2) Config 로드 확인
     const cfgOk = await page.evaluate(() => typeof CHALLENGE_CONFIG === 'object' && CHALLENGE_CONFIG.DIFFICULTY_TIME.easy === 30);

@@ -1,13 +1,15 @@
-// 실제 플레이(레벨 1~10 + 파이널 보스, 4개 모드 전부)를 헤드리스로 빠르게 재생해서
-// "쉬움→보통→어려움→매우어려움" 잠금 해제 체인이 끝까지 실제로 작동하는지 검증한다.
-// 사람이 직접 100장씩 4번(+보스 4개) 그릴 필요 없이, __debugSimulatePerfect()로 매 그림을
-// 정답대로 채우고 실제 UI 흐름(저장→확인→축하 화면 닫기)을 그대로 밟아서 진행 상황을 쌓는다.
+// 실제 플레이(레벨 1~10 + 파이널 보스)를 헤드리스로 빠르게 재생해서 유아용 모드가 끝까지
+// 정상 작동하는지 검증한다. 사람이 직접 100장을 그릴 필요 없이, __debugSimulatePerfect()로
+// 매 그림을 정답대로 채우고 실제 UI 흐름(저장→확인→축하 화면 닫기)을 그대로 밟아서 진행 상황을 쌓는다.
+// 2026-08-14: "유아용 모드는 난이도 선택 없이 easy 하나로" 요청으로 난이도 selector가 사라져서,
+// 이 스크립트도 원래 하던 easy→normal→hard→veryhard 4모드 순회를 easy 한 개로 줄였다
+// (normal/hard/veryhard는 이제 UI로 도달 불가 — 의도된 축소).
 // 사용: LOCAL_SERVER_URL=http://localhost:8843/index.html node scripts/verify-full-clear.js
 const puppeteer = require('puppeteer-core');
 
 const EDGE_PATH = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const INDEX_URL = process.env.LOCAL_SERVER_URL || ('http://localhost:8843/index.html');
-const MODE_ORDER = ['easy', 'normal', 'hard', 'veryhard'];
+const MODE_ORDER = ['easy'];
 
 // 도안 하나를 정답대로 채우고 실제 UI 흐름(저장 → 확인 → 축하 화면 닫기)을 그대로 밟는다.
 async function completeOneTemplate(page, tplId) {
@@ -68,13 +70,7 @@ async function main() {
     for (const mode of MODE_ORDER) {
       const modeT0 = Date.now();
 
-      // 1) 이 모드로 전환 (easy는 이미 기본값이라 스킵)
-      if (mode !== 'easy') {
-        const btn = await page.$(`.mode-btn[data-mode="${mode}"]`);
-        const disabled = await page.evaluate((el) => el.disabled, btn);
-        if (disabled) throw new Error(mode + ' 모드 버튼이 아직 잠겨 있음 — 이전 모드 보스를 못 깬 것 같음');
-        await btn.click();
-      }
+      // 1) 모드 전환 UI가 사라졌으니 항상 기본값(easy)인지만 확인
       const currentMode = await page.evaluate(() => localStorage.getItem('gameMode') || 'easy');
       if (currentMode !== mode) throw new Error('모드 전환 실패: 기대=' + mode + ' 실제=' + currentMode);
 
@@ -116,16 +112,13 @@ async function main() {
       console.log(`OK  ${mode.padEnd(9)} 레벨1~10(${pictureCount}장) + 보스 클리어  (${((Date.now() - modeT0) / 1000).toFixed(1)}s)`);
     }
 
-    // 4) 4개 모드 전부 보스까지 깼는지 최종 확인
+    // 4) easy 모드 보스까지 깼는지 최종 확인
     const finalCheck = await page.evaluate(() => {
       const bc = JSON.parse(localStorage.getItem('bossCleared') || '{}');
-      return ['easy', 'normal', 'hard', 'veryhard'].every((m) => bc[m] === true);
+      return bc.easy === true;
     });
 
-    // 4-1) 맵 화면에서 4개 보스 카드가 전부 "열림+클리어(🔓)"로 보이는지 렌더링까지 확인
-    // — 예전엔 나중 모드를 다 깨면 이전에 이미 깬 보스 카드가 다시 잠김(🔒)으로 보이는 실제 버그가
-    // 있었다(levelClearTimes가 모드 구분 없이 저장되던 문제, 2026-08-11 발견/수정).
-    // 마지막 보스(veryhard) 클리어 직후 boss-fanfare-close를 누르면 goHome()이 이미 맵 화면을 띄운다.
+    // 4-1) 맵 화면에서 easy 보스 카드가 "열림+클리어(🔓)"로 보이는지 렌더링까지 확인
     const bossCardStates = await page.evaluate(() => {
       const cards = Array.from(document.querySelectorAll('#boss-grid .boss-card'));
       return cards.map((c) => ({
@@ -137,11 +130,11 @@ async function main() {
     const allBossCardsOpenCleared = bossCardStates.every((s) => !s.locked && s.cleared && s.icon === '🔓');
     if (!allBossCardsOpenCleared) {
       console.log('보스 카드 상태:', JSON.stringify(bossCardStates));
-      throw new Error('보스 카드가 전부 열림+클리어(🔓)로 안 보임 — 이전 모드 보스 카드가 다시 잠긴 것처럼 보이는 회귀 버그 재발');
+      throw new Error('보스 카드가 열림+클리어(🔓)로 안 보임');
     }
 
     console.log('');
-    console.log(finalCheck ? '✅ 쉬움→보통→어려움→매우어려움 전체 체인 끝까지 정상 작동 확인' : '❌ 전체 체인 검증 실패');
+    console.log(finalCheck ? '✅ 유아용 모드(easy) 레벨1~10 + 보스까지 정상 작동 확인' : '❌ 검증 실패');
     console.log('총 소요 시간: ' + ((Date.now() - t0) / 1000).toFixed(1) + '초');
     if (pageErrors.length) {
       console.log('\n[pageerror 발생]');

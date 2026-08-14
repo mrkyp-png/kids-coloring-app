@@ -75,7 +75,10 @@
   <div class="cover-content">
     <h1 class="cover-title">🎨 Coloring Fun</h1>
     <div id="cover-bosses" class="cover-bosses" aria-hidden="true"></div>
-    <button id="btn-cover-start" class="cover-start-btn" data-i18n="cover.start">▶ Start</button>
+    <div class="cover-mode-row">
+      <button id="btn-cover-start" class="cover-start-btn" data-i18n="cover.startKids">🎨 Kids Mode</button>
+      <button id="btn-cover-start-challenge" class="cover-start-btn cover-start-btn-challenge" type="button" data-i18n="cover.startChallenge">🎮 Challenge Mode</button>
+    </div>
   </div>
 </section>
 
@@ -85,14 +88,6 @@
     <!-- 2026-08-11: "coloring fun / pick a level to start! 삭제, 그 자리엔 진행률 문구만" 요청 —
          제목/부제 삭제, stat-line(진행률)만 그 위치에 남김. mode-selector는 absolute라 title-row
          래퍼 없이도(가장 가까운 position:relative인 gallery-header 기준) 그대로 위치 유지됨. -->
-    <div id="mode-selector" class="mode-selector" role="group" aria-label="Difficulty mode">
-      <button class="mode-btn" data-mode="easy"><span data-i18n="mode.easy">Easy</span><span class="mode-btn-time">20m</span></button>
-      <button class="mode-btn" data-mode="normal"><span data-i18n="mode.normal">Normal</span><span class="mode-btn-time">15m</span><span class="mode-btn-lock">🔒</span></button>
-      <button class="mode-btn" data-mode="hard"><span data-i18n="mode.hard">Hard</span><span class="mode-btn-time">10m</span><span class="mode-btn-lock">🔒</span></button>
-      <button class="mode-btn" data-mode="veryhard"><span data-i18n="mode.veryhard">Very Hard</span><span class="mode-btn-time">5m</span><span class="mode-btn-lock">🔒</span></button>
-    </div>
-    <!-- 2026-08-14 추가: 챌린지 모드 진입 버튼 -->
-    <button id="btn-open-challenge" class="challenge-entry-btn" data-i18n="challenge.entryBtn" type="button">🎮 챌린지 모드</button>
     <p id="stat-line" class="stat-line" hidden></p>
     <p id="levels-left-line" class="levels-left-line" hidden></p>
     <button id="btn-ranking" class="ranking-btn" data-i18n="ranking.btn">🏆 Ranking</button>
