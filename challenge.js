@@ -577,6 +577,11 @@
   }
 
   function startLevel10Chaos() {
+    // 2026-08-14 피드백: LEVEL9처럼 문제 번호대별로 색상 변경 주기를 다르게(1~3번 5초,
+    // 4~6번 4초, 7~10번 3초).
+    const problemNum = run.index + 1;
+    const intervalMs = problemNum <= 3 ? CFG.LEVEL10_INTERVAL_1
+      : problemNum <= 6 ? CFG.LEVEL10_INTERVAL_2 : CFG.LEVEL10_INTERVAL_3;
     run.level10TimerId = setInterval(() => {
       // 단순화(위 "해석이 갈리는 지점" 2번 참고): "정답 상태인 영역"을 색상 tolerance 비교 대신
       // "칠해져 있음(painted)"으로 판정한다.
@@ -585,7 +590,7 @@
       const pick = painted[Math.floor(Math.random() * painted.length)];
       const wrong = pickWrongColor(pick.targetColor);
       paintRegionPixels(pick.seed, wrong);
-    }, CFG.LEVEL10_COLOR_CHANGE_INTERVAL_MS);
+    }, intervalMs);
   }
 
   function stopLevel10Chaos() {
