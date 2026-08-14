@@ -1450,6 +1450,9 @@ button:active { transform: scale(0.94); }
 }
 
 .challenge-cloud {
+  /* 2026-08-14 피드백: "구름이 중간에서 사라진다" — CSS infinite 애니메이션(항상 위치가
+     예측 불가능하게 어긋날 수 있음) 대신 challenge.js가 LEVEL7과 같은 방식(JS로 transform을
+     명시적으로 옮기고 transition)으로 왼쪽 밖 -> 오른쪽 밖까지 직접 이동시킨다. */
   position: absolute;
   top: var(--cloud-top, 20%);
   width: var(--cloud-size, 40%);
@@ -1457,45 +1460,30 @@ button:active { transform: scale(0.94); }
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 60'%3E%3Cpath fill='white' d='M25 50c-11 0-20-8-20-18 0-9 7-17 16-18 2-10 11-17 21-17 9 0 17 5 21 13 10 1 18 9 18 20 0 10-9 20-20 20H25z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-size: contain;
-  animation: challenge-cloud-drift linear infinite;
-  animation-duration: var(--cloud-duration, 4s);
-  animation-delay: var(--cloud-delay, 0s);
-}
-@keyframes challenge-cloud-drift {
-  from { transform: translateX(-70%); }
-  to { transform: translateX(170%); }
 }
 
-.challenge-rain {
+/* 2026-08-14 피드백: 대각선 줄무늬 대신 실제 물방울 모양 이미지가 위->아래로 떨어짐.
+   challenge.js가 --drop-size(goal 크기의 1/10, 1/11, 1/12)와 --drop-left를 랜덤 배정. */
+.challenge-raindrop {
   position: absolute;
-  inset: -50% -20% -50% -20%;
-  background:
-    repeating-linear-gradient(115deg, rgba(90,150,240,0.95) 0 20px, transparent 20px 200px),
-    repeating-linear-gradient(115deg, rgba(140,190,255,0.7) 0 40px, transparent 40px 340px);
-  animation: challenge-rain-fall 0.5s linear infinite;
-}
-@keyframes challenge-rain-fall {
-  /* 2026-08-14: 입자를 10배 키우면서 타일 한 칸이 커진 만큼, %기반 이동으로는 한 칸의
-     극히 일부만 움직여 거의 안 움직이는 것처럼 보였다 — 타일 크기(200px/340px)에 맞춰
-     px 단위로 한 칸만큼 이동시켜 실제로 뚝뚝 떨어지는 게 보이게 한다. */
-  from { background-position: 0 0, 0 0; }
-  to { background-position: -40px 200px, -68px 340px; }
+  left: var(--drop-left, 50%);
+  width: var(--drop-size, 10%);
+  aspect-ratio: 3 / 4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 32'%3E%3Cpath fill='%234a90d9' d='M12 2C12 2 3 15 3 22a9 9 0 0018 0C21 15 12 2 12 2z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: contain;
 }
 
-.challenge-snow {
+/* 2026-08-14 피드백: "개수가 적어 goal을 못 가리고, 박스 경계에 잘려 보인다" — 배경 타일
+   패턴 대신 빗방울과 같은 개별 엘리먼트 방식, 개수를 대폭 늘리고(25~35개) 박스 안(-8%~108%)
+   에서만 떨어지게 함. challenge.js가 --flake-size/--flake-left를 랜덤 배정. */
+.challenge-snowflake {
   position: absolute;
-  inset: -30% 0 -30% 0;
-  background:
-    radial-gradient(circle, #fff 30px, transparent 40px) 0 0/440px 440px,
-    radial-gradient(circle, #fff 15px, transparent 25px) 150px 120px/300px 300px,
-    radial-gradient(circle, #fff 22px, transparent 30px) 280px 240px/540px 540px;
-  animation: challenge-snow-fall 4s linear infinite;
-}
-@keyframes challenge-snow-fall {
-  /* 2026-08-14: 눈 입자도 10배 키운 타일 크기(440/300/540px)에 맞춰, 각 레이어가 자기
-     타일 한 칸만큼 아래로 내려가도록 px 단위로 바꿔서 실제로 눈이 떨어지는 게 보이게 한다. */
-  from { background-position: 0 0, 150px 120px, 280px 240px; }
-  to { background-position: 10px 440px, 145px 420px, 292px 780px; }
+  left: var(--flake-left, 50%);
+  width: var(--flake-size, 6%);
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  background: #fff;
 }
 
 /* ===== 챌린지 LEVEL 4: Goal이 사라지는 3가지 연출 ===== */

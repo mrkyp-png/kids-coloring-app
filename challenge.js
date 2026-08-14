@@ -424,27 +424,102 @@
   // 구름/빗줄기/눈송이 크기는 매번 랜덤해서 일정하지 않게 한다.
   function rand(min, max) { return min + Math.random() * (max - min); }
 
+  // 2026-08-14 피드백: 구름이 화면 중간에서 갑자기 사라지던 문제 — CSS infinite 애니메이션
+  // 대신 LEVEL7의 슬라이드와 같은 방식(JS로 좌표를 명시적으로 옮기고 transition)으로 바꿔서,
+  // 왼쪽 밖에서 시작해 오른쪽 밖까지 확실히 다 지나간 뒤에만 다시 시작하게 한다.
+  function startCloudCycle(cloudEl, durationMs, initialDelayMs) {
+    function runOnce() {
+      cloudEl.style.transition = 'none';
+      cloudEl.style.transform = 'translateX(-70%)';
+      void cloudEl.offsetWidth;
+      cloudEl.style.transition = 'transform ' + durationMs + 'ms linear';
+      cloudEl.style.transform = 'translateX(170%)';
+      const id = setTimeout(runOnce, durationMs + 400); // 오른쪽 밖으로 나간 뒤 잠깐 쉬었다가 재등장
+      run.level3ParticleTimerIds.push(id);
+    }
+    const id = setTimeout(runOnce, initialDelayMs);
+    run.level3ParticleTimerIds.push(id);
+  }
+
+  // 2026-08-14 피드백: 대각선 줄무늬 대신 실제 물방울 이미지가 위->아래로 떨어짐. 같은
+  // JS 사이클 방식(구름과 동일한 패턴, 축만 X->Y로) — 위쪽 밖에서 시작해 아래쪽 밖까지
+  // 확실히 다 떨어진 뒤에만 다시 시작한다.
+  // 주의: transform: translateY(%)는 엘리먼트 자기 자신의 높이 기준이라(작은 물방울/눈송이는
+  // 100%가 몇 px밖에 안 됨) 박스를 다 못 가로지른다 — top(%)은 컨테이너 기준이라 대신 이걸 쓴다.
+  function startRaindropCycle(dropEl, durationMs, initialDelayMs) {
+    function runOnce() {
+      dropEl.style.transition = 'none';
+      dropEl.style.top = '-15%';
+      void dropEl.offsetWidth;
+      dropEl.style.transition = 'top ' + durationMs + 'ms linear';
+      dropEl.style.top = '115%';
+      const id = setTimeout(runOnce, durationMs + 200);
+      run.level3ParticleTimerIds.push(id);
+    }
+    const id = setTimeout(runOnce, initialDelayMs);
+    run.level3ParticleTimerIds.push(id);
+  }
+
+  // 2026-08-14 피드백: 눈은 빗방울보다 천천히, "박스 안에서만"(-10%~110%) 떨어지게 해서
+  // 박스 경계에 잘려 보이던 문제를 없앤다.
+  function startSnowflakeCycle(flakeEl, durationMs, initialDelayMs) {
+    function runOnce() {
+      flakeEl.style.transition = 'none';
+      flakeEl.style.top = '-8%';
+      void flakeEl.offsetWidth;
+      flakeEl.style.transition = 'top ' + durationMs + 'ms linear';
+      flakeEl.style.top = '108%';
+      const id = setTimeout(runOnce, durationMs + 150);
+      run.level3ParticleTimerIds.push(id);
+    }
+    const id = setTimeout(runOnce, initialDelayMs);
+    run.level3ParticleTimerIds.push(id);
+  }
+
   function startLevel3Occlusion() {
     const problemNum = run.index + 1;
     const type = problemNum <= 3 ? 'cloud' : problemNum <= 6 ? 'rain' : 'snow';
     goalCanvasWrap.style.setProperty('--challenge-occlude-opacity', CFG.LEVEL3_OCCLUSION_OPACITY);
 
     weatherLayer.innerHTML = '';
+    run.level3ParticleTimerIds = [];
     if (type === 'cloud') {
       const count = 5 + Math.floor(Math.random() * 3); // 5~7개, 크기/속도/위치 제각각
       for (let i = 0; i < count; i++) {
         const cloud = document.createElement('span');
         cloud.className = 'challenge-cloud';
-        cloud.style.setProperty('--cloud-size', rand(22, 48) + '%');
+        cloud.style.setProperty('--cloud-size', rand(33, 72) + '%'); // 2026-08-14: 1.5배 확대(22~48 -> 33~72)
         cloud.style.setProperty('--cloud-top', rand(5, 70) + '%');
-        cloud.style.setProperty('--cloud-duration', rand(3, 6) + 's');
-        cloud.style.setProperty('--cloud-delay', rand(-4, 0) + 's');
         weatherLayer.appendChild(cloud);
+        startCloudCycle(cloud, rand(3000, 6000), rand(0, 3000));
       }
     } else if (type === 'rain') {
-      weatherLayer.appendChild(document.createElement('div')).className = 'challenge-rain';
+      const count = 10 + Math.floor(Math.random() * 6); // 10~15개
+      const sizeTiers = ['10%', '9.09%', '8.33%']; // goal 대비 1/10, 1/11, 1/12
+      for (let i = 0; i < count; i++) {
+        const drop = document.createElement('span');
+        drop.className = 'challenge-raindrop';
+        drop.style.setProperty('--drop-size', sizeTiers[Math.floor(Math.random() * sizeTiers.length)]);
+        drop.style.setProperty('--drop-left', rand(0, 95) + '%');
+        drop.style.top = rand(-15, 115) + '%'; // 낙하 시작 전(딜레이 중)에도 흩어져 보이게
+        weatherLayer.appendChild(drop);
+        startRaindropCycle(drop, rand(800, 1600), rand(0, 1500));
+      }
     } else {
-      weatherLayer.appendChild(document.createElement('div')).className = 'challenge-snow';
+      // 2026-08-14 피드백: "개수가 적어 goal을 못 가리고, 박스에 잘려 보인다" — 배경 타일
+      // 패턴 대신 빗방울과 같은 개별 엘리먼트 방식으로, 박스 안(-10%~110%)에서만 떨어지게
+      // 하고 개수를 대폭 늘림(25~35개).
+      const count = 25 + Math.floor(Math.random() * 11); // 25~35개
+      const sizeTiers = ['9%', '6%', '4%'];
+      for (let i = 0; i < count; i++) {
+        const flake = document.createElement('span');
+        flake.className = 'challenge-snowflake';
+        flake.style.setProperty('--flake-size', sizeTiers[Math.floor(Math.random() * sizeTiers.length)]);
+        flake.style.setProperty('--flake-left', rand(0, 95) + '%');
+        flake.style.top = rand(-8, 108) + '%'; // 낙하 시작 전(딜레이 중)에도 흩어져 보이게
+        weatherLayer.appendChild(flake);
+        startSnowflakeCycle(flake, rand(2000, 4000), rand(0, 3500));
+      }
     }
     weatherLayer.hidden = false;
     run.level3OccludeClass = type;
@@ -453,6 +528,8 @@
   function stopLevel3Occlusion() {
     weatherLayer.hidden = true;
     weatherLayer.innerHTML = '';
+    (run.level3ParticleTimerIds || []).forEach((id) => clearTimeout(id));
+    run.level3ParticleTimerIds = [];
     run.level3OccludeClass = null;
   }
 
