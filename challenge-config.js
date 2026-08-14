@@ -7,9 +7,7 @@
   window.CHALLENGE_CONFIG = {
     // ---- 2026-08-14 최종 리뷰(I7): Phase 1은 미완성 상태(레벨 8개 잠김, 결과창 alert)로
     // 배포되므로 진입 버튼을 숨겨둔다. Phase 4에서 true로 전환. ----
-    // 개발 중에는 사용자가 미리보기로 직접 확인해야 해서 true로 켜둠 — 실서비스에 push하기
-    // 직전에 반드시 false로 되돌릴 것.
-    ENABLED: true,
+    ENABLED: false,
 
     // ---- DIFFICULTY: 문제 1개당 제한시간(초), 명세서 4번 ----
     DIFFICULTY_TIME: { easy: 30, normal: 20, hard: 15, veryhard: 10 },
