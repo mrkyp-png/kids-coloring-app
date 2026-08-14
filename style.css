@@ -1430,3 +1430,20 @@ button:active { transform: scale(0.94); }
 .challenge-goal-mask {
   clip-path: circle(90px at 50% 50%); /* JS가 매 이동마다 style.clipPath로 좌표 갱신 */
 }
+
+/* ===== 챌린지 LEVEL 3: Goal을 완전히 가리지 않는 날씨 오클루션 ===== */
+.challenge-occlude::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 2;
+  opacity: var(--challenge-occlude-opacity, 0.35);
+}
+.challenge-occlude-cloud::after {
+  background: radial-gradient(circle at 30% 30%, #fff 0 40%, transparent 41%),
+              radial-gradient(circle at 68% 45%, #fff 0 34%, transparent 35%);
+}
+.challenge-occlude-rain::after {
+  background: repeating-linear-gradient(115deg, rgba(120,170,255,0.9) 0 3px, transparent 3px 22px);
+}
+.challenge-occlude-snow::after {
+  background: radial-gradient(circle, #fff 2px, transparent 3px) 0 0/18px 18px,
+              radial-gradient(circle, #fff 2px, transparent 3px) 9px 9px/18px 18px;
+}
