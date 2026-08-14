@@ -302,11 +302,33 @@
     hud.root.hidden = true;
   }
 
-  function startLevel1Reveal() {
-    // 명세서 8번: Goal을 1초 보여주고 숨긴다
-    clearTimeout(revealTimerId); // 이전 문제의 숨김 예약이 남아있다면 취소하고 이 문제 기준으로 다시 잡는다
-    goalCanvas.hidden = false; // app.js가 이미 캐싱해 둔 전역 goalCanvas 참조를 __challengeInternals로 재사용
-    revealTimerId = setTimeout(() => { goalCanvas.hidden = true; }, CFG.LEVEL1_GOAL_DISPLAY_MS);
+  // 2026-08-14 피드백: "LEVEL8이 LEVEL4(사라짐)랑 컨셉이 겹친다" — 새 컨셉인 "실루엣 모드"로
+  // 교체. 평소엔 도안을 전부 무채색 실루엣(모양만 보이고 색은 안 보임)으로 보여주다가, 짧게
+  // 진짜 색으로 반짝 보여준다. 문제가 뒤로 갈수록 실루엣 유지 시간은 길어지고, 반짝이는
+  // 시간은 짧아져서 더 어려워진다.
+  const LEVEL8_SILHOUETTE_HEX = '#3a3a3a';
+  function startLevel8Silhouette() {
+    const problemNum = run.index + 1;
+    const t = (problemNum - 1) / (TOTAL_CHALLENGE_LEVELS - 1);
+    const silhouetteMs = CFG.LEVEL8_SILHOUETTE_START_MS + (CFG.LEVEL8_SILHOUETTE_END_MS - CFG.LEVEL8_SILHOUETTE_START_MS) * t;
+    const flashMs = CFG.LEVEL8_FLASH_START_MS - (CFG.LEVEL8_FLASH_START_MS - CFG.LEVEL8_FLASH_END_MS) * t;
+    function showSilhouette() {
+      const info = getChallengeRegionInfo();
+      const map = new Map();
+      info.forEach((r) => map.set(r.label, LEVEL8_SILHOUETTE_HEX));
+      repaintGoalWithColors(map);
+      run.level8TimerId = setTimeout(showFlash, silhouetteMs);
+    }
+    function showFlash() {
+      repaintGoalWithColors(null); // 실제 정답색
+      run.level8TimerId = setTimeout(showSilhouette, flashMs);
+    }
+    showSilhouette();
+  }
+
+  function stopLevel8Silhouette() {
+    clearTimeout(run.level8TimerId);
+    repaintGoalWithColors(null); // 실제 정답색으로 복원
   }
 
   // 2026-08-14: "랜덤 점프 대신 원이 지그재그로 화면을 훑고, 30초 안에 전체를 한 번 다 보여주게"
@@ -669,9 +691,9 @@
   // 레벨별 시작/정지 효과 디스패치 테이블. loadNextProblem/advanceToNextProblem/endRun이 레벨을
   // if/else로 분기하지 않고 이 테이블을 조회한다. 레벨3~10은 각 담당 Task가 자기 항목만 채운다.
   const LEVEL_EFFECTS = {
-    // 2026-08-14: "레벨1 사라짐 vs 레벨8 깜빡임, 깜빡임이 더 쉬움" 피드백으로 1과 8을 서로 교체
-    // (함수/Config 이름은 그대로, 배정만 바꿈 — startLevel1Reveal/startLevel8Blink 내부 로직은
-    // 어느 레벨 번호에 붙어도 그대로 동작함).
+    // 2026-08-14: "레벨1 사라짐 vs 레벨8 깜빡임, 깜빡임이 더 쉬움" 피드백으로 1과 8을 서로
+    // 교체(1은 깜빡임=startLevel8Blink). 이후 "레벨8이 레벨4랑 겹친다" 피드백으로 레벨8은
+    // 다시 별도의 실루엣 모드(startLevel8Silhouette)로 교체했다.
     1: { start: startLevel8Blink, stop: stopLevel8Blink },
     2: { start: startLevel2Reveal, stop: stopLevel2Reveal },
     3: null, 4: null, 5: null, 6: null, 7: null, 8: null, 9: null, 10: null,
@@ -682,7 +704,7 @@
   LEVEL_EFFECTS[5] = { start: startLevel5Rotation, stop: stopLevel5Rotation };
   LEVEL_EFFECTS[6] = { start: startLevel6Flicker, stop: stopLevel6Flicker };
   LEVEL_EFFECTS[7] = { start: startLevel7Slide, stop: stopLevel7Slide };
-  LEVEL_EFFECTS[8] = { start: startLevel1Reveal, stop: null };
+  LEVEL_EFFECTS[8] = { start: startLevel8Silhouette, stop: stopLevel8Silhouette };
   LEVEL_EFFECTS[9] = { start: startLevel9Vanish, stop: stopLevel9Vanish };
   LEVEL_EFFECTS[10] = { start: startLevel10Chaos, stop: stopLevel10Chaos };
 

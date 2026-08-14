@@ -72,11 +72,20 @@
     LEVEL7_SWEEP_END_MS: 900, // 임시값 - 밸런스 테스트 후 조정
     LEVEL7_CYCLE_MS: 15000, // 2026-08-14 피드백: 왼->오->퇴장 사이클을 15초마다 반복
 
-    // ---- LEVEL 8, 명세서 13번: Goal Blink Show/Hide 시간(ms). 문제 1->10로 갈수록 START에서 END로 짧아짐 ----
+    // ---- (구)LEVEL 8 Blink Show/Hide 시간 — 지금은 LEVEL 1(깜빡임)이 씀. 문제 1->10로
+    // 갈수록 START에서 END로 짧아짐(더 빨리 깜빡임) ----
     LEVEL8_SHOW_START_MS: 1500, // 임시값 - 밸런스 테스트 후 조정
     LEVEL8_SHOW_END_MS: 500, // 임시값 - 밸런스 테스트 후 조정
     LEVEL8_HIDE_START_MS: 500, // 임시값 - 밸런스 테스트 후 조정
     LEVEL8_HIDE_END_MS: 200, // 임시값 - 밸런스 테스트 후 조정
+
+    // ---- LEVEL 8, 2026-08-14 피드백으로 "실루엣 모드"로 교체(레벨4와 컨셉 겹침 해소).
+    // 문제 1->10로 갈수록 실루엣 유지 시간은 길어지고(START->END 증가), 진짜 색 반짝이는
+    // 시간은 짧아짐(START->END 감소) — 더 어려워짐 ----
+    LEVEL8_SILHOUETTE_START_MS: 1000, // 임시값 - 밸런스 테스트 후 조정
+    LEVEL8_SILHOUETTE_END_MS: 2200, // 임시값 - 밸런스 테스트 후 조정
+    LEVEL8_FLASH_START_MS: 1200, // 임시값 - 밸런스 테스트 후 조정
+    LEVEL8_FLASH_END_MS: 400, // 임시값 - 밸런스 테스트 후 조정
 
     // ---- LEVEL 9, 명세서 14번: 색칠 영역 랜덤 소멸 간격(초 -> ms). 명세서에 1.5/1/0.7초로 명시됨 ----
     LEVEL9_INTERVAL_1: 3000, // 2026-08-14 피드백: 1.5초 -> 3초
