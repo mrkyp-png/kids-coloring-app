@@ -980,7 +980,7 @@
   });
 
   btnLevelNext.addEventListener('click', () => {
-    speakPraise('Next!');
+    playPop();
     const nextLevel = currentLevel + 1;
     if (nextLevel <= TOTAL_LEVELS && isLevelUnlocked(nextLevel)) {
       openLevel(nextLevel);
@@ -990,7 +990,7 @@
   });
 
   btnLevelBack.addEventListener('click', () => {
-    speakPraise('Back!');
+    playPop();
     if (currentLevel > 1) openLevel(currentLevel - 1);
   });
 
