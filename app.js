@@ -974,7 +974,7 @@
 
   btnResetAll.addEventListener('click', () => {
     const mode = getMode();
-    if (!window.confirm(I18N.t('confirm.resetMode', { mode: modeLabel(mode) }))) return;
+    if (!window.confirm(I18N.t('confirm.resetMode'))) return;
     resetModeProgress(mode);
     renderMap();
   });
