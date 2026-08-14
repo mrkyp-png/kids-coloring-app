@@ -15,7 +15,7 @@
   } = window.__challengeInternals;
   const goalCanvasWrap = document.getElementById('goal-canvas-wrap');
   const TOTAL_CHALLENGE_LEVELS = 10;
-  const IMPLEMENTED_LEVELS = [1, 2, 3, 4]; // Phase 1에서 실제로 플레이 가능한 레벨. Phase 2에서 3~10 추가.
+  const IMPLEMENTED_LEVELS = [1, 2, 3, 4, 5]; // Phase 1에서 실제로 플레이 가능한 레벨. Phase 2에서 3~10 추가.
 
   const coverScreen = document.getElementById('cover-screen');
   const selectScreen = document.getElementById('challenge-select-screen');
@@ -330,6 +330,23 @@
     }, CFG.LEVEL1_GOAL_DISPLAY_MS);
   }
 
+  function startLevel5Rotation() {
+    const startTime = Date.now();
+    function tick() {
+      const elapsed = Date.now() - startTime;
+      const deg = (elapsed % CFG.LEVEL5_ROTATION_MS) / CFG.LEVEL5_ROTATION_MS * 360;
+      const mirrored = Math.floor(elapsed / CFG.LEVEL5_MIRROR_INTERVAL_MS) % 2 === 1;
+      goalCanvas.style.transform = 'rotate(' + deg + 'deg)' + (mirrored ? ' scaleX(-1)' : '');
+      run.level5AnimFrame = requestAnimationFrame(tick);
+    }
+    tick();
+  }
+
+  function stopLevel5Rotation() {
+    if (run.level5AnimFrame) cancelAnimationFrame(run.level5AnimFrame);
+    run.level5AnimFrame = null;
+  }
+
   // 챌린지 진행 중일 때만 #btn-save를 가로챈다. Child 모드(hud.root.hidden===true)에서는
   // 아무 것도 하지 않고 app.js의 기존 버블 단계 핸들러가 그대로 실행된다.
   document.getElementById('btn-save').addEventListener('click', (e) => {
@@ -385,6 +402,7 @@
 
   LEVEL_EFFECTS[3] = { start: startLevel3Occlusion, stop: stopLevel3Occlusion };
   LEVEL_EFFECTS[4] = { start: startLevel4Vanish, stop: null };
+  LEVEL_EFFECTS[5] = { start: startLevel5Rotation, stop: stopLevel5Rotation };
 
   window.Challenge = { state, openSelectScreen, closeSelectScreen, startLevel, getBestScore };
 })();
