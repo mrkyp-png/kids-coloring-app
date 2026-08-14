@@ -15,7 +15,7 @@
   } = window.__challengeInternals;
   const goalCanvasWrap = document.getElementById('goal-canvas-wrap');
   const TOTAL_CHALLENGE_LEVELS = 10;
-  const IMPLEMENTED_LEVELS = [1, 2, 3, 4, 5, 6]; // Phase 1에서 실제로 플레이 가능한 레벨. Phase 2에서 3~10 추가.
+  const IMPLEMENTED_LEVELS = [1, 2, 3, 4, 5, 6, 7]; // Phase 1에서 실제로 플레이 가능한 레벨. Phase 2에서 3~10 추가.
 
   const coverScreen = document.getElementById('cover-screen');
   const selectScreen = document.getElementById('challenge-select-screen');
@@ -368,6 +368,23 @@
     repaintGoalWithColors(null); // 실제 정답색으로 복원
   }
 
+  function startLevel7Slide() {
+    const problemNum = run.index + 1;
+    const t = (problemNum - 1) / (TOTAL_CHALLENGE_LEVELS - 1);
+    const sweepMs = CFG.LEVEL7_SWEEP_START_MS - (CFG.LEVEL7_SWEEP_START_MS - CFG.LEVEL7_SWEEP_END_MS) * t;
+    goalCanvasWrap.style.overflow = 'hidden';
+    goalCanvas.hidden = false;
+    goalCanvas.style.transition = 'none';
+    goalCanvas.style.transform = 'translateX(-100%)'; // LEFT에서 시작
+    void goalCanvas.offsetWidth; // transition:none 적용을 강제로 반영(다음 transform이 즉시 안 튀도록)
+    goalCanvas.style.transition = 'transform ' + sweepMs + 'ms linear';
+    goalCanvas.style.transform = 'translateX(100%)'; // RIGHT까지 쓸고 지나감
+    clearTimeout(revealTimerId);
+    revealTimerId = setTimeout(() => {
+      goalCanvas.style.transform = 'translateX(220%)'; // OUT — 화면 밖으로 완전히 벗어난 채 유지
+    }, sweepMs);
+  }
+
   // 챌린지 진행 중일 때만 #btn-save를 가로챈다. Child 모드(hud.root.hidden===true)에서는
   // 아무 것도 하지 않고 app.js의 기존 버블 단계 핸들러가 그대로 실행된다.
   document.getElementById('btn-save').addEventListener('click', (e) => {
@@ -425,6 +442,7 @@
   LEVEL_EFFECTS[4] = { start: startLevel4Vanish, stop: null };
   LEVEL_EFFECTS[5] = { start: startLevel5Rotation, stop: stopLevel5Rotation };
   LEVEL_EFFECTS[6] = { start: startLevel6Flicker, stop: stopLevel6Flicker };
+  LEVEL_EFFECTS[7] = { start: startLevel7Slide, stop: null };
 
   window.Challenge = { state, openSelectScreen, closeSelectScreen, startLevel, getBestScore };
 })();
