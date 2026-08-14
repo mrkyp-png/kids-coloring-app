@@ -1813,7 +1813,10 @@
   // 피드백으로 쉬움 모드만 원래 방식으로 되돌림.)
   // 보스는 항상 자기 고유의 모드 하나에서만 등장하므로(다른 모드로 다시 칠할 일이 없음) 랜덤화가
   // 의미 없다 — currentTemplate.isBoss면 전역 getMode()가 뭐든 상관없이 항상 실제 색 그대로.
+  let currentLineImg = null; // Task2: repaintGoalWithColors가 line art를 다시 그릴 때 재사용
+
   function renderGoalPreview(lineImg) {
+    currentLineImg = lineImg;
     currentLabelToColor = new Map();
     const custom = currentTemplate && currentTemplate.partColors;
     const cyclePalette = (currentTemplate && currentTemplate.paletteOverride) ||
@@ -1833,12 +1836,19 @@
       const randomColors = seededRegionColors(currentGradableRegions, currentLabelMap, cyclePalette, seed);
       currentGradableRegions.forEach((r) => currentLabelToColor.set(r.label, randomColors.get(r.label)));
     }
+    repaintGoalWithColors(currentLabelToColor);
+  }
 
+  // Task2(챌린지 Phase2): goalCanvas를 임의의 label->hex 맵으로 다시 그린다. colorMap이 없으면
+  // 실제 정답색(currentLabelToColor)으로 복원. renderGoalPreview의 기존 픽셀 루프를 그대로 뺀 것뿐이라
+  // Child 모드 출력은 100% 동일.
+  function repaintGoalWithColors(colorMap) {
+    const useMap = colorMap || currentLabelToColor;
     const imgData = goalCtx.createImageData(WORK_SIZE, WORK_SIZE);
     const data = imgData.data;
     for (let i = 0; i < WORK_SIZE * WORK_SIZE; i++) {
       const label = currentLabelMap[i];
-      const hex = label >= 0 ? currentLabelToColor.get(label) : undefined;
+      const hex = label >= 0 ? useMap.get(label) : undefined;
       if (hex) {
         const [r, g, b] = hexToRgba(hex);
         const p = i * 4;
@@ -1846,7 +1856,7 @@
       }
     }
     goalCtx.putImageData(imgData, 0, 0);
-    goalCtx.drawImage(lineImg, 0, 0, WORK_SIZE, WORK_SIZE);
+    if (currentLineImg) goalCtx.drawImage(currentLineImg, 0, 0, WORK_SIZE, WORK_SIZE);
   }
 
   // ================= 색칠 영역 자동 인식(연결 요소 탐색) =================
@@ -2045,6 +2055,48 @@
     pushUndo();
     updateUndoButton();
     playPop();
+  }
+
+  // Task2(챌린지 Phase2): floodFill과 같은 벽(wallMask) 경계 연결 채우기지만, 시스템이 자동으로
+  // 색을 바꾸는 용도(LEVEL 9/10)라 pushUndo/playPop을 호출하지 않는다 — 플레이어가 실행취소를
+  // 눌렀을 때 게임이 몰래 바꾼 색까지 취소돼버리는 걸 막기 위함. hexColor가 null이면 그 영역을
+  // 다시 미색칠(alpha 0) 상태로 되돌린다(LEVEL 9의 "랜덤 소멸").
+  function paintRegionPixels(seed, hexColor) {
+    if (!wallMask || wallMask[seed] === 1) return;
+    const imgData = fillCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE);
+    const data = imgData.data;
+    const [r, g, b, a] = hexColor ? hexToRgba(hexColor) : [0, 0, 0, 0];
+    const visited = new Uint8Array(WORK_SIZE * WORK_SIZE);
+    const stack = [seed];
+    visited[seed] = 1;
+    while (stack.length) {
+      const idx = stack.pop();
+      const x = idx % WORK_SIZE;
+      const y = (idx / WORK_SIZE) | 0;
+      const p = idx * 4;
+      data[p] = r; data[p + 1] = g; data[p + 2] = b; data[p + 3] = a;
+      if (x > 0) tryPush(idx - 1);
+      if (x < WORK_SIZE - 1) tryPush(idx + 1);
+      if (y > 0) tryPush(idx - WORK_SIZE);
+      if (y < WORK_SIZE - 1) tryPush(idx + WORK_SIZE);
+    }
+    function tryPush(nIdx) {
+      if (visited[nIdx] || wallMask[nIdx] === 1) return;
+      visited[nIdx] = 1;
+      stack.push(nIdx);
+    }
+    fillCtx.putImageData(imgData, 0, 0);
+  }
+
+  // Task2(챌린지 Phase2): 현재 도안의 영역별 스냅샷(정답색 + 지금 칠해져 있는지 여부).
+  // LEVEL 6/9/10이 "어느 영역을 건드릴지" 고르는 데 쓴다.
+  function getChallengeRegionInfo() {
+    if (!currentGradableRegions || currentGradableRegions.length === 0) return [];
+    const data = fillCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE).data;
+    return currentGradableRegions.map((r) => {
+      const p = r.seed * 4;
+      return { seed: r.seed, label: r.label, targetColor: currentLabelToColor.get(r.label), painted: data[p + 3] !== 0 };
+    });
   }
 
   // ================= 실행 취소 =================
@@ -2823,7 +2875,11 @@
     coloringScreen,
     openTemplate,
     computeCompletion,
-    getTemplatesForLevel
+    getTemplatesForLevel,
+    repaintGoalWithColors,
+    paintRegionPixels,
+    getChallengeRegionInfo,
+    COLORS
   };
 
   // 디버그/테스트용: 열려 있는 도안의 모든 영역을 정답색으로 채운 뒤 성공률 계산(검증용)
