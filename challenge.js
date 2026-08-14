@@ -312,28 +312,70 @@
   // 2026-08-14: "랜덤 점프 대신 원이 지그재그로 화면을 훑고, 30초 안에 전체를 한 번 다 보여주게"
   // 요청 — 위→아래로 줄을 내려가며 왼↔오 지그재그로 훑어서, LEVEL2_SWEEP_CYCLE_MS(30초) 안에
   // 640x640 전체가 원 반경만큼씩 빠짐없이 지나가게 한다.
+  // 2026-08-14 피드백: 문제 번호대별로 노출 패턴을 다르게 — 1~3번은 기존 가로 지그재그,
+  // 4~6번은 세로 지그재그, 7~10번은 원래(Phase1)의 랜덤 점프로.
+  // 2026-08-14 피드백: 줄 끝에서 다음 줄로 넘어갈 때 가로 이동 없이 세로로만 툭 튀어서
+  // "잠깐 사라졌다 딴 데서 나타나는" 것처럼 보이던 문제 — 각 줄 시간의 마지막 일부를 다음 줄
+  // 시작점까지 대각선으로 부드럽게 이어지는 구간으로 써서, 순간이동 없이 계속 움직이게 한다.
+  function startLevel2Zigzag(radius, vertical) {
+    const step = radius * 2; // 원 지름만큼 이동해야 인접 줄끼리 딱 맞닿아 빈틈이 안 생김
+    const lines = Math.max(1, Math.ceil((640 - radius * 2) / step) + 1);
+    const start = radius;
+    const end = 640 - radius;
+    const span = Math.max(1, end - start);
+    const perLineMs = CFG.LEVEL2_SWEEP_CYCLE_MS / lines;
+    const transitionFrac = 0.15; // 각 줄 시간의 마지막 15%는 다음 줄로 대각선 전환하는 구간
+    const startTime = Date.now();
+    function posForLine(lineIndex, progress) {
+      const cross = radius + lineIndex * step; // 줄의 고정 좌표(가로형은 y, 세로형은 x)
+      const forward = lineIndex % 2 === 0; // 지그재그: 짝수 줄은 정방향, 홀수 줄은 역방향
+      const along = forward ? start + span * progress : end - span * progress;
+      return vertical ? { x: cross, y: along } : { x: along, y: cross };
+    }
+    function tick() {
+      const elapsed = (Date.now() - startTime) % CFG.LEVEL2_SWEEP_CYCLE_MS;
+      const lineIndex = Math.min(lines - 1, Math.floor(elapsed / perLineMs));
+      const t = (elapsed % perLineMs) / perLineMs; // 0~1, 이 줄 안에서의 시간 진행률
+      let pos;
+      if (t < 1 - transitionFrac) {
+        pos = posForLine(lineIndex, t / (1 - transitionFrac));
+      } else {
+        // 다음 줄(마지막 줄이면 다시 첫 줄로) 시작점까지 대각선으로 이어짐
+        const blend = (t - (1 - transitionFrac)) / transitionFrac;
+        const from = posForLine(lineIndex, 1);
+        const to = posForLine((lineIndex + 1) % lines, 0);
+        pos = { x: from.x + (to.x - from.x) * blend, y: from.y + (to.y - from.y) * blend };
+      }
+      goalCanvas.style.clipPath = `circle(${radius}px at ${pos.x}px ${pos.y}px)`;
+      run.level2RevealTimerId = requestAnimationFrame(tick);
+    }
+    tick();
+  }
+
+  function startLevel2Random(radius) {
+    function moveOnce() {
+      const x = radius + Math.random() * (640 - radius * 2);
+      const y = radius + Math.random() * (640 - radius * 2);
+      goalCanvas.style.clipPath = `circle(${radius}px at ${x}px ${y}px)`;
+    }
+    moveOnce();
+    let lastJump = Date.now();
+    function tick() {
+      const now = Date.now();
+      if (now - lastJump >= CFG.LEVEL2_RANDOM_JUMP_MS) { lastJump = now; moveOnce(); }
+      run.level2RevealTimerId = requestAnimationFrame(tick);
+    }
+    run.level2RevealTimerId = requestAnimationFrame(tick);
+  }
+
   function startLevel2Reveal() {
     goalCanvas.hidden = false;
     goalCanvas.classList.add('challenge-goal-mask');
     const radius = CFG.LEVEL2_REVEAL_RADIUS_PX;
-    const rowStep = radius * 2; // 원 지름만큼 내려가야 위아래 줄이 딱 맞닿아 빈틈이 안 생김
-    const rows = Math.max(1, Math.ceil((640 - radius * 2) / rowStep) + 1);
-    const xStart = radius;
-    const xEnd = 640 - radius;
-    const rowWidth = Math.max(1, xEnd - xStart);
-    const perRowMs = CFG.LEVEL2_SWEEP_CYCLE_MS / rows;
-    const startTime = Date.now();
-    function tick() {
-      const elapsed = (Date.now() - startTime) % CFG.LEVEL2_SWEEP_CYCLE_MS;
-      const rowIndex = Math.min(rows - 1, Math.floor(elapsed / perRowMs));
-      const rowProgress = (elapsed % perRowMs) / perRowMs;
-      const y = radius + rowIndex * rowStep;
-      const goingRight = rowIndex % 2 === 0; // 지그재그: 짝수 줄은 왼->오, 홀수 줄은 오->왼
-      const x = goingRight ? xStart + rowWidth * rowProgress : xEnd - rowWidth * rowProgress;
-      goalCanvas.style.clipPath = `circle(${radius}px at ${x}px ${y}px)`;
-      run.level2RevealTimerId = requestAnimationFrame(tick);
-    }
-    tick();
+    const problemNum = run.index + 1;
+    if (problemNum <= 3) startLevel2Zigzag(radius, false); // 1~3번: 가로 지그재그
+    else if (problemNum <= 6) startLevel2Zigzag(radius, true); // 4~6번: 세로 지그재그
+    else startLevel2Random(radius); // 7~10번: 랜덤 점프
   }
 
   function stopLevel2Reveal() {
@@ -342,21 +384,15 @@
     goalCanvas.style.clipPath = '';
   }
 
-  // 2026-08-14 피드백: 정적 오버레이 대신 실제로 움직이는 구름/비/눈으로 변경, goal 실루엣
-  // 안쪽에만 보이게(mask) + 이동 자체는 네모 박스 전체 범위를 가로지르게(마스크가 보이는
-  // 부분만 잘라줌). 구름/빗줄기/눈송이 크기는 매번 랜덤해서 일정하지 않게 한다.
+  // 2026-08-14 피드백(2차): "goal 실루엣 안쪽에만" 마스킹하지 말고 LEVEL7처럼 박스 전체를
+  // 가로지르게 변경 — 구름/비/눈이 goal 이미지 실루엣과 무관하게 화면 전체를 지나간다.
+  // 구름/빗줄기/눈송이 크기는 매번 랜덤해서 일정하지 않게 한다.
   function rand(min, max) { return min + Math.random() * (max - min); }
 
   function startLevel3Occlusion() {
     const problemNum = run.index + 1;
     const type = problemNum <= 3 ? 'cloud' : problemNum <= 6 ? 'rain' : 'snow';
     goalCanvasWrap.style.setProperty('--challenge-occlude-opacity', CFG.LEVEL3_OCCLUSION_OPACITY);
-
-    // 지금 문제의 goal 이미지 실루엣(알파 채널)을 그대로 mask로 씌워서, 날씨 효과가 캐릭터
-    // 모양 안쪽에만 보이게 한다(배경 빈 공간은 안 덮임).
-    const maskUrl = 'url(' + goalCanvas.toDataURL() + ')';
-    weatherLayer.style.webkitMaskImage = maskUrl;
-    weatherLayer.style.maskImage = maskUrl;
 
     weatherLayer.innerHTML = '';
     if (type === 'cloud') {
@@ -382,8 +418,6 @@
   function stopLevel3Occlusion() {
     weatherLayer.hidden = true;
     weatherLayer.innerHTML = '';
-    weatherLayer.style.webkitMaskImage = '';
-    weatherLayer.style.maskImage = '';
     run.level3OccludeClass = null;
   }
 

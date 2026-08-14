@@ -1438,9 +1438,8 @@ button:active { transform: scale(0.94); }
 }
 
 /* ===== 챌린지 LEVEL 3: 구름/비/눈이 실제로 움직이는 날씨 효과 =====
-   2026-08-14 피드백: 정적인 오버레이 대신 실제로 움직이게, Goal 실루엣 안쪽에만 보이게 변경.
-   challenge.js가 매 문제 시작 시 goal 이미지 스냅샷을 mask-image로 씌우고(캐릭터 모양 안쪽만
-   보임), 타입에 맞는 자식 엘리먼트(구름 span 여러 개 / 비·눈 div)를 채워 넣는다. */
+   2026-08-14 피드백(2차): goal 실루엣으로 마스킹하지 않고 LEVEL 7처럼 박스 전체를 가로지르게
+   변경. 구름은 뭉게구름 모양 SVG로, 비/눈 입자 크기는 10배 키움(너무 작아서 안 가려짐). */
 .challenge-weather-layer {
   position: absolute;
   inset: 0;
@@ -1448,22 +1447,16 @@ button:active { transform: scale(0.94); }
   pointer-events: none;
   overflow: hidden;
   opacity: var(--challenge-occlude-opacity, 0.55);
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-  -webkit-mask-mode: alpha;
-  mask-mode: alpha;
 }
 
 .challenge-cloud {
   position: absolute;
   top: var(--cloud-top, 20%);
   width: var(--cloud-size, 40%);
-  height: var(--cloud-size, 40%);
-  border-radius: 50%;
-  background: radial-gradient(circle, #fff 0 60%, transparent 72%);
-  filter: blur(1px);
+  aspect-ratio: 5 / 3;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 60'%3E%3Cpath fill='white' d='M25 50c-11 0-20-8-20-18 0-9 7-17 16-18 2-10 11-17 21-17 9 0 17 5 21 13 10 1 18 9 18 20 0 10-9 20-20 20H25z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: contain;
   animation: challenge-cloud-drift linear infinite;
   animation-duration: var(--cloud-duration, 4s);
   animation-delay: var(--cloud-delay, 0s);
@@ -1477,27 +1470,32 @@ button:active { transform: scale(0.94); }
   position: absolute;
   inset: -50% -20% -50% -20%;
   background:
-    repeating-linear-gradient(115deg, rgba(90,150,240,0.95) 0 2px, transparent 2px 20px),
-    repeating-linear-gradient(115deg, rgba(140,190,255,0.7) 0 4px, transparent 4px 34px);
+    repeating-linear-gradient(115deg, rgba(90,150,240,0.95) 0 20px, transparent 20px 200px),
+    repeating-linear-gradient(115deg, rgba(140,190,255,0.7) 0 40px, transparent 40px 340px);
   animation: challenge-rain-fall 0.5s linear infinite;
 }
 @keyframes challenge-rain-fall {
-  from { background-position: 0 -30%, 0 -30%; }
-  to { background-position: -14% 30%, -22% 30%; }
+  /* 2026-08-14: 입자를 10배 키우면서 타일 한 칸이 커진 만큼, %기반 이동으로는 한 칸의
+     극히 일부만 움직여 거의 안 움직이는 것처럼 보였다 — 타일 크기(200px/340px)에 맞춰
+     px 단위로 한 칸만큼 이동시켜 실제로 뚝뚝 떨어지는 게 보이게 한다. */
+  from { background-position: 0 0, 0 0; }
+  to { background-position: -40px 200px, -68px 340px; }
 }
 
 .challenge-snow {
   position: absolute;
   inset: -30% 0 -30% 0;
   background:
-    radial-gradient(circle, #fff 3px, transparent 4px) 0 0/44px 44px,
-    radial-gradient(circle, #fff 1.5px, transparent 2.5px) 15px 12px/30px 30px,
-    radial-gradient(circle, #fff 2.2px, transparent 3px) 28px 24px/54px 54px;
+    radial-gradient(circle, #fff 30px, transparent 40px) 0 0/440px 440px,
+    radial-gradient(circle, #fff 15px, transparent 25px) 150px 120px/300px 300px,
+    radial-gradient(circle, #fff 22px, transparent 30px) 280px 240px/540px 540px;
   animation: challenge-snow-fall 4s linear infinite;
 }
 @keyframes challenge-snow-fall {
-  from { background-position: 0 0, 15px 12px, 28px 24px; }
-  to { background-position: 10px 130%, 0px 130%, 42px 130%; }
+  /* 2026-08-14: 눈 입자도 10배 키운 타일 크기(440/300/540px)에 맞춰, 각 레이어가 자기
+     타일 한 칸만큼 아래로 내려가도록 px 단위로 바꿔서 실제로 눈이 떨어지는 게 보이게 한다. */
+  from { background-position: 0 0, 150px 120px, 280px 240px; }
+  to { background-position: 10px 440px, 145px 420px, 292px 780px; }
 }
 
 /* ===== 챌린지 LEVEL 4: Goal이 사라지는 3가지 연출 ===== */
