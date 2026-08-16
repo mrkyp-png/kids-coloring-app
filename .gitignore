@@ -2,3 +2,13 @@ node_modules/
 scripts/_*.js
 _goal-*.png
 *.log
+
+# 2026-08-17: git add -A 실수로 무관한 파일(플러그인 스킬 캐시, 개인 문서 등)이
+# 딸려 들어가는 걸 막기 위해 추가
+.agents/
+.claude/
+*.odt
+샘플/
+프롬프트/
+scripts/_tmp-*
+assets/emoji.bak-before-padding-fix/

@@ -711,15 +711,18 @@ button:active { transform: scale(0.94); }
   overflow: hidden;
 }
 .level-reward {
-  position: relative; /* 조각맞추기 완성 크로스페이드 때 두 요소를 겹쳐 놓는 기준점 */
   flex: 0 0 auto;
   height: min(34vh, 280px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  /* 2026-08-17: "크로스페이드 중 엉뚱한 곳에서 커진다" 버그 — 겹쳐 보이게 하려고 잠깐
+     position:absolute를 줬었는데, absolute가 되는 순간 justify-content(가운데 정렬)가
+     안 먹혀서 폭이 좁은 svg가 왼쪽으로 붙어버렸음. grid는 여러 자식이 같은 칸을 공유하면
+     자연히 겹쳐지므로, position 트릭 없이도 항상 가운데 정렬 유지하면서 겹칠 수 있음. */
+  display: grid;
+  place-items: center;
   overflow: hidden;
 }
 .level-reward-art {
+  grid-area: 1 / 1; /* .reward-puzzle-target-grid와 같은 칸에 둬서 크로스페이드 때 겹치게 함 */
   width: min(78vw, 320px);
   height: 100%;
   max-height: 340px;
@@ -750,6 +753,7 @@ button:active { transform: scale(0.94); }
   padding: 8px 16px;
 }
 .reward-puzzle-target-grid {
+  grid-area: 1 / 1; /* .level-reward-art와 같은 칸에 둬서 크로스페이드 때 겹치게 함 */
   display: grid;
   grid-template-columns: repeat(2, 72px);
   gap: 4px;
