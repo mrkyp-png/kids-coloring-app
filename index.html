@@ -84,6 +84,7 @@
 
 <!-- ===================== Map screen (home) ===================== -->
 <section id="map-screen" class="screen" hidden>
+  <div class="screen-decor" aria-hidden="true"></div>
   <header class="gallery-header">
     <!-- 2026-08-11: "coloring fun / pick a level to start! 삭제, 그 자리엔 진행률 문구만" 요청 —
          제목/부제 삭제, stat-line(진행률)만 그 위치에 남김. mode-selector는 absolute라 title-row
@@ -145,14 +146,10 @@
     <span id="level-next-text"></span>
     <button id="btn-level-next" class="next-btn" hidden data-i18n="level.next">Next ▶</button>
   </div>
-  <!-- 2026-08-16: 배경을 은은하게 채우는 장식(커버 화면의 .cover-decor와 같은 패턴) — 유아들이
-       좋아하는 이미지를 흐릿하게 흩뿌려서 대기열 박스 2개뿐인 화면 아래쪽이 허전하지 않게. -->
-  <div class="gallery-decor" aria-hidden="true">
-    <img class="gallery-decor-item gd-1" src="assets/emoji/star.svg" alt="">
-    <img class="gallery-decor-item gd-2" src="assets/emoji/heart.svg" alt="">
-    <img class="gallery-decor-item gd-4" src="assets/emoji/rabbit.svg" alt="">
-    <img class="gallery-decor-item gd-5" src="assets/emoji/duck.svg" alt="">
-  </div>
+  <!-- 2026-08-16: 배경을 채우는 장식 — 무채색 실루엣 이모지 ~30개를 흩뿌린다(app.js의
+       buildScreenDecor()가 채움). 보상 이미지/대기열 박스는 그 위에 불투명하게 그려지므로
+       장식이 그 뒤에 있어도 저절로 가려짐(좌표 회피 불필요). -->
+  <div class="screen-decor" aria-hidden="true"></div>
   <!-- 2026-08-16: 레벨별 "퍼즐 조각 보상" 그래픽 — 그림을 완료할 때마다 칸이 하나씩 열리며
        실제 이모지 그림이 드러나고, 다 채워지면 완성 연출이 재생된다(레벨1~10 전부 적용). -->
   <div id="level-reward" class="level-reward" hidden aria-hidden="true">

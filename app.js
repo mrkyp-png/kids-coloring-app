@@ -3104,10 +3104,36 @@
     onboardingModal.hidden = false;
   }
 
+  // 2026-08-16: 갤러리/맵 화면 배경 장식 — 작은 무채색 실루엣 이모지를 화면당 ~30개 흩뿌린다.
+  // 보상 이미지/대기열 박스/레벨 박스는 그 위에 불투명하게 그려지므로(z-index + 배경색으로
+  // 보장) 장식이 겹쳐도 저절로 가려짐 — 좌표를 일일이 피해 배치할 필요가 없다.
+  const SCREEN_DECOR_ICONS = ['star', 'heart', 'rabbit', 'duck', 'balloon', 'rainbow'];
+  const SCREEN_DECOR_COUNT = 30;
+  function buildScreenDecor() {
+    document.querySelectorAll('.screen-decor').forEach((el) => {
+      if (el.children.length) return; // 이미 채워져 있으면 다시 안 함
+      const frag = document.createDocumentFragment();
+      for (let i = 0; i < SCREEN_DECOR_COUNT; i++) {
+        const img = document.createElement('img');
+        img.className = 'screen-decor-item';
+        img.src = 'assets/emoji/' + SCREEN_DECOR_ICONS[i % SCREEN_DECOR_ICONS.length] + '.svg';
+        img.alt = '';
+        img.style.top = (Math.random() * 96).toFixed(1) + '%';
+        img.style.left = (Math.random() * 94).toFixed(1) + '%';
+        const size = 14 + Math.random() * 14; // 14~28px
+        img.style.width = size.toFixed(0) + 'px';
+        img.style.height = size.toFixed(0) + 'px';
+        frag.appendChild(img);
+      }
+      el.appendChild(frag);
+    });
+  }
+
   // ================= 초기화 =================
   renderCoverBosses();
   renderMap();
   renderPalette();
+  buildScreenDecor();
 
   // 2026-08-11: 로딩 화면(마스코트) 추가 — 초기화는 사실 거의 즉시 끝나지만, 뜬 즉시 사라지면
   // 그냥 화면이 깜빡이는 것처럼 보여서 브랜딩 효과가 없다. 최소 노출시간(600ms)을 보장한 뒤

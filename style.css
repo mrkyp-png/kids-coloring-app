@@ -418,6 +418,7 @@ button:active { transform: scale(0.94); }
 }
 
 /* ---------- 갤러리 ---------- */
+#map-screen { position: relative; } /* .screen-decor(absolute) 기준점 */
 .gallery-header {
   position: relative;
   text-align: center;
@@ -464,6 +465,10 @@ button:active { transform: scale(0.94); }
   max-width: 700px;
   margin: 0 auto;
   width: 100%;
+  /* 2026-08-16: 배경 장식(z-index:0)이 레벨 박스의 둥근 모서리 바깥쪽(투명한 네 귀퉁이) 틈으로
+     살짝 비쳐 보이는 문제 발견 — 박스 하나하나가 아니라 그리드 컨테이너 자체를 불투명하게
+     칠해서, 박스가 어떤 모양이든 장식이 절대 안 비치게 확실히 막는다. */
+  background: var(--bg);
 }
 .level-node-wrap {
   position: relative;
@@ -655,6 +660,7 @@ button:active { transform: scale(0.94); }
   max-width: 480px;
   margin: 0 auto;
   width: 100%;
+  background: var(--bg); /* 배경 장식이 박스 둥근 모서리 틈으로 비치는 것 방지 — .map-grid와 동일 */
 }
 
 /* 2026-08-16: 레벨1 "로켓 퍼즐" 보상 그래픽. 처음엔 gallery-grid와 flex:1을 반반 나눴는데,
@@ -671,27 +677,28 @@ button:active { transform: scale(0.94); }
   height: 100svh;
   overflow: hidden;
 }
-/* 2026-08-16: 커버 화면의 .cover-decor와 같은 패턴 — 배경에 흐릿한 장식 이미지를 흩뿌린다. */
-.gallery-decor {
+/* 2026-08-16: 커버 화면의 .cover-decor와 같은 패턴 — 배경에 무채색 작은 이모지 실루엣을
+   ~30개 흩뿌린다(app.js의 buildScreenDecor()가 채움. 좌표는 JS에서 랜덤 생성). 보상
+   이미지/대기열 박스/레벨 박스는 전부 불투명한 배경 위에 그려지므로(아래 z-index 규칙 +
+   .level-reward 자체 배경색) 장식이 그 뒤에 있어도 저절로 가려진다 — 좌표 회피 불필요. */
+.screen-decor {
   position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 0;
+  overflow: hidden;
 }
-.gallery-decor-item {
+.screen-decor-item {
   position: absolute;
-  width: 40px;
-  height: 40px;
-  opacity: 0.22;
-  filter: blur(1px);
+  opacity: 0.16;
+  filter: brightness(0) blur(0.5px);
 }
-.gd-1 { top: 6%;  left: 8%;  width: 34px; }
-.gd-2 { top: 10%; left: 78%; width: 30px; }
-.gd-4 { bottom: 30%; left: 14%; width: 36px; }
-.gd-5 { bottom: 26%; left: 72%; width: 34px; }
-/* 헤더/보상/대기열은 장식보다 위에 오도록(z-index 0인 장식은 자연히 뒤로 가지만, 명시적으로
-   보장 — coloring-header 등은 이미 배경색이 있어서 실제로는 안 겹쳐도 되지만 안전하게). */
-#gallery-screen .coloring-header, #level-next-banner, #level-reward, #gallery-grid { position: relative; z-index: 1; }
+/* 헤더/보상/대기열/레벨 박스는 장식보다 위에 오도록 명시적으로 쌓임 순서 보장. */
+#gallery-screen .coloring-header, #level-next-banner, #level-reward, #gallery-grid,
+#map-screen .gallery-header, #map-grid, #boss-section { position: relative; z-index: 1; }
+/* 레벨1의 보상 이미지는 정사각형이라 폭이 넓은 컨테이너 안에서 좌우로 여백(레터박스)이
+   남을 수 있는데, 거기로 장식이 비쳐 보이지 않도록 컨테이너 자체를 배경색으로 채운다. */
+.level-reward { background: var(--bg); }
 .level-reward {
   flex: 0 0 auto;
   height: min(34vh, 280px);
