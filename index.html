@@ -145,9 +145,18 @@
     <span id="level-next-text"></span>
     <button id="btn-level-next" class="next-btn" hidden data-i18n="level.next">Next ▶</button>
   </div>
-  <!-- 2026-08-16: 레벨1 "로켓 퍼즐" 보상 그래픽 — 그림을 완료할 때마다 로켓 조각이 하나씩
-       채색되고, 12조각이 다 채워지면 발사 애니메이션이 재생된다. 지금은 레벨1 전용(currentLevel
-       기준으로 app.js에서 hidden 토글), 추후 레벨2~10도 같은 방식으로 이미지만 바꿔 확장 예정. -->
+  <!-- 2026-08-16: 배경을 은은하게 채우는 장식(커버 화면의 .cover-decor와 같은 패턴) — 유아들이
+       좋아하는 이미지를 흐릿하게 흩뿌려서 대기열 박스 2개뿐인 화면 아래쪽이 허전하지 않게. -->
+  <div class="gallery-decor" aria-hidden="true">
+    <img class="gallery-decor-item gd-1" src="assets/emoji/star.svg" alt="">
+    <img class="gallery-decor-item gd-2" src="assets/emoji/heart.svg" alt="">
+    <img class="gallery-decor-item gd-3" src="assets/emoji/balloon.svg" alt="">
+    <img class="gallery-decor-item gd-4" src="assets/emoji/rabbit.svg" alt="">
+    <img class="gallery-decor-item gd-5" src="assets/emoji/duck.svg" alt="">
+    <img class="gallery-decor-item gd-6" src="assets/emoji/rainbow.svg" alt="">
+  </div>
+  <!-- 2026-08-16: 레벨별 "퍼즐 조각 보상" 그래픽 — 그림을 완료할 때마다 칸이 하나씩 열리며
+       실제 이모지 그림이 드러나고, 다 채워지면 완성 연출이 재생된다(레벨1~10 전부 적용). -->
   <div id="level-reward" class="level-reward" hidden aria-hidden="true">
     <svg id="level-reward-art" class="level-reward-art"></svg>
   </div>

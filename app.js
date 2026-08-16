@@ -1097,6 +1097,32 @@
     10: { emoji: 'clock' },                             // 시계
   };
 
+  // 2026-08-16: 흡수되는 순간 짧은 "휙" 효과음(별도 음원 파일 없이 WebAudio로 직접 합성) +
+  // 진동. 효과음은 기존 배경음악 음소거 설정(🎵/🔇)을 그대로 따른다.
+  let sfxCtx = null;
+  function playAbsorbSfx() {
+    if (!isMusicOn()) return;
+    try {
+      if (!sfxCtx) sfxCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (sfxCtx.state === 'suspended') sfxCtx.resume();
+      const t0 = sfxCtx.currentTime;
+      const osc = sfxCtx.createOscillator();
+      const gain = sfxCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(500, t0);
+      osc.frequency.exponentialRampToValueAtTime(1100, t0 + 0.12);
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(0.25, t0 + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.22);
+      osc.connect(gain).connect(sfxCtx.destination);
+      osc.start(t0);
+      osc.stop(t0 + 0.25);
+    } catch (e) { /* 효과음은 부가 기능이라 실패해도 무시 */ }
+    if (navigator.vibrate) {
+      try { navigator.vibrate(35); } catch (e) { /* 무시 */ }
+    }
+  }
+
   // 2026-08-16: "완료한 그림이 보상 이미지로 흡수되는" 연출 — 완료된 줄의 이모지 복제본이
   // 보상 이미지의 해당 칸 위치로 날아가 사라지는 잔상을 만든다. 실제 줄 제거/대기열 교체는
   // renderQueue()가 담당.
@@ -1119,7 +1145,7 @@
       ghost.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(0.2)';
       ghost.style.opacity = '0';
     });
-    setTimeout(() => ghost.remove(), 700);
+    setTimeout(() => ghost.remove(), 1200);
   }
 
   function updateLevelReward(level, clearedCount, total) {
@@ -1233,6 +1259,7 @@
     const doneCountAfter = list.length - pending.length;
     const doneCountBefore = doneCountAfter - justCleared.length;
     const art = LEVEL_REWARD_ART[level];
+    playAbsorbSfx();
     justCleared.forEach((id, k) => {
       const row = galleryGrid.querySelector('[data-tpl-id="' + id + '"]');
       if (!row) return;
@@ -1249,16 +1276,14 @@
     }
     queueByLevel[level] = remaining;
 
-    setTimeout(() => paintQueue(queueByLevel[level], byId), 650);
+    setTimeout(() => paintQueue(queueByLevel[level], byId), 1100);
   }
 
   // ================= 색칠 화면 진입 =================
   function openTemplate(tpl, onReady, opts) {
     opts = opts || {};
-    // 이전 그림의 "축하 후 자동으로 홈으로" 타이머가 아직 안 끝났는데 다음 그림을 벌써 열었다면
-    // 그 타이머는 이제 의미가 없다 — 안 지우면 몇 초 뒤 엉뚱한 시점에 goHome()이 몰래 또 불려서
-    // (지금 보고 있는 그림이 보스든 뭐든) 상태를 헝클어뜨림. praiseOverlay 클릭/showPraise 재호출
-    // 경로 말고도 놓친 경로가 있을까봐 여기서도 한 번 더 방어.
+    // "다시 도전!"(showTryAgain) 오버레이가 아직 안 닫혔는데 다음 그림을 벌써 열었다면 그
+    // 타이머는 이제 의미가 없다 — 정리해둔다.
     if (praiseHomeTimer) { clearTimeout(praiseHomeTimer); praiseHomeTimer = null; }
     currentTemplate = tpl;
     currentIsChallenge = !!opts.challenge;
@@ -2525,15 +2550,24 @@
     const { matched, total } = computeCompletion();
     if (total > 0 && matched === total) {
       lastScore = 100;
-      saveHistory(RATING_LEVELS[0]);
-      showPraise(RATING_LEVELS[0], matched, total);
+      saveHistory(RATING_LEVELS[0]); // justBecameBossCleared/justBecameLevelCleared를 여기서 계산해서 세팅해둠
+      if (justBecameBossCleared) {
+        showBossFanfare(); // 보스는 그대로 팡파레 유지
+      } else {
+        // 2026-08-16: "칭찬 메시지 빼고 흡수되는 이미지로만" 요청 — 그림 하나는 팝업 없이 바로
+        // 갤러리로 돌아가고, 대기열 박스가 보상 이미지로 흡수되는 애니메이션이 축하 역할을 한다.
+        // 레벨 전체를 다 클리어했을 때의 음성 축하(랜덤 문구)는 그대로 유지.
+        if (justBecameLevelCleared) playExcellent();
+        goHome();
+      }
     } else {
       showTryAgain(matched, total);
     }
   });
 
   // 이번 제출로 그 레벨이 "방금 처음" 클리어됐는지(이미 클리어돼 있던 레벨을 다시 색칠한 게 아닌지) —
-  // saveHistory에서 점수 저장 전/후 상태를 비교해 기록해두고, showPraise가 이 값으로만 축하를 띄운다.
+  // saveHistory에서 점수 저장 전/후 상태를 비교해 기록해두고, btnSave 핸들러가 이 값으로만
+  // 음성 축하(justBecameLevelCleared)/보스 팡파레(justBecameBossCleared)를 띄운다.
   let justBecameLevelCleared = false;
   let justBecameBossCleared = false;
 
@@ -2578,35 +2612,6 @@
   // 리셋되는 원인 — 헤드리스 전체 클리어 검증 중 발견, 2026-08-10). 타이머 id를 들고 있다가
   // 조기 종료/재호출 시 반드시 지운다.
   let praiseHomeTimer = null;
-
-  function showPraise(r, matched, total) {
-    if (praiseHomeTimer) { clearTimeout(praiseHomeTimer); praiseHomeTimer = null; }
-    if (justBecameBossCleared) {
-      showBossFanfare();
-      return;
-    }
-    praiseOverlay.classList.remove('fail');
-    praiseEmoji.textContent = r.emoji;
-    const justClearedLevel = justBecameLevelCleared;
-    praiseText.textContent = justClearedLevel
-      ? I18N.t('praise.clearSuffix', { label: ratingLabel(r.level) })
-      : ratingLabel(r.level);
-    // 2026-08-14: "완료시간은 표기되게" 요청 — 보스가 아닐 때만, 이 레벨(10장) 시작부터 지금까지
-    // 걸린 경과시간을 결과창에도 같이 보여준다.
-    let countText = I18N.t('praise.parts', { matched: matched, total: total });
-    if (!currentTemplate || !currentTemplate.isBoss) {
-      const start = getLevelAttempts()[r.level];
-      if (start) countText += ' ⏱ ' + formatMMSS((Date.now() - start) / 1000);
-    }
-    praiseCount.textContent = countText;
-    praiseOverlay.hidden = false;
-    if (justClearedLevel) playExcellent();
-    praiseHomeTimer = setTimeout(() => {
-      praiseHomeTimer = null;
-      praiseOverlay.hidden = true;
-      goHome();
-    }, 1800);
-  }
 
   // 하나라도 틀리면 저장하지 않고 "다시 도전!"만 잠깐 보여준 뒤 색칠 화면에 그대로 머무른다
   // (색칠 화면을 떠난 적이 없으므로 별도 화면 전환 없이 오버레이만 닫으면 됨).
