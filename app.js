@@ -1485,8 +1485,9 @@
   }
 
   // 조각을 다 맞추면(로켓 완성) 정답 칸 격자를 원래 svg로 되돌리고(퍼즐 이전과 동일한 완성
-  // 그림), 원래 정해진 방향으로 날아가며 사라지는 기존 연출 + 칭찬 문구(다국어+음성, 기존
-  // playExcellent/showLevelClearPraise 재활용)를 그 순간 재생하며 "다음" 버튼을 연다.
+  // 그림) 그 자리에서 한 번 커졌다가, 원래 정해진 방향으로 날아가며 사라지는 기존 연출 +
+  // 칭찬 문구(다국어+음성, 기존 playExcellent/showLevelClearPraise 재활용)를 재생하며
+  // "다음" 버튼을 연다("다음"은 애니메이션을 기다리지 않고 즉시 열림 — 다른 레벨들과 동일).
   function finishRewardPuzzle(level) {
     const art = LEVEL_REWARD_ART[level];
     const total = getTemplatesForLevel(level).length;
@@ -1494,9 +1495,13 @@
     rewardPuzzleTargetGrid.hidden = true;
     levelRewardArt.innerHTML = buildRewardSvg(art, cols, rows);
     levelRewardArt.querySelectorAll('.reward-cell').forEach((el) => el.classList.add('is-active'));
-    levelRewardArt.setAttribute('class', 'level-reward-art' + (art.flyDirection ? ' reward-fly-' + art.flyDirection + ' launched' : ''));
+    levelRewardArt.setAttribute('class', 'level-reward-art reward-puzzle-grow');
     levelRewardArt.removeAttribute('hidden');
-    playExcellent();
+    setTimeout(() => {
+      if (currentLevel !== level) return; // 그 사이 다른 레벨로 이동했으면 건너뜀
+      levelRewardArt.setAttribute('class', 'level-reward-art' + (art.flyDirection ? ' reward-fly-' + art.flyDirection + ' launched' : ''));
+      playExcellent();
+    }, 380);
     renderLevelGallery(); // 막혀있던 "다음" 버튼 열기
   }
 
@@ -1524,19 +1529,32 @@
     });
     piece.addEventListener('pointerup', (e) => {
       if (!piece.classList.contains('dragging')) return;
-      piece.classList.remove('dragging');
-      piece.style.left = '';
-      piece.style.top = '';
-      piece.style.width = '';
-      piece.style.height = '';
       const dropX = e.clientX, dropY = e.clientY - 36;
       const target = rewardPuzzleTargetGrid.querySelector('[data-piece="cell-' + cellIndex + '"]');
       const targetRect = target ? target.getBoundingClientRect() : null;
       const isCorrect = !!targetRect &&
         dropX >= targetRect.left - 12 && dropX <= targetRect.right + 12 &&
         dropY >= targetRect.top - 12 && dropY <= targetRect.bottom + 12;
-      if (isCorrect) placePuzzlePiece(piece, cellIndex, target);
-      else rejectPuzzlePiece(piece);
+      if (isCorrect) {
+        // 2026-08-17: "맞으면 그 자리에서 사라져야" 요청 — 트레이 자리로 순간이동한 뒤
+        // 사라지지 않도록, 드롭한 그 위치(position:fixed 유지)에서 페이드아웃하고 나서야
+        // dragging 상태/인라인 위치값을 정리한다.
+        placePuzzlePiece(piece, cellIndex, target);
+        setTimeout(() => {
+          piece.classList.remove('dragging');
+          piece.style.left = '';
+          piece.style.top = '';
+          piece.style.width = '';
+          piece.style.height = '';
+        }, 180);
+      } else {
+        piece.classList.remove('dragging');
+        piece.style.left = '';
+        piece.style.top = '';
+        piece.style.width = '';
+        piece.style.height = '';
+        rejectPuzzlePiece(piece);
+      }
     });
   }
 

@@ -1017,6 +1017,16 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 @media (prefers-reduced-motion: reduce) {
   .reward-drop-in { animation: none; }
 }
+/* 레벨1 실험 기능 — 조각 4개를 다 맞춰서 한 그림으로 합쳐진 순간, 그 자리에서 한 번 커졌다가
+   (이후 날아가는 연출로 이어짐) */
+.reward-puzzle-grow { animation: reward-puzzle-grow-anim 0.38s ease-out both; }
+@keyframes reward-puzzle-grow-anim {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.35); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reward-puzzle-grow { animation: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   .reward-piece.reward-cell { transition: fill 0.2s ease; }
   .level-reward-art.launched { animation: none; }
