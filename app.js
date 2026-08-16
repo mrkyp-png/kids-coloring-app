@@ -3109,40 +3109,27 @@
     onboardingModal.hidden = false;
   }
 
-  // 2026-08-16: 갤러리/맵 화면 배경 장식 — 무채색 실루엣 이모지 30개(전부 다른 그림)를 5x6
-  // 격자 규칙으로 고르게 배치한다(요청: "동일 크기로, 지금의 3배, 중복 없이, 일정한 규칙").
-  // 보상 이미지/대기열 박스/레벨 박스는 각진 래퍼에 배경색이 깔려 있어 겹쳐도 저절로 가려짐.
-  const SCREEN_DECOR_ICONS = [
-    'star', 'heart', 'rabbit', 'duck', 'balloon', 'rainbow', 'apple', 'banana', 'bee', 'butterfly',
-    'candy', 'cat', 'cherry', 'cloud', 'cookie', 'cupcake', 'dog', 'icecream', 'moonface', 'soccerball',
-    'strawberry', 'sunface', 'umbrella', 'cake', 'chick', 'flower', 'fourleafclover', 'frog', 'ladybug', 'tulip',
-  ];
-  const SCREEN_DECOR_SIZE = 60; // 3배 확대(기존 14~28px 랜덤 -> 고정 60px)
-  const SCREEN_DECOR_COLS = 5;
-  const SCREEN_DECOR_ROWS = 6; // 5 x 6 = 30, 아이콘 30개와 정확히 일치(중복 없음)
+  // 2026-08-16: 갤러리/맵 화면 배경 장식 — "장식이 너무 튀고 지저분해 보인다" 피드백으로 대폭
+  // 축소: 10개, 작게, 연하게, 박스가 있는 영역은 아예 피해서 상단 여백 한 줄에만 규칙적으로 배치.
+  const SCREEN_DECOR_ICONS = ['star', 'heart', 'rabbit', 'duck', 'balloon', 'rainbow', 'apple', 'butterfly', 'cloud', 'tulip'];
+  const SCREEN_DECOR_SIZE = 22;
   function buildScreenDecor() {
     document.querySelectorAll('.screen-decor').forEach((el) => {
       if (el.children.length) return; // 이미 채워져 있으면 다시 안 함
       const frag = document.createDocumentFragment();
-      let i = 0;
-      for (let r = 0; r < SCREEN_DECOR_ROWS; r++) {
-        for (let c = 0; c < SCREEN_DECOR_COLS; c++) {
-          const img = document.createElement('img');
-          img.className = 'screen-decor-item';
-          img.src = 'assets/emoji/' + SCREEN_DECOR_ICONS[i % SCREEN_DECOR_ICONS.length] + '.svg';
-          img.alt = '';
-          // 2026-08-16: "대각선으로 배열" 요청 — 행이 내려갈수록 가로 위치를 일정하게 밀어서
-          // 화면 전체에 사선 줄무늬처럼 규칙적으로 흐르게 배치.
-          const topPct = ((r + 0.5) * 100 / SCREEN_DECOR_ROWS);
-          const leftPct = ((c + 0.5) * 100 / SCREEN_DECOR_COLS + r * 7) % 92;
-          img.style.left = leftPct.toFixed(1) + '%';
-          img.style.top = topPct.toFixed(1) + '%';
-          img.style.width = SCREEN_DECOR_SIZE + 'px';
-          img.style.height = SCREEN_DECOR_SIZE + 'px';
-          frag.appendChild(img);
-          i++;
-        }
-      }
+      SCREEN_DECOR_ICONS.forEach((icon, i) => {
+        const img = document.createElement('img');
+        img.className = 'screen-decor-item';
+        img.src = 'assets/emoji/' + icon + '.svg';
+        img.alt = '';
+        // 박스/보상 이미지가 시작되기 전, 화면 맨 위 여백 한 줄에만 고르게 배치 — 박스 영역은
+        // 아예 건드리지 않아서 가려져 삐져나오는 일 자체가 없다.
+        img.style.left = ((i + 0.5) * 100 / SCREEN_DECOR_ICONS.length).toFixed(1) + '%';
+        img.style.top = '5%';
+        img.style.width = SCREEN_DECOR_SIZE + 'px';
+        img.style.height = SCREEN_DECOR_SIZE + 'px';
+        frag.appendChild(img);
+      });
       el.appendChild(frag);
     });
   }

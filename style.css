@@ -697,7 +697,7 @@ button:active { transform: scale(0.94); }
   /* 2026-08-16: "무채색으로 하니 이상해" 피드백 — brightness(0) 흑백 실루엣 제거하고 원래
      색 그대로, 은은하게 비치는 정도로만(opacity)로 조절. */
   position: absolute;
-  opacity: 0.32;
+  opacity: 0.24;
   transform: translate(-50%, -50%);
 }
 /* 헤더/보상/대기열/레벨 박스는 장식보다 위에 오도록 명시적으로 쌓임 순서 보장. */
