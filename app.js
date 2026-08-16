@@ -1115,9 +1115,10 @@
     balloon: () => sparkleGroup('reward-decor-hearts', [[38, 56, 0.8], [62, 53, 0.9]]),
     bicycle: () => lineGroup('reward-decor-lines', [[62, 32, 84, 28], [64, 42, 86, 40], [60, 52, 80, 54]]),
     helicopter: () => puffGroup('reward-decor-swirl', [[30, 78, 3], [46, 82, 2.2], [62, 78, 2.6]]),
-    // 2026-08-17: "비행기는 뭉게구름 말고 일직선 잔상(비행운)" 요청 — 대각선(꼬리 방향)으로
-    // 뻗는 곧은 선 두 줄.
-    airplane: () => lineGroup('reward-decor-contrail', [[8, 82, 34, 56], [4, 70, 22, 52]]),
+    // 2026-08-17: "비행기는 뭉게구름 말고 일직선 잔상(비행운), 각각 엔진 뒤에" 요청 —
+    // airplane.svg의 회색 사각 엔진 마크 2개(원본 좌표 약 (30,21)/(15,6)) 바로 뒤에서
+    // 대각선(꼬리 방향, 진행 반대)으로 뻗는 곧은 선.
+    airplane: () => lineGroup('reward-decor-contrail', [[75, 55, 50, 80], [42, 20, 18, 44]]),
     train: () => puffGroup('reward-decor-smoke', [[26, 14, 3.2], [20, 6, 2.6], [32, 4, 2.2]]),
     racingcar: () => lineGroup('reward-decor-lines', [[62, 30, 84, 26], [64, 40, 86, 38], [60, 50, 80, 52]]),
     scooter: () => lineGroup('reward-decor-lines', [[62, 34, 84, 30], [64, 44, 86, 42], [60, 54, 80, 56]]),
