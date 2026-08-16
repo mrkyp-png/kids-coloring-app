@@ -1089,7 +1089,7 @@
     return '<image class="reward-emoji-img" href="assets/emoji/' + art.emoji + '.svg" x="0" y="0" width="100" height="100"/>' + cells + (art.sparkles ? ROCKET_SPARKLES : '');
   }
 
-  // flyDirection이 있는 레벨(로켓=대각선, 풍선=위, 기차=오른쪽)은 완성 후 화면 밖으로 날아가며
+  // flyDirection이 있는 레벨(로켓=대각선, 풍선=위, 기차=왼쪽)은 완성 후 화면 밖으로 날아가며
   // 사라지고, 없는 레벨은 제자리에서 콤보 연출(살짝 확대 + 색종이) 후 완성된 그림으로 남는다.
   // 로켓은 이모지 그림 자체가 오른쪽 위 대각선을 향하고 있어(코 방향) 그 방향 그대로 날아간다.
   const LEVEL_REWARD_ART = {
@@ -1100,7 +1100,7 @@
     5: { emoji: 'starstruck' },                         // 사람
     6: { emoji: 'robot' },                              // 생활용품
     7: { emoji: 'ferriswheel' },                        // 놀이
-    8: { emoji: 'train', flyDirection: 'right' },       // 탈것/장소
+    8: { emoji: 'train', flyDirection: 'left' },        // 탈것/장소
     9: { emoji: 'trophy' },                             // 기호/기타
     10: { emoji: 'clock' },                             // 시계
   };
