@@ -1298,9 +1298,11 @@
 
   // 2026-08-16: 실험 기능(레벨1만 테스트) — 로켓이 날아가서 사라진 뒤, 흩어진 조각을 드래그해서
   // 원래 자리에 맞추면 그림이 되살아나는 미니게임. 다 맞추기 전엔 "다음" 버튼을 막아둔다.
-  // 조각 8개(4x2 격자, 레벨1 원래 템플릿 개수 12와는 별개 — 이 미니게임의 조각 수는 색칠
-  // 진행량과 무관하게 독립적으로 정함), 위 4개/아래 4개로 나눠 보상 이미지를 감싼다.
-  const PUZZLE_COLS = 4;
+  // 조각 4개(2x2 격자 — 원본 100x100 정사각 이미지를 2등분씩 나누면 칸 자체가 정확히
+  // 정사각형이라 letterbox 여백 없이 꽉 채울 수 있음). "8조각은 유아에게 너무 어렵고,
+  // 조각끼리 비슷해 보인다"는 피드백으로 10 -> 8 -> 4로 줄임. 위 2개/아래 2개로 나눠
+  // 보상 이미지를 감싼다.
+  const PUZZLE_COLS = 2;
   const PUZZLE_ROWS = 2;
   const PUZZLE_TOTAL = PUZZLE_COLS * PUZZLE_ROWS;
   let rewardPuzzle = null; // { level, solved: Set<number> }
@@ -1326,8 +1328,11 @@
     const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
     if (doneCount < list.length) return; // 아직 다 안 깼음
     rewardPuzzle = { level: level, solved: new Set() };
-    // 완성된 그림을 잠깐 그대로 보여준 뒤(레벨1은 updateLevelReward가 launched를 안 걸어서
-    // 원래의 "날아가서 사라짐" 연출은 안 탐 — 아래 참고) 조각으로 터뜨린다.
+    // 완성된 그림이 위에서 살짝 내려오며 가운데 자리잡는 연출(0.4s) 후 잠깐 그대로 보여주다
+    // (레벨1은 updateLevelReward가 launched를 안 걸어서 원래의 "날아가서 사라짐" 연출은 안
+    // 탐 — 아래 explodeIntoPuzzle 참고) 조각으로 터뜨린다.
+    levelRewardArt.classList.add('reward-drop-in');
+    setTimeout(() => levelRewardArt.classList.remove('reward-drop-in'), 450);
     setTimeout(() => explodeIntoPuzzle(level), 700);
   }
 
@@ -1339,15 +1344,78 @@
     };
   }
 
-  // 완성된 그림이 잠깐 사라지는 듯하다가 조각 8개로 나뉘어 위/아래 트레이의 각자 자리로
+  // 2026-08-17: "정사각형 타일 유지 + 진짜 직소퍼즐 모양(가장자리 돌출부/홈)" 요청 — 2x2라
+  // 딱 떨어지는 표준 배치로 그림: 0(좌상)-1(우상)은 세로 경계에서, 0-2(좌하)는 가로 경계에서,
+  // 1·2-3(우하)은 각각 만나는 변에서 돌출부(out)/홈(in)이 서로 맞물린다. 바깥쪽 변(그림
+  // 테두리와 닿는 변)은 반듯한 직선(straight) 그대로 둔다.
+  //   0(TL): 오른쪽=out, 아래=out           1(TR): 왼쪽=in, 아래=out
+  //   2(BL): 위=in, 오른쪽=out              3(BR): 위=in, 왼쪽=in
+  const PUZZLE_EDGES = [
+    { top: 'straight', right: 'out', bottom: 'out', left: 'straight' },
+    { top: 'straight', right: 'straight', bottom: 'out', left: 'in' },
+    { top: 'in', right: 'out', bottom: 'straight', left: 'straight' },
+    { top: 'in', right: 'straight', bottom: 'straight', left: 'in' },
+  ];
+  const JIG = 100; // 조각 하나의 "본체" 크기(로컬 단위, 정사각형)
+  const JIG_R = 16; // 돌출부/홈 반지름(로컬 단위)
+  const JIG_PAD = 20; // 바깥 여백(돌출부가 이 안쪽에 다 들어오게) — viewBox에 사방으로 더함
+
+  // 한 변(직선 A->B)을 그리는 path 조각. type이 'out'/'in'이면 중점에 반원 돌기를 그린다.
+  // 항상 시계방향으로 변을 도는 걸 기준으로, 진행방향의 오른쪽이 조각 "바깥쪽"이 되도록
+  // 법선 부호를 맞춰서 sweep-flag를 정함(직접 렌더해서 방향 확인 후 조정함).
+  function jigEdge(x1, y1, x2, y2, type) {
+    if (type === 'straight') return 'L' + x2 + ',' + y2;
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    const ux = dx / len, uy = dy / len;
+    const p1x = mx - ux * JIG_R, p1y = my - uy * JIG_R;
+    const p2x = mx + ux * JIG_R, p2y = my + uy * JIG_R;
+    const sweep = type === 'out' ? 1 : 0;
+    return 'L' + p1x + ',' + p1y + ' A' + JIG_R + ',' + JIG_R + ' 0 1 ' + sweep + ' ' + p2x + ',' + p2y + ' L' + x2 + ',' + y2;
+  }
+
+  function jigsawPathD(edges) {
+    let d = 'M0,0 ';
+    d += jigEdge(0, 0, JIG, 0, edges.top) + ' ';
+    d += jigEdge(JIG, 0, JIG, JIG, edges.right) + ' ';
+    d += jigEdge(JIG, JIG, 0, JIG, edges.bottom) + ' ';
+    d += jigEdge(0, JIG, 0, 0, edges.left) + ' Z';
+    return d;
+  }
+
+  // 완성된 그림이 잠깐 사라지는 듯하다가 조각 4개로 나뉘어 위/아래 트레이의 각자 자리로
   // 순서대로(팝콘 터지듯 살짝 시간차) 튀어나간다. FLIP 기법: 조각을 최종 위치(트레이)에
   // 먼저 심어서 실제 좌표를 잰 뒤, 중앙(보상 이미지 자리)에서 막 튀어나온 것처럼 보이도록
   // 역방향 이동+축소+회전 값을 transform으로 씌웠다가 다음 틱에 원위치로 트랜지션시킨다.
-  // 조각 하나가 화면에 그리는 내용(원본 칸을 그대로 잘라서, 정사각형 타일 안에 letterbox로
-  // 표시 — svg의 기본 preserveAspectRatio(meet)라 그림이 잘리거나 늘어나지 않음).
+  // 조각 하나가 화면에 그리는 내용 — 원본 칸(50x50, 정사각형)을 직소 모양(clipPath)으로
+  // 잘라서 표시. 돌출부가 이웃 칸 영역까지 살짝 걸치므로, 이미지 자체는 그 칸보다 넉넉히
+  // (JIG_PAD만큼) 확대해서 깔아둔 뒤 클립한다 — 돌출부 안에도 실제 그림이 채워지게.
   function puzzleTileInnerSvg(emoji, cellIndex) {
-    const r = puzzleCellRect(cellIndex);
-    return '<svg viewBox="' + r.x + ' ' + r.y + ' ' + r.w + ' ' + r.h + '"><image href="assets/emoji/' + emoji + '.svg" x="0" y="0" width="100" height="100"/></svg>';
+    const c = puzzleCellRect(cellIndex);
+    const cellW = Number(c.w);
+    const scale = JIG / cellW; // 로컬 100단위 = 실제 칸 cellW 단위
+    const clipId = 'jig-clip-' + cellIndex + '-' + Math.random().toString(36).slice(2, 8);
+    const imgX = (-Number(c.x) * scale).toFixed(2);
+    const imgY = (-Number(c.y) * scale).toFixed(2);
+    const imgSize = (100 * scale).toFixed(2);
+    const outline = jigsawPathD(PUZZLE_EDGES[cellIndex]);
+    return '<svg viewBox="' + (-JIG_PAD) + ' ' + (-JIG_PAD) + ' ' + (JIG + JIG_PAD * 2) + ' ' + (JIG + JIG_PAD * 2) + '">' +
+      '<defs><clipPath id="' + clipId + '"><path d="' + outline + '"/></clipPath></defs>' +
+      '<g clip-path="url(#' + clipId + ')">' +
+      '<image href="assets/emoji/' + emoji + '.svg" x="' + imgX + '" y="' + imgY + '" width="' + imgSize + '" height="' + imgSize + '"/>' +
+      '</g>' +
+      '<path d="' + outline + '" fill="none" stroke="#fff" stroke-width="3"/>' +
+      '</svg>';
+  }
+
+  // 정답 칸(가운데)이 아직 안 채워졌을 때 — 조각과 똑같은 직소 윤곽을 옅은 보라색으로 채워서
+  // "이 모양 조각이 여기 들어가야 함"을 보여준다.
+  function puzzleEmptySlotSvg(cellIndex) {
+    const outline = jigsawPathD(PUZZLE_EDGES[cellIndex]);
+    return '<svg viewBox="' + (-JIG_PAD) + ' ' + (-JIG_PAD) + ' ' + (JIG + JIG_PAD * 2) + ' ' + (JIG + JIG_PAD * 2) + '">' +
+      '<path d="' + outline + '" fill="#EDEBF9" stroke="#FFF8ED" stroke-width="2"/>' +
+      '</svg>';
   }
 
   function explodeIntoPuzzle(level) {
@@ -1367,12 +1435,14 @@
       levelRewardArt.style.opacity = '';
       levelRewardArt.style.transition = '';
 
-      // 정답 칸(가운데) — 트레이 조각과 완전히 같은 정사각형 타일 클래스를 씀(크기 통일).
+      // 정답 칸(가운데) — 트레이 조각과 완전히 같은 타일 클래스를 씀(크기 통일), 해당
+      // 조각과 정확히 같은 직소 윤곽을 옅은 색으로 미리 보여줌.
       rewardPuzzleTargetGrid.innerHTML = '';
       for (let i = 0; i < PUZZLE_TOTAL; i++) {
         const slot = document.createElement('div');
         slot.className = 'reward-puzzle-tile reward-puzzle-target';
         slot.dataset.piece = 'cell-' + i;
+        slot.innerHTML = puzzleEmptySlotSvg(i);
         rewardPuzzleTargetGrid.appendChild(slot);
       }
       rewardPuzzleTargetGrid.hidden = false;

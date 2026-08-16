@@ -729,17 +729,17 @@ button:active { transform: scale(0.94); }
 /* 2026-08-16: 실험 기능(레벨1만 테스트) — 조각 맞추기 미니게임.
    2026-08-16(2차): "목표박스와 선택박스 크기가 달라요, 정사각형으로" 피드백 — 정답 칸(가운데)과
    트레이 조각을 서로 다른 좌표계(SVG 전체 vs 개별 박스)로 따로 만들다 보니 크기가 어긋났었음.
-   이제 둘 다 같은 정사각형 타일 클래스(.reward-puzzle-tile)를 공유해서 완전히 같은 크기가
-   되도록 통일. 조각 내용은 원본 칸(4x2, 1:2 비율)을 그대로 자르되(잘리거나 늘어나지 않음),
-   정사각형 박스 안에 letterbox(위아래 살짝 여백)로 표시. */
+   이제 둘 다 같은 타일 클래스(.reward-puzzle-tile)를 공유해서 완전히 같은 크기가 되도록 통일.
+   2026-08-17: "진짜 직소퍼즐 모양(돌출부/홈)" 요청 — 네모난 카드 배경/테두리는 빼고, 모양
+   자체가 조각 윤곽(흰 테두리+그림자는 SVG 안에서 path로 직접 그림, puzzleTileInnerSvg 참고)을
+   그대로 드러내도록 함. viewBox에 돌출부가 들어갈 여백(JIG_PAD)까지 미리 포함돼 있어서
+   overflow:hidden이어도 안 잘림. */
 .reward-puzzle-tile {
-  width: 52px;
-  height: 52px;
-  border-radius: 8px;
+  width: 72px;
+  height: 72px;
   overflow: hidden;
-  background: var(--card-bg);
 }
-.reward-puzzle-tile svg { width: 100%; height: 100%; display: block; }
+.reward-puzzle-tile svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .reward-puzzle-tray {
   flex: 0 0 auto;
   display: flex;
@@ -750,20 +750,15 @@ button:active { transform: scale(0.94); }
 }
 .reward-puzzle-target-grid {
   display: grid;
-  grid-template-columns: repeat(4, 52px);
+  grid-template-columns: repeat(2, 72px);
   gap: 4px;
   justify-content: center;
   align-content: center;
 }
-/* 정답 칸(가운데, 아직 안 채워짐) — 기존 닫힌 퍼즐칸과 같은 톤 */
-.reward-puzzle-target {
-  background: #EDEBF9;
-  border: 2px solid #FFF8ED;
-}
-.reward-puzzle-target.filled { background: transparent; border-color: transparent; }
+/* 정답 칸(가운데, 아직 안 채워짐)과 조각 자체의 테두리/음영은 이제 SVG path에 직접 그려서
+   (puzzleEmptySlotSvg/puzzleTileInnerSvg 참고) 조각 윤곽 그대로 표시 — 여기선 크기/드래그
+   동작만 관리. */
 .reward-puzzle-piece {
-  border: 2px solid #fff;
-  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.14), 0 4px 6px rgba(0, 0, 0, 0.14);
   touch-action: none; /* 드래그 중 화면 스크롤 방지 */
   cursor: grab;
   transition: opacity 0.15s ease;
@@ -772,8 +767,8 @@ button:active { transform: scale(0.94); }
   position: fixed;
   z-index: 600;
   cursor: grabbing;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.28);
 }
+.reward-puzzle-piece.dragging svg { filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.3)); }
 .reward-puzzle-piece.placed { opacity: 0; pointer-events: none; }
 .reward-puzzle-piece.reward-puzzle-reject { animation: reward-puzzle-reject-shake 0.4s ease; }
 @keyframes reward-puzzle-reject-shake {
@@ -1011,6 +1006,16 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   30% { transform: scale(1.15) rotate(-4deg); }
   55% { transform: scale(0.95) rotate(3deg); }
   100% { transform: scale(1) rotate(0deg); }
+}
+/* 레벨1 실험 기능 — 색칠이 다 끝난 그림이 위에서 살짝 내려오며 제자리(가운데)에 앉는 연출.
+   조각 맞추기가 시작되기 직전에 한 번만 재생됨. */
+.reward-drop-in { animation: reward-drop-in-anim 0.4s cubic-bezier(0.2, 0.8, 0.4, 1) both; }
+@keyframes reward-drop-in-anim {
+  0% { transform: translateY(-26px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reward-drop-in { animation: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .reward-piece.reward-cell { transition: fill 0.2s ease; }
