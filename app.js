@@ -1115,8 +1115,10 @@
     balloon: () => sparkleGroup('reward-decor-hearts', [[38, 56, 0.8], [62, 53, 0.9]]),
     bicycle: () => lineGroup('reward-decor-lines', [[62, 32, 84, 28], [64, 42, 86, 40], [60, 52, 80, 54]]),
     helicopter: () => puffGroup('reward-decor-swirl', [[30, 78, 3], [46, 82, 2.2], [62, 78, 2.6]]),
-    airplane: () => puffGroup('reward-decor-cloud', [[18, 78, 4], [10, 86, 3], [26, 88, 3.2]]),
-    train: () => puffGroup('reward-decor-cloud', [[26, 14, 3.2], [20, 6, 2.6], [32, 4, 2.2]]),
+    // 2026-08-17: "비행기는 뭉게구름 말고 일직선 잔상(비행운)" 요청 — 대각선(꼬리 방향)으로
+    // 뻗는 곧은 선 두 줄.
+    airplane: () => lineGroup('reward-decor-contrail', [[8, 82, 34, 56], [4, 70, 22, 52]]),
+    train: () => puffGroup('reward-decor-smoke', [[26, 14, 3.2], [20, 6, 2.6], [32, 4, 2.2]]),
     racingcar: () => lineGroup('reward-decor-lines', [[62, 30, 84, 26], [64, 40, 86, 38], [60, 50, 80, 52]]),
     scooter: () => lineGroup('reward-decor-lines', [[62, 34, 84, 30], [64, 44, 86, 42], [60, 54, 80, 56]]),
   };
@@ -1297,7 +1299,10 @@
     };
     const base = INLINE_BY_EMOJI[art.emoji] ||
       '<image class="reward-emoji-img" href="assets/emoji/' + art.emoji + '.svg" x="0" y="0" width="100" height="100"/>';
-    return base + cells + extra;
+    // 2026-08-17: "스피드선은 이미지 뒤에 나와야" 요청 — 스피드선류(바퀴 달린 탈것)는 차체보다
+    // 먼저(=아래) 그려서 차체가 그 위에 겹쳐 보이게 한다. 나머지 장식은 원래대로 위에.
+    const decorBehind = ['motorcycle', 'bicycle', 'racingcar', 'scooter'].includes(art.emoji);
+    return decorBehind ? (extra + base + cells) : (base + cells + extra);
   }
 
   // flyDirection이 있는 레벨은 완성 후 그 방향으로 화면 밖으로 날아가며 사라진다(로켓=대각선,

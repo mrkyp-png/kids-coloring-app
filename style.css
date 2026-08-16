@@ -892,20 +892,22 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 }
 
 /* 2026-08-17: "레벨1 불꽃 반짝임처럼 나머지 레벨에도 그 탈것다운 장식" 요청 — 완성되면
-   짧게 한 번 재생되고 날아가는 연출로 이어짐. */
-.reward-decor-lines, .reward-decor-drops, .reward-decor-swirl, .reward-decor-cloud, .reward-decor-hearts {
+   재생되고 날아가는 연출로 이어짐. */
+.reward-decor-lines, .reward-decor-drops, .reward-decor-swirl, .reward-decor-smoke,
+.reward-decor-hearts, .reward-decor-contrail {
   opacity: 0;
 }
 .level-reward-art.launched .reward-decor-lines,
 .level-reward-art.launched .reward-decor-drops,
 .level-reward-art.launched .reward-decor-swirl,
-.level-reward-art.launched .reward-decor-cloud,
-.level-reward-art.launched .reward-decor-hearts {
+.level-reward-art.launched .reward-decor-smoke,
+.level-reward-art.launched .reward-decor-hearts,
+.level-reward-art.launched .reward-decor-contrail {
   opacity: 1;
 }
 .reward-decor-hearts .reward-sparkle { fill: #FF6B81; }
-/* 오토바이/자전거/경주차/스쿠터 — 뒤로 흩날리는 스피드선. 흰색은 크림 배경에 묻히므로
-   대비되는 회청색을 씀(로켓 반짝임 색 문제와 같은 이유). */
+/* 오토바이/자전거/경주차/스쿠터 — 뒤로 흩날리는 스피드선(차체보다 먼저 그려서 뒤에 깔림,
+   순서는 buildRewardSvg 참고). 흰색은 크림 배경에 묻히므로 대비되는 회청색을 씀. */
 .reward-decor-lines line {
   stroke: #8C97A6;
   stroke-width: 2.4;
@@ -920,24 +922,31 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   0%, 100% { opacity: 0.2; }
   50% { opacity: 0.9; }
 }
-/* 카누 물방울 / 기차·비행기 연기구름 — 둥실 떠오르며 사라짐. */
-.reward-decor-drops circle, .reward-decor-cloud circle, .reward-decor-swirl circle {
+/* 비행기 — 곧은 잔상(비행운) 두 줄. 날아가는 연출과 함께 계속 보임(반복 애니메이션 없음). */
+.reward-decor-contrail line {
+  stroke: #E8EDF2;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+/* 카누 물방울 / 기차 연기 / 헬리콥터 바람 소용돌이 — 둥실 떠오르며 사라짐. */
+.reward-decor-drops circle, .reward-decor-smoke circle, .reward-decor-swirl circle {
   transform-box: fill-box;
   transform-origin: center;
 }
 /* 2026-08-17: 물방울 색이 카누 물 색(#55ACEE)과 똑같아 안 보이던 버그 — 밝은 색으로 대비 확보 */
 .reward-decor-drops circle { fill: #E8F6FF; stroke: #55ACEE; stroke-width: 0.6; }
-.reward-decor-cloud circle { fill: #E8EDF2; }
+.reward-decor-smoke circle { fill: #E8EDF2; }
 .reward-decor-swirl circle { fill: none; stroke: #B8C4D0; stroke-width: 1.4; }
+/* 2026-08-17: "카누 물방울/기차 연기는 한 번이 아니라 사라질 때까지 계속" 요청 — infinite로. */
 .level-reward-art.launched .reward-decor-drops circle,
-.level-reward-art.launched .reward-decor-cloud circle {
-  animation: reward-puff-float 0.9s ease-out both;
+.level-reward-art.launched .reward-decor-smoke circle {
+  animation: reward-puff-float 0.9s ease-out infinite;
 }
 .level-reward-art.launched .reward-decor-swirl circle {
   animation: reward-swirl-spin 0.9s ease-out both;
 }
-.reward-decor-drops circle:nth-child(2), .reward-decor-cloud circle:nth-child(2), .reward-decor-swirl circle:nth-child(2) { animation-delay: 0.15s; }
-.reward-decor-drops circle:nth-child(3), .reward-decor-cloud circle:nth-child(3), .reward-decor-swirl circle:nth-child(3) { animation-delay: 0.3s; }
+.reward-decor-drops circle:nth-child(2), .reward-decor-smoke circle:nth-child(2), .reward-decor-swirl circle:nth-child(2) { animation-delay: 0.15s; }
+.reward-decor-drops circle:nth-child(3), .reward-decor-smoke circle:nth-child(3), .reward-decor-swirl circle:nth-child(3) { animation-delay: 0.3s; }
 @keyframes reward-puff-float {
   0% { opacity: 0; transform: translateY(4px) scale(0.6); }
   40% { opacity: 0.85; }
@@ -951,7 +960,7 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 @media (prefers-reduced-motion: reduce) {
   .level-reward-art.launched .reward-decor-lines line,
   .level-reward-art.launched .reward-decor-drops circle,
-  .level-reward-art.launched .reward-decor-cloud circle,
+  .level-reward-art.launched .reward-decor-smoke circle,
   .level-reward-art.launched .reward-decor-swirl circle { animation: none; }
 }
 
