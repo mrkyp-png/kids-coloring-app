@@ -458,7 +458,7 @@ button:active { transform: scale(0.94); }
   position: relative;
   text-align: center;
   flex: 0 0 auto;
-  padding: 10px 12px 4px;
+  padding: 6px 12px 4px;
 }
 .map-top-bar {
   display: flex;
@@ -759,8 +759,17 @@ button:active { transform: scale(0.94); }
   animation: screen-decor-scroll 24s linear infinite;
 }
 /* 갤러리 화면은 제목 바로 아래에 보상 이미지가 여백 없이 붙어 있어서(상단이 안전지대가
-   아님) 대신 보상 이미지와 대기열 박스 사이의 빈 틈에 배치한다. */
-#gallery-screen .screen-decor-track { top: 46%; }
+   아님) 대신 보상 이미지와 대기열 박스 사이의 빈 틈에 배치한다.
+   2026-08-16: "보상이미지에 배경장식 비침" 제보로 실측 — 보상 이미지는 배경색이 없어서(요청에
+   따라 뺌) 장식이 그 뒤에 있으면 레터박스 틈으로 그대로 비친다. 흔한 폰 높이(667~844px)에서
+   레벨클리어 배너까지 보이는 최악의 경우 보상 이미지 하단이 뷰포트의 50~56% 지점까지 내려오는
+   걸 실측 확인 — 62%로 넉넉히 내려서 확실히 그 아래(대기열 박스 사이 틈)에서만 보이게 한다. */
+#gallery-screen .screen-decor-track { top: 62%; }
+/* 2026-08-16: "뒤로가기/리셋 버튼이 바탕화면 움직이는 이미지와 겹친다" 제보 — 맵 화면 헤더가
+   한 줄(버튼 4개)로 압축되면서 기본 top:6%(예전의 큰 헤더 여백 기준)가 그 버튼 줄과 겹치게
+   됐다. 헤더+진행률 문구 아래, 레벨 그리드 쪽으로 내림(카드가 불투명이라 그 뒤에서는 안
+   보이지만 겹치던 문제 자체가 사라짐). */
+#map-screen .screen-decor-track { top: 15%; }
 .screen-decor-item {
   /* 2026-08-16: "무채색으로 하니 이상해" 피드백 — brightness(0) 흑백 실루엣 제거하고 원래
      색 그대로, 은은하게 비치는 정도로만(opacity)로 조절. */
@@ -1387,9 +1396,9 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 
 /* ---------- 랭킹 ---------- */
 .ranking-btn {
-  /* 2026-08-11: "랭킹/모드초기화 아이콘도 3D" 요청 — 키캡 스타일 적용(reset-all-btn도 이 클래스
-     공유라 같이 적용됨).
-     2026-08-16: 예전엔 우상단에 position:absolute로 떠 있었는데, 이제 .map-top-bar(flex row)
+  /* 2026-08-11: "랭킹 아이콘도 3D" 요청 — 키캡 스타일 적용.
+     2026-08-16: 리셋 버튼은 icon-btn-sm(음악/소리와 동일)으로 옮겨가서 더 이상 이 클래스를
+     안 씀. 예전엔 우상단에 position:absolute로 떠 있었는데, 이제 .map-top-bar(flex row)
      안에 다른 버튼들과 나란히 놓이므로 absolute 좌표를 뺐다. */
   margin: 0;
   background: linear-gradient(180deg, #fff 0%, #fdfcff 55%, #F3EFFF 100%);

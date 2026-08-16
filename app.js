@@ -409,6 +409,13 @@
     try { localStorage.setItem(BOSS_CLEARED_KEY, JSON.stringify(bc)); } catch (e) { /* 무시 */ }
 
     try { localStorage.removeItem(LEVEL_ATTEMPTS_KEY); } catch (e) { /* 무시 */ } // 진행 중이던 타임어택도 함께 정리
+
+    // 2026-08-16: "리셋하고 레벨1 들어가니 아래 박스가 안나와" 버그 — renderQueue()가 세션 중
+    // "지금 화면에 보이는 2개"를 queueByLevel에 캐싱해두는데, 리셋 전에 그 레벨을 이미 100%
+    // 클리어한 적이 있으면 캐시가 빈 배열([])로 남아있다. 빈 배열도 truthy라 renderQueue의
+    // "최초 진입" 분기를 안 타고 그 빈 캐시를 그대로 다시 그려서 대기열이 계속 비어 보였다.
+    // 리셋 시 이 캐시를 통째로 지워서 다음 진입 때 새로 계산하게 한다.
+    Object.keys(queueByLevel).forEach((k) => delete queueByLevel[k]);
   }
 
   // 레벨 10개를 다 완료하는 데 걸린 시간(초) 기록 — 메인 화면 레벨 블록 아래에 표시한다.
@@ -870,11 +877,9 @@
       statLine.hidden = true;
     }
     // 이 모드로 뭔가 한 번이라도 진행한 게 있을 때만 "이 모드 초기화" 버튼을 보여준다.
-    // 2026-08-11: "reset easy progress => 모드 리셋으로 변경" 요청 — 모드 이름을 매번 붙이던
-    // 긴 문구 대신 짧게 "Reset Mode"로 통일(어떤 모드든 지금 선택된 모드를 리셋한다는 의미는
-    // Ranking 바로 밑 위치+ 모드 선택 버튼과의 맥락으로 충분히 전달됨).
+    // 2026-08-16: 아이콘 전용 버튼(🔄)으로 바뀌면서 텍스트는 aria-label로만 남음(data-i18n-aria-label,
+    // applyStatic()이 처리).
     btnResetAll.hidden = doneCount === 0;
-    btnResetAll.textContent = I18N.t('resetMode.btn');
 
     // 2026-08-11: "🚀 N more levels to go!" 문구 삭제 요청 — levelsLeftLine 자체는 index.html에
     // 남아있지만 항상 숨김 처리만 한다(엘리먼트를 지우는 것보다 안전).
