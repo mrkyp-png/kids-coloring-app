@@ -728,8 +728,9 @@ button:active { transform: scale(0.94); }
 }
 /* 2026-08-16: 실험 기능(레벨1만 테스트) — 조각 맞추기 미니게임. 빈 정답 칸(.reward-puzzle-slot,
    기존 .reward-cell 닫힌 상태와 같은 색이지만 클래스를 분리해서 기존 진행률 표시 로직
-   (updateLevelReward의 is-active 토글)이 실수로 건드리지 않게 함)과, 아래 트레이에 흩어진
-   조각(.reward-puzzle-piece, 드래그로 옮김)으로 구성. */
+   (updateLevelReward의 is-active 토글)이 실수로 건드리지 않게 함)과, 보상 이미지를 위/아래에서
+   감싸는 두 트레이(reward-puzzle-tray-top/bottom, 각 4조각)에 흩어진 조각(.reward-puzzle-piece,
+   드래그로 옮김)으로 구성. */
 .reward-puzzle-slot {
   fill: #EDEBF9;
   stroke: #FFF8ED;
@@ -743,10 +744,12 @@ button:active { transform: scale(0.94); }
   gap: 8px;
   padding: 8px 16px;
 }
+/* 조각 격자가 4열x2행이라 칸 하나의 가로:세로 비율이 1:2 — 박스도 그 비율로 맞춰서 그림이
+   눌리거나 늘어나 보이지 않게 함(요청: "조각의 크기와 그림은 같게"). 8조각 전부 같은 크기. */
 .reward-puzzle-piece {
-  width: 46px;
-  height: 46px;
-  border-radius: 10px;
+  width: 36px;
+  height: 72px;
+  border-radius: 8px;
   overflow: hidden;
   border: 2px solid #fff;
   box-shadow: 0 3px 0 rgba(0, 0, 0, 0.14), 0 4px 6px rgba(0, 0, 0, 0.14);

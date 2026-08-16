@@ -133,7 +133,8 @@
   const levelReward = document.getElementById('level-reward');
   const levelRewardArt = document.getElementById('level-reward-art');
   const levelRewardPraise = document.getElementById('level-reward-praise');
-  const rewardPuzzleTray = document.getElementById('reward-puzzle-tray');
+  const rewardPuzzleTrayTop = document.getElementById('reward-puzzle-tray-top');
+  const rewardPuzzleTrayBottom = document.getElementById('reward-puzzle-tray-bottom');
   const bonusGameBanner = document.getElementById('bonus-game-banner');
   const btnMapBack = document.getElementById('btn-map-back');
   const levelTitle = document.getElementById('level-title');
@@ -1291,9 +1292,9 @@
 
   // 2026-08-16: 실험 기능(레벨1만 테스트) — 로켓이 날아가서 사라진 뒤, 흩어진 조각을 드래그해서
   // 원래 자리에 맞추면 그림이 되살아나는 미니게임. 다 맞추기 전엔 "다음" 버튼을 막아둔다.
-  // 조각 수는 요청대로 다른 레벨(10조각) 기준에 맞춰 5x2=10으로 통일(레벨1 원래 템플릿
-  // 개수인 12와는 별개 — 이 미니게임의 조각 수는 색칠 진행량과 무관하게 독립적으로 정함).
-  const PUZZLE_COLS = 5;
+  // 조각 8개(4x2 격자, 레벨1 원래 템플릿 개수 12와는 별개 — 이 미니게임의 조각 수는 색칠
+  // 진행량과 무관하게 독립적으로 정함), 위 4개/아래 4개로 나눠 보상 이미지를 감싼다.
+  const PUZZLE_COLS = 4;
   const PUZZLE_ROWS = 2;
   const PUZZLE_TOTAL = PUZZLE_COLS * PUZZLE_ROWS;
   let rewardPuzzle = null; // { level, solved: Set<number> }
@@ -1364,17 +1365,21 @@
       const j = Math.floor(Math.random() * (i + 1));
       [order[i], order[j]] = [order[j], order[i]];
     }
-    rewardPuzzleTray.innerHTML = '';
-    order.forEach((cellIndex) => {
+    // 요청대로 보상 이미지를 가운데 두고 조각을 위/아래 트레이에 4개씩 나눠 배치.
+    rewardPuzzleTrayTop.innerHTML = '';
+    rewardPuzzleTrayBottom.innerHTML = '';
+    const half = PUZZLE_TOTAL / 2;
+    order.forEach((cellIndex, i) => {
       const r = puzzleCellRect(cellIndex);
       const piece = document.createElement('div');
       piece.className = 'reward-puzzle-piece';
       piece.dataset.cell = String(cellIndex);
       piece.innerHTML = '<svg viewBox="' + r.x + ' ' + r.y + ' ' + r.w + ' ' + r.h + '"><image href="assets/emoji/' + art.emoji + '.svg" x="0" y="0" width="100" height="100"/></svg>';
       wirePuzzlePieceDrag(piece, cellIndex);
-      rewardPuzzleTray.appendChild(piece);
+      (i < half ? rewardPuzzleTrayTop : rewardPuzzleTrayBottom).appendChild(piece);
     });
-    rewardPuzzleTray.hidden = false;
+    rewardPuzzleTrayTop.hidden = false;
+    rewardPuzzleTrayBottom.hidden = false;
     renderLevelGallery(); // "다음" 버튼 막힘 상태 반영
   }
 
@@ -1433,7 +1438,8 @@
     if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) { /* 무시 */ } }
     if (rewardPuzzle && rewardPuzzle.solved.size >= PUZZLE_TOTAL) {
       rewardPuzzleSolvedLevels.add(rewardPuzzle.level);
-      rewardPuzzleTray.hidden = true;
+      rewardPuzzleTrayTop.hidden = true;
+      rewardPuzzleTrayBottom.hidden = true;
       renderLevelGallery(); // 막혀있던 "다음" 버튼 열기
     }
   }
