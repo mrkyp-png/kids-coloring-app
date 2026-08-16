@@ -1120,7 +1120,7 @@
   // 10개 전부 flyDirection을 가짐.
   const LEVEL_REWARD_ART = {
     1: { emoji: 'rocket', flyDirection: 'diagonal', sparkles: true }, // 동물
-    2: { emoji: 'motorcycle', flyDirection: 'diagonal' }, // 음식
+    2: { emoji: 'motorcycle', flyDirection: 'left' },   // 음식
     3: { emoji: 'canoe', flyDirection: 'left' },        // 자연
     4: { emoji: 'balloon', flyDirection: 'up' },        // 하늘
     5: { emoji: 'bicycle', flyDirection: 'up' },        // 사람
