@@ -799,8 +799,10 @@ button:active { transform: scale(0.94); }
   filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.18));
 }
 /* 완성되면(전부 열리고 나서) 칸 구분선을 마저 지워서, "격자" 대신 깔끔하게 완성된 그림
-   한 장으로 보이게 마무리한다. */
-.level-reward-art.launched .reward-cell {
+   한 장으로 보이게 마무리한다. 레벨1 퍼즐 실험 기능은 .launched를 일부러 안 거치므로(날아
+   가기 전에 퍼즐부터 풀어야 해서) reward-puzzle-clean으로 같은 효과를 별도로 낸다. */
+.level-reward-art.launched .reward-cell,
+.level-reward-art.reward-puzzle-clean .reward-cell {
   stroke-opacity: 0;
   transition: stroke-opacity 0.6s ease 0.3s;
 }
@@ -1022,12 +1024,27 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 @media (prefers-reduced-motion: reduce) {
   .reward-drop-in { animation: none; }
 }
-/* 레벨1 실험 기능 — 조각 4개를 다 맞춰서 한 그림으로 합쳐진 순간, 그 자리에서 한 번 커졌다가
-   (이후 날아가는 연출로 이어짐) */
-.reward-puzzle-grow { animation: reward-puzzle-grow-anim 0.9s ease-out both; }
+/* 레벨1 실험 기능 — 색칠이 끝난 완성 그림이 퍼즐 트레이 크기로 줄어들며 살짝 아래로
+   자리잡는 연출(조각 4개로 흩어지기 직전 한 번만 재생). */
+.reward-puzzle-shrink { animation: reward-puzzle-shrink-anim 0.5s ease-in both; }
+@keyframes reward-puzzle-shrink-anim {
+  0% { transform: translateY(0) scale(1); }
+  100% { transform: translateY(28px) scale(0.46); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reward-puzzle-shrink { animation: none; }
+}
+/* 축소된 채로 고정(애니메이션 없이) — 조각 4개가 맞춰져 그림으로 합쳐지는 크로스페이드가
+   "분리되기 전" 크기(=조각들이 있던 축소 크기)에서 시작하도록 위 축소 연출의 끝 상태를
+   그대로 재사용. */
+.reward-puzzle-shrunk { transform: translateY(28px) scale(0.46); }
+/* 레벨1 실험 기능 — 조각이 합쳐진 축소 크기 그림이 그 자리에서 천천히 원래(색칠 막 끝났을
+   때) 크기로 커진다(=위 축소 연출을 반대로 재생, 이후 공용 날아가는 연출로 이어짐. 최종
+   크기가 원본 그대로(scale 1)라 별도 보정 없이 공용 연출을 그대로 써도 됨). */
+.reward-puzzle-grow { animation: reward-puzzle-grow-anim 2s ease-out both; }
 @keyframes reward-puzzle-grow-anim {
-  0% { transform: scale(1); }
-  100% { transform: scale(1.35); }
+  0% { transform: translateY(28px) scale(0.46); }
+  100% { transform: translateY(0) scale(1); }
 }
 @media (prefers-reduced-motion: reduce) {
   .reward-puzzle-grow { animation: none; }

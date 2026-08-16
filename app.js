@@ -1328,12 +1328,16 @@
     const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
     if (doneCount < list.length) return; // 아직 다 안 깼음
     rewardPuzzle = { level: level, solved: new Set() };
-    // 완성된 그림이 위에서 살짝 내려오며 가운데 자리잡는 연출(0.4s) 후 잠깐 그대로 보여주다
-    // (레벨1은 updateLevelReward가 launched를 안 걸어서 원래의 "날아가서 사라짐" 연출은 안
-    // 탐 — 아래 explodeIntoPuzzle 참고) 조각으로 터뜨린다.
+    // 완성된 그림이 위에서 살짝 내려오며 가운데 자리잡는 연출(0.4s) → 칸 구분선이 지워져
+    // 깔끔한 한 장의 그림이 됨 → 퍼즐 트레이 크기로 줄어들며 살짝 아래로 자리잡음(0.5s) →
+    // 그 자리에서 조각 4개로 터뜨린다.
     levelRewardArt.classList.add('reward-drop-in');
-    setTimeout(() => levelRewardArt.classList.remove('reward-drop-in'), 450);
-    setTimeout(() => explodeIntoPuzzle(level), 700);
+    setTimeout(() => {
+      levelRewardArt.classList.remove('reward-drop-in');
+      levelRewardArt.classList.add('reward-puzzle-clean');
+    }, 450);
+    setTimeout(() => levelRewardArt.classList.add('reward-puzzle-shrink'), 700);
+    setTimeout(() => explodeIntoPuzzle(level), 1300);
   }
 
   function puzzleCellRect(i) {
@@ -1494,16 +1498,27 @@
     const total = getTemplatesForLevel(level).length;
     const { cols, rows } = gridDims(total);
 
+    // "다음" 버튼을 여는 재렌더링은 맨 먼저 해둔다 — updateLevelReward가 이 시점부터는
+    // isRewardPuzzleBlocking이 false라 판단해 levelRewardArt에 .launched를 미리 붙여버리는데,
+    // 뒤에서(아래) class를 통째로 다시 지정하므로 어차피 덮어써짐. 순서가 바뀌면(맨 뒤에서
+    // 호출) 그 미리 붙은 .launched 때문에 원치 않는 축하 연출(reward-celebrate)이 우리 크로스
+    // 페이드/축소 연출을 덮어써버리는 버그가 있었음.
+    renderLevelGallery();
+
     // ① 완성 이미지를 정답 칸과 같은 자리(둘 다 CSS grid-area:1/1 — .level-reward의 grid가
     // 자동으로 겹쳐줌)에 투명하게 깔아둔 뒤, 정답 칸은 페이드아웃시키고 완성 이미지는
     // 페이드인시킨다.
     levelRewardArt.innerHTML = buildRewardSvg(art, cols, rows);
     levelRewardArt.querySelectorAll('.reward-cell').forEach((el) => el.classList.add('is-active'));
-    levelRewardArt.setAttribute('class', 'level-reward-art');
+    // reward-puzzle-clean: 칸 구분선 없이 깔끔한 한 장의 그림으로 보이게(밑에서 커지는
+    // 동안에도 계속 유지해야 해서 이후 class를 바꿀 때도 계속 같이 붙여줌).
+    // reward-puzzle-shrunk: 조각이 있던 자리와 같은 축소 크기로 시작 — "분리되기 전 크기로
+    // 합쳐진다"는 요청대로, 크로스페이드가 원본 크기가 아니라 이 축소 크기에서 시작됨.
+    levelRewardArt.setAttribute('class', 'level-reward-art reward-puzzle-clean reward-puzzle-shrunk');
     levelRewardArt.removeAttribute('hidden');
     levelRewardArt.style.opacity = '0';
-    levelRewardArt.style.transition = 'opacity 0.6s ease';
-    rewardPuzzleTargetGrid.style.transition = 'opacity 0.6s ease';
+    levelRewardArt.style.transition = 'opacity 1s ease';
+    rewardPuzzleTargetGrid.style.transition = 'opacity 1s ease';
     requestAnimationFrame(() => {
       levelRewardArt.style.opacity = '1';
       rewardPuzzleTargetGrid.style.opacity = '0';
@@ -1518,17 +1533,16 @@
       levelRewardArt.style.opacity = '';
       levelRewardArt.style.transition = '';
 
-      // ② 천천히 커지는 연출
-      levelRewardArt.setAttribute('class', 'level-reward-art reward-puzzle-grow');
+      // ② 축소 크기에서 원본 크기로 천천히 커지는 연출
+      levelRewardArt.setAttribute('class', 'level-reward-art reward-puzzle-clean reward-puzzle-grow');
       setTimeout(() => {
         if (currentLevel !== level) return;
-        // ③ 날아가며 사라짐 + 칭찬
+        // ③ 원본 크기 그대로(=1배) 정해진 방향으로 날아가며 사라짐 + 칭찬 — 위 확대가
+        // 딱 원본 크기(scale 1)에서 끝나므로 공용 연출을 그대로 써도 크기 튐이 없음.
         levelRewardArt.setAttribute('class', 'level-reward-art' + (art.flyDirection ? ' reward-fly-' + art.flyDirection + ' launched' : ''));
         playExcellent();
-      }, 900);
-    }, 600);
-
-    renderLevelGallery(); // 막혀있던 "다음" 버튼 열기
+      }, 2000);
+    }, 1000);
   }
 
   // 조각을 손가락/마우스로 끌어서 정답 칸 위에 놓으면 붙고(소리+짧은 진동), 아니면
