@@ -726,6 +726,53 @@ button:active { transform: scale(0.94); }
   transform-box: border-box;
   transform-origin: center;
 }
+/* 2026-08-16: 실험 기능(레벨1만 테스트) — 조각 맞추기 미니게임. 빈 정답 칸(.reward-puzzle-slot,
+   기존 .reward-cell 닫힌 상태와 같은 색이지만 클래스를 분리해서 기존 진행률 표시 로직
+   (updateLevelReward의 is-active 토글)이 실수로 건드리지 않게 함)과, 아래 트레이에 흩어진
+   조각(.reward-puzzle-piece, 드래그로 옮김)으로 구성. */
+.reward-puzzle-slot {
+  fill: #EDEBF9;
+  stroke: #FFF8ED;
+  stroke-width: 0.6;
+}
+.reward-puzzle-tray {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+}
+.reward-puzzle-piece {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid #fff;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.14), 0 4px 6px rgba(0, 0, 0, 0.14);
+  background: var(--card-bg);
+  touch-action: none; /* 드래그 중 화면 스크롤 방지 */
+  cursor: grab;
+  transition: opacity 0.15s ease;
+}
+.reward-puzzle-piece svg { width: 100%; height: 100%; display: block; }
+.reward-puzzle-piece.dragging {
+  position: fixed;
+  z-index: 600;
+  cursor: grabbing;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.28);
+}
+.reward-puzzle-piece.placed { opacity: 0; pointer-events: none; }
+.reward-puzzle-piece.reward-puzzle-reject { animation: reward-puzzle-reject-shake 0.4s ease; }
+@keyframes reward-puzzle-reject-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reward-puzzle-piece.reward-puzzle-reject { animation: none; }
+}
+
 /* 칸(퍼즐 조각) — 미완료면 이모지 위를 옅은 색으로 덮고, 완료되면 투명해지며 안의 그림이 드러남.
    테두리는 살짝 남겨서 격자 구분이 보이고, 열릴 때 그림자로 "떠오르는" 입체감을 준다. */
 .reward-piece.reward-cell {

@@ -133,6 +133,7 @@
   const levelReward = document.getElementById('level-reward');
   const levelRewardArt = document.getElementById('level-reward-art');
   const levelRewardPraise = document.getElementById('level-reward-praise');
+  const rewardPuzzleTray = document.getElementById('reward-puzzle-tray');
   const btnMapBack = document.getElementById('btn-map-back');
   const levelTitle = document.getElementById('level-title');
   const levelProgress = document.getElementById('level-progress');
@@ -1287,6 +1288,147 @@
     levelRewardArt.classList.toggle('launched', clearedCount >= total);
   }
 
+  // 2026-08-16: 실험 기능(레벨1만 테스트) — 로켓이 날아가서 사라진 뒤, 흩어진 조각을 드래그해서
+  // 원래 자리에 맞추면 그림이 되살아나는 미니게임. 다 맞추기 전엔 "다음" 버튼을 막아둔다.
+  // 조각 수는 요청대로 다른 레벨(10조각) 기준에 맞춰 5x2=10으로 통일(레벨1 원래 템플릿
+  // 개수인 12와는 별개 — 이 미니게임의 조각 수는 색칠 진행량과 무관하게 독립적으로 정함).
+  const PUZZLE_COLS = 5;
+  const PUZZLE_ROWS = 2;
+  const PUZZLE_TOTAL = PUZZLE_COLS * PUZZLE_ROWS;
+  let rewardPuzzle = null; // { level, solved: Set<number> }
+
+  function isRewardPuzzleBlocking(level) {
+    return !!(rewardPuzzle && rewardPuzzle.level === level && rewardPuzzle.solved.size < PUZZLE_TOTAL);
+  }
+
+  function puzzleCellRect(i) {
+    const c = i % PUZZLE_COLS, r = Math.floor(i / PUZZLE_COLS);
+    return {
+      x: (c * 100 / PUZZLE_COLS).toFixed(2), y: (r * 100 / PUZZLE_ROWS).toFixed(2),
+      w: (100 / PUZZLE_COLS).toFixed(2), h: (100 / PUZZLE_ROWS).toFixed(2),
+    };
+  }
+
+  // 레벨을 방금 클리어한 지 fly 애니메이션 시간(0.5s 지연 + 1.8s 재생)만큼 지난 뒤 호출됨 —
+  // 보상 영역을 빈 칸 격자로 리셋하고, 섞은 조각들을 트레이에 채운다.
+  function startRewardPuzzle(level) {
+    if (currentLevel !== level) return; // 그 사이 다른 레벨로 이동했으면 건너뜀
+    const art = LEVEL_REWARD_ART[level];
+    let slots = '';
+    for (let i = 0; i < PUZZLE_TOTAL; i++) {
+      const r = puzzleCellRect(i);
+      slots += '<rect class="reward-puzzle-slot" data-piece="cell-' + i + '" x="' + r.x + '" y="' + r.y + '" width="' + r.w + '" height="' + r.h + '"/>';
+    }
+    levelRewardArt.innerHTML = slots;
+    levelRewardArt.setAttribute('class', 'level-reward-art');
+    levelReward.hidden = false;
+
+    const order = Array.from({ length: PUZZLE_TOTAL }, (_, i) => i);
+    for (let i = order.length - 1; i > 0; i--) { // 셔플
+      const j = Math.floor(Math.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    rewardPuzzleTray.innerHTML = '';
+    order.forEach((cellIndex) => {
+      const r = puzzleCellRect(cellIndex);
+      const piece = document.createElement('div');
+      piece.className = 'reward-puzzle-piece';
+      piece.dataset.cell = String(cellIndex);
+      piece.innerHTML = '<svg viewBox="' + r.x + ' ' + r.y + ' ' + r.w + ' ' + r.h + '"><image href="assets/emoji/' + art.emoji + '.svg" x="0" y="0" width="100" height="100"/></svg>';
+      wirePuzzlePieceDrag(piece, cellIndex);
+      rewardPuzzleTray.appendChild(piece);
+    });
+    rewardPuzzleTray.hidden = false;
+    renderLevelGallery(); // "다음" 버튼 막힘 상태 반영
+  }
+
+  // 조각을 손가락/마우스로 끌어서 정답 칸 위에 놓으면 붙고(소리+짧은 진동), 아니면
+  // 튕겨 돌아간다(긴 진동, 안 붙음).
+  function wirePuzzlePieceDrag(piece, cellIndex) {
+    let offsetX = 0, offsetY = 0;
+    piece.addEventListener('pointerdown', (e) => {
+      if (piece.classList.contains('placed')) return;
+      piece.setPointerCapture(e.pointerId);
+      const rect = piece.getBoundingClientRect();
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+      piece.classList.add('dragging');
+      piece.style.width = rect.width + 'px';
+      piece.style.height = rect.height + 'px';
+      piece.style.left = rect.left + 'px';
+      piece.style.top = rect.top + 'px';
+    });
+    piece.addEventListener('pointermove', (e) => {
+      if (!piece.classList.contains('dragging')) return;
+      // 손가락에 가려지지 않도록 살짝 위로 띄워서 따라다니게 함
+      piece.style.left = (e.clientX - offsetX) + 'px';
+      piece.style.top = (e.clientY - offsetY - 36) + 'px';
+    });
+    piece.addEventListener('pointerup', (e) => {
+      if (!piece.classList.contains('dragging')) return;
+      piece.classList.remove('dragging');
+      piece.style.left = '';
+      piece.style.top = '';
+      piece.style.width = '';
+      piece.style.height = '';
+      const dropX = e.clientX, dropY = e.clientY - 36;
+      const target = levelRewardArt.querySelector('[data-piece="cell-' + cellIndex + '"]');
+      const targetRect = target ? target.getBoundingClientRect() : null;
+      const isCorrect = !!targetRect &&
+        dropX >= targetRect.left - 12 && dropX <= targetRect.right + 12 &&
+        dropY >= targetRect.top - 12 && dropY <= targetRect.bottom + 12;
+      if (isCorrect) placePuzzlePiece(piece, cellIndex, target);
+      else rejectPuzzlePiece(piece);
+    });
+  }
+
+  function placePuzzlePiece(piece, cellIndex, targetSlotEl) {
+    const r = puzzleCellRect(cellIndex);
+    const art = LEVEL_REWARD_ART[currentLevel];
+    const img = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    img.setAttribute('x', r.x); img.setAttribute('y', r.y);
+    img.setAttribute('width', r.w); img.setAttribute('height', r.h);
+    img.setAttribute('viewBox', r.x + ' ' + r.y + ' ' + r.w + ' ' + r.h);
+    img.innerHTML = '<image href="assets/emoji/' + art.emoji + '.svg" x="0" y="0" width="100" height="100"/>';
+    if (targetSlotEl) targetSlotEl.replaceWith(img);
+    piece.classList.add('placed');
+    if (rewardPuzzle) rewardPuzzle.solved.add(cellIndex);
+    playPuzzleCorrectSfx();
+    if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) { /* 무시 */ } }
+    if (rewardPuzzle && rewardPuzzle.solved.size >= PUZZLE_TOTAL) {
+      rewardPuzzleTray.hidden = true;
+      renderLevelGallery(); // 막혀있던 "다음" 버튼 열기
+    }
+  }
+
+  function rejectPuzzlePiece(piece) {
+    piece.classList.add('reward-puzzle-reject');
+    setTimeout(() => piece.classList.remove('reward-puzzle-reject'), 400);
+    if (navigator.vibrate) { try { navigator.vibrate(400); } catch (e) { /* 무시 */ } }
+  }
+
+  // 정답 배치 효과음 — playAbsorbSfx와 같은 방식(별도 음원 없이 WebAudio로 합성), 더 밝은 2음 딩.
+  let puzzleSfxCtx = null;
+  function playPuzzleCorrectSfx() {
+    if (!isMusicOn()) return;
+    try {
+      if (!puzzleSfxCtx) puzzleSfxCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (puzzleSfxCtx.state === 'suspended') puzzleSfxCtx.resume();
+      const t0 = puzzleSfxCtx.currentTime;
+      const osc = puzzleSfxCtx.createOscillator();
+      const gain = puzzleSfxCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(700, t0);
+      osc.frequency.setValueAtTime(1050, t0 + 0.09);
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(0.25, t0 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.2);
+      osc.connect(gain).connect(puzzleSfxCtx.destination);
+      osc.start(t0);
+      osc.stop(t0 + 0.22);
+    } catch (e) { /* 효과음은 부가 기능이라 실패해도 무시 */ }
+  }
+
   function renderLevelGallery() {
     // 2026-08-11: "시간초과 확인 눌러도 체크표시 남음" 재현/원인 확인 — 아래에서 scores를 미리
     // 캡처해두는데, 그 뒤 이 함수 안에서 updateLevelTimerDisplay()가 시간초과를 감지하면 점수를
@@ -1316,7 +1458,8 @@
       const hasNext = currentLevel < TOTAL_LEVELS;
       levelNextText.textContent = hasNext ? I18N.t('level.clear') : I18N.t('level.allClear');
       btnLevelNext.textContent = hasNext ? I18N.t('level.next') : I18N.t('level.map');
-      btnLevelNext.hidden = false;
+      // 2026-08-16: 실험 기능 — 조각 맞추기 미니게임이 아직 안 끝났으면 "다음"을 계속 숨겨둔다.
+      btnLevelNext.hidden = isRewardPuzzleBlocking(currentLevel);
     } else {
       levelNextText.textContent = '';
       btnLevelNext.hidden = true;
@@ -2682,7 +2825,16 @@
         // 2026-08-16: "칭찬 메시지 빼고 흡수되는 이미지로만" 요청 — 그림 하나는 팝업 없이 바로
         // 갤러리로 돌아가고, 대기열 박스가 보상 이미지로 흡수되는 애니메이션이 축하 역할을 한다.
         // 레벨 전체를 다 클리어했을 때의 음성 축하(랜덤 문구)는 그대로 유지.
-        if (justBecameLevelCleared) playExcellent();
+        if (justBecameLevelCleared) {
+          playExcellent();
+          // 실험 기능(레벨1만 테스트) — 로켓이 날아가 사라지는 연출(0.5s 지연+1.8s 재생)이
+          // 끝난 뒤 조각 맞추기 미니게임을 띄운다.
+          if (currentTemplate && currentTemplate.difficulty === 1) {
+            const puzzleLevel = currentTemplate.difficulty;
+            rewardPuzzle = { level: puzzleLevel, solved: new Set() };
+            setTimeout(() => startRewardPuzzle(puzzleLevel), 2300);
+          }
+        }
         goHome();
       }
     } else {
