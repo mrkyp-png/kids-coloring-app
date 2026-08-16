@@ -1217,6 +1217,10 @@
   const queueByLevel = {};
 
   function renderQueueRow(tpl) {
+    // 2026-08-16: 배경 장식이 .tpl-row의 둥근 모서리 틈으로 비치는 걸 막으려고, 각진(둥글지
+    // 않은) 래퍼로 한 겹 감싼다 — 래퍼 크기만큼만 장식을 가리고, 래퍼 바깥 여백엔 장식이 보임.
+    const wrap = document.createElement('div');
+    wrap.className = 'tpl-row-wrap';
     const row = document.createElement('button');
     row.className = 'tpl-row';
     row.dataset.tplId = tpl.id;
@@ -1226,7 +1230,8 @@
       '<img class="tpl-emoji" src="assets/emoji/' + tpl.id + (tpl.isBoss ? '-icon' : '') + '.svg" alt="">' +
       '<span class="tpl-label">' + escapeHtml(displayName) + '</span>';
     row.addEventListener('click', () => openTemplate(tpl));
-    return row;
+    wrap.appendChild(row);
+    return wrap;
   }
 
   function paintQueue(ids, byId) {
@@ -3104,26 +3109,39 @@
     onboardingModal.hidden = false;
   }
 
-  // 2026-08-16: 갤러리/맵 화면 배경 장식 — 작은 무채색 실루엣 이모지를 화면당 ~30개 흩뿌린다.
-  // 보상 이미지/대기열 박스/레벨 박스는 그 위에 불투명하게 그려지므로(z-index + 배경색으로
-  // 보장) 장식이 겹쳐도 저절로 가려짐 — 좌표를 일일이 피해 배치할 필요가 없다.
-  const SCREEN_DECOR_ICONS = ['star', 'heart', 'rabbit', 'duck', 'balloon', 'rainbow'];
-  const SCREEN_DECOR_COUNT = 30;
+  // 2026-08-16: 갤러리/맵 화면 배경 장식 — 무채색 실루엣 이모지 30개(전부 다른 그림)를 5x6
+  // 격자 규칙으로 고르게 배치한다(요청: "동일 크기로, 지금의 3배, 중복 없이, 일정한 규칙").
+  // 보상 이미지/대기열 박스/레벨 박스는 각진 래퍼에 배경색이 깔려 있어 겹쳐도 저절로 가려짐.
+  const SCREEN_DECOR_ICONS = [
+    'star', 'heart', 'rabbit', 'duck', 'balloon', 'rainbow', 'apple', 'banana', 'bee', 'butterfly',
+    'candy', 'cat', 'cherry', 'cloud', 'cookie', 'cupcake', 'dog', 'icecream', 'moonface', 'soccerball',
+    'strawberry', 'sunface', 'umbrella', 'cake', 'chick', 'flower', 'fourleafclover', 'frog', 'ladybug', 'tulip',
+  ];
+  const SCREEN_DECOR_SIZE = 60; // 3배 확대(기존 14~28px 랜덤 -> 고정 60px)
+  const SCREEN_DECOR_COLS = 5;
+  const SCREEN_DECOR_ROWS = 6; // 5 x 6 = 30, 아이콘 30개와 정확히 일치(중복 없음)
   function buildScreenDecor() {
     document.querySelectorAll('.screen-decor').forEach((el) => {
       if (el.children.length) return; // 이미 채워져 있으면 다시 안 함
       const frag = document.createDocumentFragment();
-      for (let i = 0; i < SCREEN_DECOR_COUNT; i++) {
-        const img = document.createElement('img');
-        img.className = 'screen-decor-item';
-        img.src = 'assets/emoji/' + SCREEN_DECOR_ICONS[i % SCREEN_DECOR_ICONS.length] + '.svg';
-        img.alt = '';
-        img.style.top = (Math.random() * 96).toFixed(1) + '%';
-        img.style.left = (Math.random() * 94).toFixed(1) + '%';
-        const size = 14 + Math.random() * 14; // 14~28px
-        img.style.width = size.toFixed(0) + 'px';
-        img.style.height = size.toFixed(0) + 'px';
-        frag.appendChild(img);
+      let i = 0;
+      for (let r = 0; r < SCREEN_DECOR_ROWS; r++) {
+        for (let c = 0; c < SCREEN_DECOR_COLS; c++) {
+          const img = document.createElement('img');
+          img.className = 'screen-decor-item';
+          img.src = 'assets/emoji/' + SCREEN_DECOR_ICONS[i % SCREEN_DECOR_ICONS.length] + '.svg';
+          img.alt = '';
+          // 2026-08-16: "대각선으로 배열" 요청 — 행이 내려갈수록 가로 위치를 일정하게 밀어서
+          // 화면 전체에 사선 줄무늬처럼 규칙적으로 흐르게 배치.
+          const topPct = ((r + 0.5) * 100 / SCREEN_DECOR_ROWS);
+          const leftPct = ((c + 0.5) * 100 / SCREEN_DECOR_COLS + r * 7) % 92;
+          img.style.left = leftPct.toFixed(1) + '%';
+          img.style.top = topPct.toFixed(1) + '%';
+          img.style.width = SCREEN_DECOR_SIZE + 'px';
+          img.style.height = SCREEN_DECOR_SIZE + 'px';
+          frag.appendChild(img);
+          i++;
+        }
       }
       el.appendChild(frag);
     });
