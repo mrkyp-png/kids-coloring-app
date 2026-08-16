@@ -872,6 +872,33 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   .reward-absorb-ghost { display: none; }
 }
 
+/* 카누 노(레벨3) — 계속 좌우로 젓는 동작을 반복하다가 카누와 함께 날아가며 사라진다. */
+.reward-paddle { transform-box: fill-box; transform-origin: center; }
+.level-reward-art.launched .reward-paddle {
+  animation: reward-paddle-row 0.5s ease-in-out infinite;
+}
+@keyframes reward-paddle-row {
+  0%, 100% { transform: rotate(-16deg); }
+  50% { transform: rotate(16deg); }
+}
+
+/* 바퀴 달린 탈것들(자전거/오토바이/기차/경주차/스쿠터) 공용 — 바퀴 하나하나가 자기
+   중심(fill-box)으로 계속 회전. */
+.reward-bike-wheel { transform-box: fill-box; transform-origin: center; }
+.level-reward-art.launched .reward-bike-wheel {
+  animation: reward-bike-wheel-spin 0.5s linear infinite;
+}
+@keyframes reward-bike-wheel-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 헬리콥터 프로펠러(레벨6) — 위쪽 회전날개 두 짝이 한 축을 중심으로 빠르게 회전. */
+.reward-heli-rotor { transform-box: fill-box; transform-origin: center; }
+.level-reward-art.launched .reward-heli-rotor {
+  animation: reward-bike-wheel-spin 0.15s linear infinite;
+}
+
 /* 완성 연출: 2026-08-17부터 10개 레벨 전부 flyDirection을 가지므로(로켓/비행기=대각선,
    풍선/나비/헬리콥터/불꽃놀이=위, 기차/오토바이/카누/경주차/스쿠터=왼쪽) 완성되면 항상
    화면 밖으로 날아가며 사라진다. */
@@ -937,7 +964,10 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   .level-reward-art.reward-fly-up.launched,
   .level-reward-art.reward-fly-left.launched,
   .level-reward-art.reward-fly-diagonal.launched { opacity: 0; }
-  .level-reward-art.launched .reward-sparkle { animation: none; }
+  .level-reward-art.launched .reward-sparkle,
+  .level-reward-art.launched .reward-paddle,
+  .level-reward-art.launched .reward-bike-wheel,
+  .level-reward-art.launched .reward-heli-rotor { animation: none; }
 }
 
 /* 2026-08-16: "그림 카드 여러 개 그리드"에서 "한 번에 2개짜리 대기열"로 교체 — 한 줄(.tpl-row)에
