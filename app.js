@@ -1095,6 +1095,32 @@
   // (화면 왼쪽 가장자리)에 배치해서 대비가 나게 함.
   const ROCKET_SPARKLES = sparkleGroup('reward-sparkles', [[6, 55, 0.9], [3, 74, 1], [9, 90, 0.8]]);
 
+  // 2026-08-17: "레벨1 불꽃 반짝임처럼 나머지 레벨에도 그 탈것다운 장식 넣어줘" 요청 —
+  // 원마다 다른 작은 포인트 장식(연기/물방울/구름/스피드선 등)을 완성 시 재생.
+  // points: [x, y, r] — 연기/구름/물방울처럼 둥근 뭉치용.
+  function puffGroup(cls, points) {
+    return '<g class="' + cls + '" aria-hidden="true">' +
+      points.map(([x, y, r]) => '<circle cx="' + x + '" cy="' + y + '" r="' + r + '"/>').join('') +
+      '</g>';
+  }
+  // points: [x1, y1, x2, y2] — 스피드선/바람 소용돌이처럼 짧은 선용.
+  function lineGroup(cls, points) {
+    return '<g class="' + cls + '" aria-hidden="true">' +
+      points.map(([x1, y1, x2, y2]) => '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '"/>').join('') +
+      '</g>';
+  }
+  const DECOR_BY_EMOJI = {
+    motorcycle: () => lineGroup('reward-decor-lines', [[62, 30, 82, 26], [64, 40, 86, 38], [60, 50, 80, 52]]),
+    canoe: () => puffGroup('reward-decor-drops', [[68, 62, 2.2], [74, 70, 1.6], [64, 72, 1.8]]),
+    balloon: () => sparkleGroup('reward-decor-hearts', [[38, 56, 0.8], [62, 53, 0.9]]),
+    bicycle: () => lineGroup('reward-decor-lines', [[62, 32, 84, 28], [64, 42, 86, 40], [60, 52, 80, 54]]),
+    helicopter: () => puffGroup('reward-decor-swirl', [[30, 78, 3], [46, 82, 2.2], [62, 78, 2.6]]),
+    airplane: () => puffGroup('reward-decor-cloud', [[18, 78, 4], [10, 86, 3], [26, 88, 3.2]]),
+    train: () => puffGroup('reward-decor-cloud', [[26, 14, 3.2], [20, 6, 2.6], [32, 4, 2.2]]),
+    racingcar: () => lineGroup('reward-decor-lines', [[62, 30, 84, 26], [64, 40, 86, 38], [60, 50, 80, 52]]),
+    scooter: () => lineGroup('reward-decor-lines', [[62, 34, 84, 30], [64, 44, 86, 42], [60, 54, 80, 56]]),
+  };
+
   // 카누(레벨3) 전용 — "노젓는 애니메이션" 요청. canoe.svg를 <image href>로 통째로 박으면
   // 노만 따로 움직일 수 없어서, 원본 path를 배(선체+물)와 노(대각선 주황/노랑 두 조각)로
   // 나눠 인라인으로 그린다. 좌표계 변환은 다른 인라인 이모지(관람차 등)와 같은 방식
@@ -1261,8 +1287,9 @@
         cells += '<rect class="reward-piece reward-cell" data-piece="cell-' + (r * cols + c) + '" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '"/>';
       }
     }
-    // sparkles(로켓 전용) 외 나머지 이펙트는 전부 flyDirection(날아가는 연출)로 대체됨.
-    const extra = art.sparkles ? ROCKET_SPARKLES : '';
+    // sparkles(로켓 전용)이거나, DECOR_BY_EMOJI에 등록된 탈것이면 그 탈것다운 포인트 장식.
+    const decorFn = DECOR_BY_EMOJI[art.emoji];
+    const extra = art.sparkles ? ROCKET_SPARKLES : (decorFn ? decorFn() : '');
     const INLINE_BY_EMOJI = {
       canoe: CANOE_INLINE, bicycle: BICYCLE_INLINE, motorcycle: MOTORCYCLE_INLINE,
       train: TRAIN_INLINE, racingcar: RACINGCAR_INLINE, scooter: SCOOTER_INLINE,

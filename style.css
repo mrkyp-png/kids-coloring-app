@@ -885,6 +885,76 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   .reward-absorb-ghost { display: none; }
 }
 
+/* 2026-08-17: "보상이미지가 입체적으로 보이게" 요청 — 아래로 살짝 떨어지는 그림자를 겹쳐서
+   그림이 배경 위에 떠 있는 듯한 입체감을 준다(그림 자체를 다시 그리지 않고 CSS만으로). */
+.reward-emoji-img {
+  filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.2)) drop-shadow(0 6px 6px rgba(0, 0, 0, 0.15));
+}
+
+/* 2026-08-17: "레벨1 불꽃 반짝임처럼 나머지 레벨에도 그 탈것다운 장식" 요청 — 완성되면
+   짧게 한 번 재생되고 날아가는 연출로 이어짐. */
+.reward-decor-lines, .reward-decor-drops, .reward-decor-swirl, .reward-decor-cloud, .reward-decor-hearts {
+  opacity: 0;
+}
+.level-reward-art.launched .reward-decor-lines,
+.level-reward-art.launched .reward-decor-drops,
+.level-reward-art.launched .reward-decor-swirl,
+.level-reward-art.launched .reward-decor-cloud,
+.level-reward-art.launched .reward-decor-hearts {
+  opacity: 1;
+}
+.reward-decor-hearts .reward-sparkle { fill: #FF6B81; }
+/* 오토바이/자전거/경주차/스쿠터 — 뒤로 흩날리는 스피드선. 흰색은 크림 배경에 묻히므로
+   대비되는 회청색을 씀(로켓 반짝임 색 문제와 같은 이유). */
+.reward-decor-lines line {
+  stroke: #8C97A6;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.level-reward-art.launched .reward-decor-lines line {
+  animation: reward-speedline-flick 0.5s ease-out infinite;
+}
+.reward-decor-lines line:nth-child(2) { animation-delay: 0.08s; }
+.reward-decor-lines line:nth-child(3) { animation-delay: 0.16s; }
+@keyframes reward-speedline-flick {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.9; }
+}
+/* 카누 물방울 / 기차·비행기 연기구름 — 둥실 떠오르며 사라짐. */
+.reward-decor-drops circle, .reward-decor-cloud circle, .reward-decor-swirl circle {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+/* 2026-08-17: 물방울 색이 카누 물 색(#55ACEE)과 똑같아 안 보이던 버그 — 밝은 색으로 대비 확보 */
+.reward-decor-drops circle { fill: #E8F6FF; stroke: #55ACEE; stroke-width: 0.6; }
+.reward-decor-cloud circle { fill: #E8EDF2; }
+.reward-decor-swirl circle { fill: none; stroke: #B8C4D0; stroke-width: 1.4; }
+.level-reward-art.launched .reward-decor-drops circle,
+.level-reward-art.launched .reward-decor-cloud circle {
+  animation: reward-puff-float 0.9s ease-out both;
+}
+.level-reward-art.launched .reward-decor-swirl circle {
+  animation: reward-swirl-spin 0.9s ease-out both;
+}
+.reward-decor-drops circle:nth-child(2), .reward-decor-cloud circle:nth-child(2), .reward-decor-swirl circle:nth-child(2) { animation-delay: 0.15s; }
+.reward-decor-drops circle:nth-child(3), .reward-decor-cloud circle:nth-child(3), .reward-decor-swirl circle:nth-child(3) { animation-delay: 0.3s; }
+@keyframes reward-puff-float {
+  0% { opacity: 0; transform: translateY(4px) scale(0.6); }
+  40% { opacity: 0.85; }
+  100% { opacity: 0; transform: translateY(-10px) scale(1.15); }
+}
+@keyframes reward-swirl-spin {
+  0% { opacity: 0; transform: rotate(0deg) scale(0.6); }
+  40% { opacity: 0.7; }
+  100% { opacity: 0; transform: rotate(140deg) scale(1.1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .level-reward-art.launched .reward-decor-lines line,
+  .level-reward-art.launched .reward-decor-drops circle,
+  .level-reward-art.launched .reward-decor-cloud circle,
+  .level-reward-art.launched .reward-decor-swirl circle { animation: none; }
+}
+
 /* 카누 노(레벨3) — 계속 좌우로 젓는 동작을 반복하다가 카누와 함께 날아가며 사라진다. */
 .reward-paddle { transform-box: fill-box; transform-origin: center; }
 .level-reward-art.launched .reward-paddle {
