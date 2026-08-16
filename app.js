@@ -1576,17 +1576,26 @@
         dropX >= targetRect.left - 12 && dropX <= targetRect.right + 12 &&
         dropY >= targetRect.top - 12 && dropY <= targetRect.bottom + 12;
       if (isCorrect) {
-        // 2026-08-17: "맞으면 그 자리에서 사라져야" 요청 — 트레이 자리로 순간이동한 뒤
-        // 사라지지 않도록, 드롭한 그 위치(position:fixed 유지)에서 페이드아웃하고 나서야
-        // dragging 상태/인라인 위치값을 정리한다.
-        placePuzzlePiece(piece, cellIndex, target);
+        // 2026-08-17: "맞춰질 때 자연스러워야" 요청 — 드롭한 자리에서 바로 사라지고 정답
+        // 그림이 뚝 나타나면(순간 교체) 부자연스러움. 정답 칸 자리/크기에 딱 맞게 슥
+        // 미끄러져 들어가는 스냅 연출을 먼저 재생하고, 완전히 자리에 앉은 뒤에야
+        // placePuzzlePiece로 정답 그림을 앉히고(이 시점엔 이미 같은 자리라 표시 안 남)
+        // 조각을 페이드아웃시킨다.
+        piece.style.transition = 'left 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.2s ease, height 0.2s ease';
+        piece.style.left = targetRect.left + 'px';
+        piece.style.top = targetRect.top + 'px';
+        piece.style.width = targetRect.width + 'px';
+        piece.style.height = targetRect.height + 'px';
         setTimeout(() => {
-          piece.classList.remove('dragging');
-          piece.style.left = '';
-          piece.style.top = '';
-          piece.style.width = '';
-          piece.style.height = '';
-        }, 180);
+          placePuzzlePiece(piece, cellIndex, target);
+          setTimeout(() => {
+            piece.classList.remove('dragging');
+            piece.style.left = '';
+            piece.style.top = '';
+            piece.style.width = '';
+            piece.style.height = '';
+          }, 180);
+        }, 200);
       } else {
         piece.classList.remove('dragging');
         piece.style.left = '';

@@ -719,7 +719,10 @@ button:active { transform: scale(0.94); }
      자연히 겹쳐지므로, position 트릭 없이도 항상 가운데 정렬 유지하면서 겹칠 수 있음. */
   display: grid;
   place-items: center;
-  overflow: hidden;
+  /* 2026-08-17: "날아가기 전 로켓이 잘려" 제보 — overflow:hidden이면 날아가는 연출이 이
+     고정 높이 박스 위쪽 경계를 넘어가는 순간 뭉텅 잘려 보임. 날아가며 사라지는 연출은
+     화면 밖으로 자연스럽게 나가야 하므로 visible로 바꿔서 박스 경계에 안 걸리게 함. */
+  overflow: visible;
 }
 .level-reward-art {
   grid-area: 1 / 1; /* .reward-puzzle-target-grid와 같은 칸에 둬서 크로스페이드 때 겹치게 함 */
