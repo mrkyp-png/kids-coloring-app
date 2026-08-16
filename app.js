@@ -135,6 +135,7 @@
   const levelRewardPraise = document.getElementById('level-reward-praise');
   const rewardPuzzleTrayTop = document.getElementById('reward-puzzle-tray-top');
   const rewardPuzzleTrayBottom = document.getElementById('reward-puzzle-tray-bottom');
+  const rewardPuzzleTargetGrid = document.getElementById('reward-puzzle-target-grid');
   const btnMapBack = document.getElementById('btn-map-back');
   const levelTitle = document.getElementById('level-title');
   const levelProgress = document.getElementById('level-progress');
@@ -1342,6 +1343,13 @@
   // 순서대로(팝콘 터지듯 살짝 시간차) 튀어나간다. FLIP 기법: 조각을 최종 위치(트레이)에
   // 먼저 심어서 실제 좌표를 잰 뒤, 중앙(보상 이미지 자리)에서 막 튀어나온 것처럼 보이도록
   // 역방향 이동+축소+회전 값을 transform으로 씌웠다가 다음 틱에 원위치로 트랜지션시킨다.
+  // 조각 하나가 화면에 그리는 내용(원본 칸을 그대로 잘라서, 정사각형 타일 안에 letterbox로
+  // 표시 — svg의 기본 preserveAspectRatio(meet)라 그림이 잘리거나 늘어나지 않음).
+  function puzzleTileInnerSvg(emoji, cellIndex) {
+    const r = puzzleCellRect(cellIndex);
+    return '<svg viewBox="' + r.x + ' ' + r.y + ' ' + r.w + ' ' + r.h + '"><image href="assets/emoji/' + emoji + '.svg" x="0" y="0" width="100" height="100"/></svg>';
+  }
+
   function explodeIntoPuzzle(level) {
     if (currentLevel !== level) return; // 그 사이 다른 레벨로 이동했으면 건너뜀
     const art = LEVEL_REWARD_ART[level];
@@ -1352,14 +1360,22 @@
     levelRewardArt.style.transition = 'opacity 0.25s ease';
     levelRewardArt.style.opacity = '0';
     setTimeout(() => {
-      let slots = '';
+      // 2026-08-16: SVG 요소는 .hidden 프로퍼티를 true로 줘도 실제 hidden 속성에 반영이
+      // 안 돼서([hidden]{display:none} 규칙이 안 먹음) 그대로 보이는 버그가 있었음 —
+      // setAttribute로 직접 속성을 건드려야 함(다른 div 기반 hidden 토글은 문제없음).
+      levelRewardArt.setAttribute('hidden', '');
+      levelRewardArt.style.opacity = '';
+      levelRewardArt.style.transition = '';
+
+      // 정답 칸(가운데) — 트레이 조각과 완전히 같은 정사각형 타일 클래스를 씀(크기 통일).
+      rewardPuzzleTargetGrid.innerHTML = '';
       for (let i = 0; i < PUZZLE_TOTAL; i++) {
-        const r = puzzleCellRect(i);
-        slots += '<rect class="reward-puzzle-slot" data-piece="cell-' + i + '" x="' + r.x + '" y="' + r.y + '" width="' + r.w + '" height="' + r.h + '"/>';
+        const slot = document.createElement('div');
+        slot.className = 'reward-puzzle-tile reward-puzzle-target';
+        slot.dataset.piece = 'cell-' + i;
+        rewardPuzzleTargetGrid.appendChild(slot);
       }
-      levelRewardArt.innerHTML = slots;
-      levelRewardArt.setAttribute('class', 'level-reward-art');
-      levelRewardArt.style.opacity = '1';
+      rewardPuzzleTargetGrid.hidden = false;
       levelReward.hidden = false;
 
       const order = Array.from({ length: PUZZLE_TOTAL }, (_, i) => i);
@@ -1374,11 +1390,10 @@
       rewardPuzzleTrayBottom.hidden = false;
       const half = PUZZLE_TOTAL / 2;
       order.forEach((cellIndex, i) => {
-        const r = puzzleCellRect(cellIndex);
         const piece = document.createElement('div');
-        piece.className = 'reward-puzzle-piece';
+        piece.className = 'reward-puzzle-tile reward-puzzle-piece';
         piece.dataset.cell = String(cellIndex);
-        piece.innerHTML = '<svg viewBox="' + r.x + ' ' + r.y + ' ' + r.w + ' ' + r.h + '"><image href="assets/emoji/' + art.emoji + '.svg" x="0" y="0" width="100" height="100"/></svg>';
+        piece.innerHTML = puzzleTileInnerSvg(art.emoji, cellIndex);
         wirePuzzlePieceDrag(piece, cellIndex);
         (i < half ? rewardPuzzleTrayTop : rewardPuzzleTrayBottom).appendChild(piece);
 
@@ -1399,14 +1414,18 @@
     }, 250);
   }
 
-  // 조각을 다 맞추면(로켓 완성) 원래 정해진 방향으로 날아가며 사라지고(기존 fly 연출 재활용) +
-  // 그 순간 칭찬 문구(다국어+음성, 기존 playExcellent/showLevelClearPraise 재활용)가 크게
-  // 뜨며, 막혀있던 "다음" 버튼이 열린다.
+  // 조각을 다 맞추면(로켓 완성) 정답 칸 격자를 원래 svg로 되돌리고(퍼즐 이전과 동일한 완성
+  // 그림), 원래 정해진 방향으로 날아가며 사라지는 기존 연출 + 칭찬 문구(다국어+음성, 기존
+  // playExcellent/showLevelClearPraise 재활용)를 그 순간 재생하며 "다음" 버튼을 연다.
   function finishRewardPuzzle(level) {
     const art = LEVEL_REWARD_ART[level];
-    if (art.flyDirection) {
-      levelRewardArt.setAttribute('class', 'level-reward-art reward-fly-' + art.flyDirection + ' launched');
-    }
+    const total = getTemplatesForLevel(level).length;
+    const { cols, rows } = gridDims(total);
+    rewardPuzzleTargetGrid.hidden = true;
+    levelRewardArt.innerHTML = buildRewardSvg(art, cols, rows);
+    levelRewardArt.querySelectorAll('.reward-cell').forEach((el) => el.classList.add('is-active'));
+    levelRewardArt.setAttribute('class', 'level-reward-art' + (art.flyDirection ? ' reward-fly-' + art.flyDirection + ' launched' : ''));
+    levelRewardArt.removeAttribute('hidden');
     playExcellent();
     renderLevelGallery(); // 막혀있던 "다음" 버튼 열기
   }
@@ -1441,7 +1460,7 @@
       piece.style.width = '';
       piece.style.height = '';
       const dropX = e.clientX, dropY = e.clientY - 36;
-      const target = levelRewardArt.querySelector('[data-piece="cell-' + cellIndex + '"]');
+      const target = rewardPuzzleTargetGrid.querySelector('[data-piece="cell-' + cellIndex + '"]');
       const targetRect = target ? target.getBoundingClientRect() : null;
       const isCorrect = !!targetRect &&
         dropX >= targetRect.left - 12 && dropX <= targetRect.right + 12 &&
@@ -1452,14 +1471,11 @@
   }
 
   function placePuzzlePiece(piece, cellIndex, targetSlotEl) {
-    const r = puzzleCellRect(cellIndex);
     const art = LEVEL_REWARD_ART[currentLevel];
-    const img = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    img.setAttribute('x', r.x); img.setAttribute('y', r.y);
-    img.setAttribute('width', r.w); img.setAttribute('height', r.h);
-    img.setAttribute('viewBox', r.x + ' ' + r.y + ' ' + r.w + ' ' + r.h);
-    img.innerHTML = '<image href="assets/emoji/' + art.emoji + '.svg" x="0" y="0" width="100" height="100"/>';
-    if (targetSlotEl) targetSlotEl.replaceWith(img);
+    if (targetSlotEl) {
+      targetSlotEl.innerHTML = puzzleTileInnerSvg(art.emoji, cellIndex);
+      targetSlotEl.classList.add('filled');
+    }
     piece.classList.add('placed');
     if (rewardPuzzle) rewardPuzzle.solved.add(cellIndex);
     playPuzzleCorrectSfx();

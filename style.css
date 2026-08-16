@@ -726,16 +726,20 @@ button:active { transform: scale(0.94); }
   transform-box: border-box;
   transform-origin: center;
 }
-/* 2026-08-16: 실험 기능(레벨1만 테스트) — 조각 맞추기 미니게임. 빈 정답 칸(.reward-puzzle-slot,
-   기존 .reward-cell 닫힌 상태와 같은 색이지만 클래스를 분리해서 기존 진행률 표시 로직
-   (updateLevelReward의 is-active 토글)이 실수로 건드리지 않게 함)과, 보상 이미지를 위/아래에서
-   감싸는 두 트레이(reward-puzzle-tray-top/bottom, 각 4조각)에 흩어진 조각(.reward-puzzle-piece,
-   드래그로 옮김)으로 구성. */
-.reward-puzzle-slot {
-  fill: #EDEBF9;
-  stroke: #FFF8ED;
-  stroke-width: 0.6;
+/* 2026-08-16: 실험 기능(레벨1만 테스트) — 조각 맞추기 미니게임.
+   2026-08-16(2차): "목표박스와 선택박스 크기가 달라요, 정사각형으로" 피드백 — 정답 칸(가운데)과
+   트레이 조각을 서로 다른 좌표계(SVG 전체 vs 개별 박스)로 따로 만들다 보니 크기가 어긋났었음.
+   이제 둘 다 같은 정사각형 타일 클래스(.reward-puzzle-tile)를 공유해서 완전히 같은 크기가
+   되도록 통일. 조각 내용은 원본 칸(4x2, 1:2 비율)을 그대로 자르되(잘리거나 늘어나지 않음),
+   정사각형 박스 안에 letterbox(위아래 살짝 여백)로 표시. */
+.reward-puzzle-tile {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--card-bg);
 }
+.reward-puzzle-tile svg { width: 100%; height: 100%; display: block; }
 .reward-puzzle-tray {
   flex: 0 0 auto;
   display: flex;
@@ -744,21 +748,26 @@ button:active { transform: scale(0.94); }
   gap: 8px;
   padding: 8px 16px;
 }
-/* 조각 격자가 4열x2행이라 칸 하나의 가로:세로 비율이 1:2 — 박스도 그 비율로 맞춰서 그림이
-   눌리거나 늘어나 보이지 않게 함(요청: "조각의 크기와 그림은 같게"). 8조각 전부 같은 크기. */
+.reward-puzzle-target-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 52px);
+  gap: 4px;
+  justify-content: center;
+  align-content: center;
+}
+/* 정답 칸(가운데, 아직 안 채워짐) — 기존 닫힌 퍼즐칸과 같은 톤 */
+.reward-puzzle-target {
+  background: #EDEBF9;
+  border: 2px solid #FFF8ED;
+}
+.reward-puzzle-target.filled { background: transparent; border-color: transparent; }
 .reward-puzzle-piece {
-  width: 36px;
-  height: 72px;
-  border-radius: 8px;
-  overflow: hidden;
   border: 2px solid #fff;
   box-shadow: 0 3px 0 rgba(0, 0, 0, 0.14), 0 4px 6px rgba(0, 0, 0, 0.14);
-  background: var(--card-bg);
   touch-action: none; /* 드래그 중 화면 스크롤 방지 */
   cursor: grab;
   transition: opacity 0.15s ease;
 }
-.reward-puzzle-piece svg { width: 100%; height: 100%; display: block; }
 .reward-puzzle-piece.dragging {
   position: fixed;
   z-index: 600;

@@ -147,6 +147,10 @@
        실제 이모지 그림이 드러나고, 다 채워지면 완성 연출이 재생된다(레벨1~10 전부 적용). -->
   <div id="level-reward" class="level-reward" hidden aria-hidden="true">
     <svg id="level-reward-art" class="level-reward-art"></svg>
+    <!-- 2026-08-16: 조각 맞추기 미니게임 진행 중에만 보임(그 외엔 위 svg를 씀) — 정답 칸을
+         트레이 조각과 완전히 같은 정사각형 타일(.reward-puzzle-tile)로 만들어서 크기를
+         정확히 맞춘다. -->
+    <div id="reward-puzzle-target-grid" class="reward-puzzle-target-grid" hidden></div>
   </div>
   <div id="reward-puzzle-tray-bottom" class="reward-puzzle-tray" hidden></div>
   <!-- 2026-08-16: 레벨을 방금 클리어한 순간에만 잠깐 뜨는 칭찬 문구(보상 이미지 바로 아래) —
