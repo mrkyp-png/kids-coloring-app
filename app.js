@@ -1367,8 +1367,9 @@
     }
   }
 
-  // 2026-08-16: 실험 기능(레벨1만 테스트) — 로켓이 날아가서 사라진 뒤, 흩어진 조각을 드래그해서
-  // 원래 자리에 맞추면 그림이 되살아나는 미니게임. 다 맞추기 전엔 "다음" 버튼을 막아둔다.
+  // 2026-08-16: 레벨을 다 깨면(레벨1만 테스트하다 2026-08-17부터 전체 레벨로 확장) 보상
+  // 이미지가 흩어진 조각을 드래그해서 원래 자리에 맞추면 완성되는 미니게임이 재생된다.
+  // 다 맞추기 전엔 "다음" 버튼을 막아둔다.
   // 조각 4개(2x2 격자 — 원본 100x100 정사각 이미지를 2등분씩 나누면 칸 자체가 정확히
   // 정사각형이라 letterbox 여백 없이 꽉 채울 수 있음). "8조각은 유아에게 너무 어렵고,
   // 조각끼리 비슷해 보인다"는 피드백으로 10 -> 8 -> 4로 줄임. 위 2개/아래 2개로 나눠
@@ -1391,7 +1392,6 @@
   // "지금 다 깼는데 아직 안 풀었으면" 조건으로 다시 판단하도록 바꿈 — 여러 번 호출돼도
   // rewardPuzzle/rewardPuzzleSolvedLevels로 중복 시작은 막는다.
   function maybeShowRewardPuzzle(level) {
-    if (level !== 1) return; // 테스트는 레벨1만
     if (rewardPuzzle && rewardPuzzle.level === level) return; // 이미 진행 중
     if (rewardPuzzleSolvedLevels.has(level)) return; // 이번 세션에 이미 다 품
     const list = getTemplatesForLevel(level);
@@ -3132,12 +3132,11 @@
       } else {
         // 2026-08-16: "칭찬 메시지 빼고 흡수되는 이미지로만" 요청 — 그림 하나는 팝업 없이 바로
         // 갤러리로 돌아가고, 대기열 박스가 보상 이미지로 흡수되는 애니메이션이 축하 역할을 한다.
-        // 레벨 전체를 다 클리어했을 때의 음성 축하(랜덤 문구)는 그대로 유지 — 단, 레벨1은
-        // 조각 맞추기 미니게임(실험 기능)을 다 풀었을 때가 진짜 완성 순간이라 그때
-        // finishRewardPuzzle()이 대신 재생한다(여기서 미리 축하하지 않음).
-        if (justBecameLevelCleared && currentTemplate.difficulty !== 1) playExcellent();
-        // 조각 맞추기 미니게임(실험 기능, 레벨1만) 트리거는 renderLevelGallery() 안의
-        // maybeShowRewardPuzzle()이 담당 — goHome()이 그 함수를 호출한다.
+        // 레벨 전체를 다 클리어한 순간엔 조각 맞추기 미니게임부터 재생되고, 그걸 다 풀었을
+        // 때가 진짜 완성 순간이라 그때 finishRewardPuzzle()이 축하를 대신 재생한다(여기서
+        // 미리 축하하지 않음).
+        // 조각 맞추기 미니게임 트리거는 renderLevelGallery() 안의 maybeShowRewardPuzzle()이
+        // 담당 — goHome()이 그 함수를 호출한다.
         goHome();
       }
     } else {
