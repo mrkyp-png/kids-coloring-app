@@ -773,6 +773,43 @@ button:active { transform: scale(0.94); }
   .reward-puzzle-piece.reward-puzzle-reject { animation: none; }
 }
 
+/* 조각 맞추기 미니게임 시작 전 화면 꽉 채운 "보너스 게임!" 안내 — 잠깐 떴다가 사라짐. */
+.bonus-game-banner {
+  position: fixed;
+  inset: 0;
+  z-index: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, var(--brand) 0%, #8B5CF6 100%);
+  opacity: 0;
+  pointer-events: none;
+}
+.bonus-game-banner span {
+  color: #fff;
+  font-weight: 800;
+  font-size: clamp(2rem, 10vw, 3rem);
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.15);
+  text-align: center;
+  padding: 0 24px;
+}
+.bonus-game-banner.show {
+  opacity: 1;
+  animation: bonus-game-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.bonus-game-banner.hide {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+@keyframes bonus-game-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bonus-game-banner.show { animation: none; opacity: 1; }
+}
+
 /* 칸(퍼즐 조각) — 미완료면 이모지 위를 옅은 색으로 덮고, 완료되면 투명해지며 안의 그림이 드러남.
    테두리는 살짝 남겨서 격자 구분이 보이고, 열릴 때 그림자로 "떠오르는" 입체감을 준다. */
 .reward-piece.reward-cell {

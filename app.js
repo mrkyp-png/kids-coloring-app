@@ -134,6 +134,7 @@
   const levelRewardArt = document.getElementById('level-reward-art');
   const levelRewardPraise = document.getElementById('level-reward-praise');
   const rewardPuzzleTray = document.getElementById('reward-puzzle-tray');
+  const bonusGameBanner = document.getElementById('bonus-game-banner');
   const btnMapBack = document.getElementById('btn-map-back');
   const levelTitle = document.getElementById('level-title');
   const levelProgress = document.getElementById('level-progress');
@@ -1296,9 +1297,44 @@
   const PUZZLE_ROWS = 2;
   const PUZZLE_TOTAL = PUZZLE_COLS * PUZZLE_ROWS;
   let rewardPuzzle = null; // { level, solved: Set<number> }
+  // 이번 세션에 이미 다 맞춘 레벨(다시 들어가도 매번 또 안 뜨게). 새로고침하면 초기화되는
+  // 세션 한정 상태 — 테스트 기능이라 영구 저장까지는 아직 안 함.
+  const rewardPuzzleSolvedLevels = new Set();
 
   function isRewardPuzzleBlocking(level) {
     return !!(rewardPuzzle && rewardPuzzle.level === level && rewardPuzzle.solved.size < PUZZLE_TOTAL);
+  }
+
+  // 2026-08-16: "안 나온다" 제보로 원인 파악 — 예전엔 "방금 막 클리어한 순간"(justBecameLevelCleared)
+  // 이벤트에만 걸려있어서, 이미 예전에 클리어해둔 레벨1을 다시 들어가는 경우엔 그 이벤트 자체가
+  // 안 나서 미니게임이 절대 안 떴다. renderLevelGallery가 호출될 때마다(레벨 진입/재진입 포함)
+  // "지금 다 깼는데 아직 안 풀었으면" 조건으로 다시 판단하도록 바꿈 — 여러 번 호출돼도
+  // rewardPuzzle/rewardPuzzleSolvedLevels로 중복 시작은 막는다.
+  function maybeShowRewardPuzzle(level) {
+    if (level !== 1) return; // 테스트는 레벨1만
+    if (rewardPuzzle && rewardPuzzle.level === level) return; // 이미 진행 중
+    if (rewardPuzzleSolvedLevels.has(level)) return; // 이번 세션에 이미 다 품
+    const list = getTemplatesForLevel(level);
+    const scores = getScores();
+    const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
+    if (doneCount < list.length) return; // 아직 다 안 깼음
+    rewardPuzzle = { level: level, solved: new Set() };
+    setTimeout(() => showBonusGameBanner(level), 2300); // 로켓 날아가는 연출 끝날 때까지 대기
+  }
+
+  function showBonusGameBanner(level) {
+    if (currentLevel !== level) return; // 그 사이 다른 레벨로 이동했으면 건너뜀
+    bonusGameBanner.hidden = false;
+    bonusGameBanner.classList.add('show');
+    setTimeout(() => {
+      bonusGameBanner.classList.remove('show');
+      bonusGameBanner.classList.add('hide');
+      setTimeout(() => {
+        bonusGameBanner.hidden = true;
+        bonusGameBanner.classList.remove('hide');
+        startRewardPuzzle(level);
+      }, 300);
+    }, 1500);
   }
 
   function puzzleCellRect(i) {
@@ -1396,6 +1432,7 @@
     playPuzzleCorrectSfx();
     if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) { /* 무시 */ } }
     if (rewardPuzzle && rewardPuzzle.solved.size >= PUZZLE_TOTAL) {
+      rewardPuzzleSolvedLevels.add(rewardPuzzle.level);
       rewardPuzzleTray.hidden = true;
       renderLevelGallery(); // 막혀있던 "다음" 버튼 열기
     }
@@ -1441,6 +1478,9 @@
     const list = getTemplatesForLevel(currentLevel);
     const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
     updateLevelReward(currentLevel, doneCount, list.length);
+    // 2026-08-16: "다음" 버튼 숨김 여부를 이 함수 안에서 바로 아래 판단하므로, 미니게임을
+    // 시작할지 여부(rewardPuzzle 상태)는 그 판단 전에 먼저 정해둬야 함 — 순서 중요.
+    maybeShowRewardPuzzle(currentLevel);
 
     levelTitle.textContent = I18N.t('level.title', { n: currentLevel });
     levelProgress.textContent = I18N.t('level.progress', { done: doneCount, total: list.length });
@@ -2825,16 +2865,9 @@
         // 2026-08-16: "칭찬 메시지 빼고 흡수되는 이미지로만" 요청 — 그림 하나는 팝업 없이 바로
         // 갤러리로 돌아가고, 대기열 박스가 보상 이미지로 흡수되는 애니메이션이 축하 역할을 한다.
         // 레벨 전체를 다 클리어했을 때의 음성 축하(랜덤 문구)는 그대로 유지.
-        if (justBecameLevelCleared) {
-          playExcellent();
-          // 실험 기능(레벨1만 테스트) — 로켓이 날아가 사라지는 연출(0.5s 지연+1.8s 재생)이
-          // 끝난 뒤 조각 맞추기 미니게임을 띄운다.
-          if (currentTemplate && currentTemplate.difficulty === 1) {
-            const puzzleLevel = currentTemplate.difficulty;
-            rewardPuzzle = { level: puzzleLevel, solved: new Set() };
-            setTimeout(() => startRewardPuzzle(puzzleLevel), 2300);
-          }
-        }
+        if (justBecameLevelCleared) playExcellent();
+        // 조각 맞추기 미니게임(실험 기능, 레벨1만) 트리거는 renderLevelGallery() 안의
+        // maybeShowRewardPuzzle()이 담당 — goHome()이 그 함수를 호출한다.
         goHome();
       }
     } else {
