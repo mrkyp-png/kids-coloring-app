@@ -135,7 +135,6 @@
   const levelRewardPraise = document.getElementById('level-reward-praise');
   const rewardPuzzleTrayTop = document.getElementById('reward-puzzle-tray-top');
   const rewardPuzzleTrayBottom = document.getElementById('reward-puzzle-tray-bottom');
-  const bonusGameBanner = document.getElementById('bonus-game-banner');
   const btnMapBack = document.getElementById('btn-map-back');
   const levelTitle = document.getElementById('level-title');
   const levelProgress = document.getElementById('level-progress');
@@ -1287,7 +1286,13 @@
     levelRewardArt.querySelectorAll('.reward-cell').forEach((el, i) => {
       el.classList.toggle('is-active', i < clearedCount);
     });
-    levelRewardArt.classList.toggle('launched', clearedCount >= total);
+    // 2026-08-16: 조각 맞추기 미니게임이 진행 중인 동안은(레벨1 테스트) 이 함수가 다시
+    // 불려도 launched를 건드리지 않는다 — 그림이 다 채워졌다고 여기서 자동으로 날아가거나
+    // 바운스 연출이 끼어들면 안 되고, 퍼즐을 다 풀었을 때 finishRewardPuzzle()이 직접
+    // 관리한다.
+    if (!isRewardPuzzleBlocking(level)) {
+      levelRewardArt.classList.toggle('launched', clearedCount >= total);
+    }
   }
 
   // 2026-08-16: 실험 기능(레벨1만 테스트) — 로켓이 날아가서 사라진 뒤, 흩어진 조각을 드래그해서
@@ -1320,22 +1325,9 @@
     const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
     if (doneCount < list.length) return; // 아직 다 안 깼음
     rewardPuzzle = { level: level, solved: new Set() };
-    setTimeout(() => showBonusGameBanner(level), 2300); // 로켓 날아가는 연출 끝날 때까지 대기
-  }
-
-  function showBonusGameBanner(level) {
-    if (currentLevel !== level) return; // 그 사이 다른 레벨로 이동했으면 건너뜀
-    bonusGameBanner.hidden = false;
-    bonusGameBanner.classList.add('show');
-    setTimeout(() => {
-      bonusGameBanner.classList.remove('show');
-      bonusGameBanner.classList.add('hide');
-      setTimeout(() => {
-        bonusGameBanner.hidden = true;
-        bonusGameBanner.classList.remove('hide');
-        startRewardPuzzle(level);
-      }, 300);
-    }, 1500);
+    // 완성된 그림을 잠깐 그대로 보여준 뒤(레벨1은 updateLevelReward가 launched를 안 걸어서
+    // 원래의 "날아가서 사라짐" 연출은 안 탐 — 아래 참고) 조각으로 터뜨린다.
+    setTimeout(() => explodeIntoPuzzle(level), 700);
   }
 
   function puzzleCellRect(i) {
@@ -1346,41 +1338,77 @@
     };
   }
 
-  // 레벨을 방금 클리어한 지 fly 애니메이션 시간(0.5s 지연 + 1.8s 재생)만큼 지난 뒤 호출됨 —
-  // 보상 영역을 빈 칸 격자로 리셋하고, 섞은 조각들을 트레이에 채운다.
-  function startRewardPuzzle(level) {
+  // 완성된 그림이 잠깐 사라지는 듯하다가 조각 8개로 나뉘어 위/아래 트레이의 각자 자리로
+  // 순서대로(팝콘 터지듯 살짝 시간차) 튀어나간다. FLIP 기법: 조각을 최종 위치(트레이)에
+  // 먼저 심어서 실제 좌표를 잰 뒤, 중앙(보상 이미지 자리)에서 막 튀어나온 것처럼 보이도록
+  // 역방향 이동+축소+회전 값을 transform으로 씌웠다가 다음 틱에 원위치로 트랜지션시킨다.
+  function explodeIntoPuzzle(level) {
     if (currentLevel !== level) return; // 그 사이 다른 레벨로 이동했으면 건너뜀
     const art = LEVEL_REWARD_ART[level];
-    let slots = '';
-    for (let i = 0; i < PUZZLE_TOTAL; i++) {
-      const r = puzzleCellRect(i);
-      slots += '<rect class="reward-puzzle-slot" data-piece="cell-' + i + '" x="' + r.x + '" y="' + r.y + '" width="' + r.w + '" height="' + r.h + '"/>';
-    }
-    levelRewardArt.innerHTML = slots;
-    levelRewardArt.setAttribute('class', 'level-reward-art');
-    levelReward.hidden = false;
+    const centerRect = levelRewardArt.getBoundingClientRect();
+    const centerX = centerRect.left + centerRect.width / 2;
+    const centerY = centerRect.top + centerRect.height / 2;
 
-    const order = Array.from({ length: PUZZLE_TOTAL }, (_, i) => i);
-    for (let i = order.length - 1; i > 0; i--) { // 셔플
-      const j = Math.floor(Math.random() * (i + 1));
-      [order[i], order[j]] = [order[j], order[i]];
+    levelRewardArt.style.transition = 'opacity 0.25s ease';
+    levelRewardArt.style.opacity = '0';
+    setTimeout(() => {
+      let slots = '';
+      for (let i = 0; i < PUZZLE_TOTAL; i++) {
+        const r = puzzleCellRect(i);
+        slots += '<rect class="reward-puzzle-slot" data-piece="cell-' + i + '" x="' + r.x + '" y="' + r.y + '" width="' + r.w + '" height="' + r.h + '"/>';
+      }
+      levelRewardArt.innerHTML = slots;
+      levelRewardArt.setAttribute('class', 'level-reward-art');
+      levelRewardArt.style.opacity = '1';
+      levelReward.hidden = false;
+
+      const order = Array.from({ length: PUZZLE_TOTAL }, (_, i) => i);
+      for (let i = order.length - 1; i > 0; i--) { // 셔플
+        const j = Math.floor(Math.random() * (i + 1));
+        [order[i], order[j]] = [order[j], order[i]];
+      }
+      // 요청대로 보상 이미지를 가운데 두고 조각을 위/아래 트레이에 4개씩 나눠 배치.
+      rewardPuzzleTrayTop.innerHTML = '';
+      rewardPuzzleTrayBottom.innerHTML = '';
+      rewardPuzzleTrayTop.hidden = false;
+      rewardPuzzleTrayBottom.hidden = false;
+      const half = PUZZLE_TOTAL / 2;
+      order.forEach((cellIndex, i) => {
+        const r = puzzleCellRect(cellIndex);
+        const piece = document.createElement('div');
+        piece.className = 'reward-puzzle-piece';
+        piece.dataset.cell = String(cellIndex);
+        piece.innerHTML = '<svg viewBox="' + r.x + ' ' + r.y + ' ' + r.w + ' ' + r.h + '"><image href="assets/emoji/' + art.emoji + '.svg" x="0" y="0" width="100" height="100"/></svg>';
+        wirePuzzlePieceDrag(piece, cellIndex);
+        (i < half ? rewardPuzzleTrayTop : rewardPuzzleTrayBottom).appendChild(piece);
+
+        const finalRect = piece.getBoundingClientRect();
+        const dx = centerX - (finalRect.left + finalRect.width / 2);
+        const dy = centerY - (finalRect.top + finalRect.height / 2);
+        const rot = (Math.random() - 0.5) * 60;
+        piece.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(0.3) rotate(' + rot + 'deg)';
+        piece.style.opacity = '0';
+        setTimeout(() => {
+          piece.style.transition = 'transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease';
+          piece.style.transform = '';
+          piece.style.opacity = '1';
+        }, i * 90); // 팝콘처럼 하나씩 순서대로
+      });
+
+      renderLevelGallery(); // "다음" 버튼 막힘 상태 반영
+    }, 250);
+  }
+
+  // 조각을 다 맞추면(로켓 완성) 원래 정해진 방향으로 날아가며 사라지고(기존 fly 연출 재활용) +
+  // 그 순간 칭찬 문구(다국어+음성, 기존 playExcellent/showLevelClearPraise 재활용)가 크게
+  // 뜨며, 막혀있던 "다음" 버튼이 열린다.
+  function finishRewardPuzzle(level) {
+    const art = LEVEL_REWARD_ART[level];
+    if (art.flyDirection) {
+      levelRewardArt.setAttribute('class', 'level-reward-art reward-fly-' + art.flyDirection + ' launched');
     }
-    // 요청대로 보상 이미지를 가운데 두고 조각을 위/아래 트레이에 4개씩 나눠 배치.
-    rewardPuzzleTrayTop.innerHTML = '';
-    rewardPuzzleTrayBottom.innerHTML = '';
-    const half = PUZZLE_TOTAL / 2;
-    order.forEach((cellIndex, i) => {
-      const r = puzzleCellRect(cellIndex);
-      const piece = document.createElement('div');
-      piece.className = 'reward-puzzle-piece';
-      piece.dataset.cell = String(cellIndex);
-      piece.innerHTML = '<svg viewBox="' + r.x + ' ' + r.y + ' ' + r.w + ' ' + r.h + '"><image href="assets/emoji/' + art.emoji + '.svg" x="0" y="0" width="100" height="100"/></svg>';
-      wirePuzzlePieceDrag(piece, cellIndex);
-      (i < half ? rewardPuzzleTrayTop : rewardPuzzleTrayBottom).appendChild(piece);
-    });
-    rewardPuzzleTrayTop.hidden = false;
-    rewardPuzzleTrayBottom.hidden = false;
-    renderLevelGallery(); // "다음" 버튼 막힘 상태 반영
+    playExcellent();
+    renderLevelGallery(); // 막혀있던 "다음" 버튼 열기
   }
 
   // 조각을 손가락/마우스로 끌어서 정답 칸 위에 놓으면 붙고(소리+짧은 진동), 아니면
@@ -1437,10 +1465,11 @@
     playPuzzleCorrectSfx();
     if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) { /* 무시 */ } }
     if (rewardPuzzle && rewardPuzzle.solved.size >= PUZZLE_TOTAL) {
-      rewardPuzzleSolvedLevels.add(rewardPuzzle.level);
+      const solvedLevel = rewardPuzzle.level;
+      rewardPuzzleSolvedLevels.add(solvedLevel);
       rewardPuzzleTrayTop.hidden = true;
       rewardPuzzleTrayBottom.hidden = true;
-      renderLevelGallery(); // 막혀있던 "다음" 버튼 열기
+      finishRewardPuzzle(solvedLevel);
     }
   }
 
@@ -1483,10 +1512,13 @@
     const scores = getScores();
     const list = getTemplatesForLevel(currentLevel);
     const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
-    updateLevelReward(currentLevel, doneCount, list.length);
-    // 2026-08-16: "다음" 버튼 숨김 여부를 이 함수 안에서 바로 아래 판단하므로, 미니게임을
-    // 시작할지 여부(rewardPuzzle 상태)는 그 판단 전에 먼저 정해둬야 함 — 순서 중요.
+    // 2026-08-16: 순서 중요 — updateLevelReward보다 먼저 호출해야 한다. updateLevelReward가
+    // "다 채워졌으면 launched(=자동으로 날아감/바운스)" 여부를 rewardPuzzle 상태를 보고
+    // 판단하는데(isRewardPuzzleBlocking), 미니게임을 시작할지(rewardPuzzle 세팅)를 그보다
+    // 늦게 정하면 막 클리어한 바로 그 순간엔 rewardPuzzle이 아직 null이라 원래 날아가는
+    // 연출이 먼저 새치기해버린다.
     maybeShowRewardPuzzle(currentLevel);
+    updateLevelReward(currentLevel, doneCount, list.length);
 
     levelTitle.textContent = I18N.t('level.title', { n: currentLevel });
     levelProgress.textContent = I18N.t('level.progress', { done: doneCount, total: list.length });
@@ -2870,8 +2902,10 @@
       } else {
         // 2026-08-16: "칭찬 메시지 빼고 흡수되는 이미지로만" 요청 — 그림 하나는 팝업 없이 바로
         // 갤러리로 돌아가고, 대기열 박스가 보상 이미지로 흡수되는 애니메이션이 축하 역할을 한다.
-        // 레벨 전체를 다 클리어했을 때의 음성 축하(랜덤 문구)는 그대로 유지.
-        if (justBecameLevelCleared) playExcellent();
+        // 레벨 전체를 다 클리어했을 때의 음성 축하(랜덤 문구)는 그대로 유지 — 단, 레벨1은
+        // 조각 맞추기 미니게임(실험 기능)을 다 풀었을 때가 진짜 완성 순간이라 그때
+        // finishRewardPuzzle()이 대신 재생한다(여기서 미리 축하하지 않음).
+        if (justBecameLevelCleared && currentTemplate.difficulty !== 1) playExcellent();
         // 조각 맞추기 미니게임(실험 기능, 레벨1만) 트리거는 renderLevelGallery() 안의
         // maybeShowRewardPuzzle()이 담당 — goHome()이 그 함수를 호출한다.
         goHome();
