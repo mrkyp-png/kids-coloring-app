@@ -132,6 +132,7 @@
   const galleryGrid = document.getElementById('gallery-grid');
   const levelReward = document.getElementById('level-reward');
   const levelRewardArt = document.getElementById('level-reward-art');
+  const levelRewardPraise = document.getElementById('level-reward-praise');
   const btnMapBack = document.getElementById('btn-map-back');
   const levelTitle = document.getElementById('level-title');
   const levelProgress = document.getElementById('level-progress');
@@ -913,8 +914,10 @@
       // 살짝 얹어서 숫자만 있던 밋밋한 카드에 그 레벨에 뭐가 들었는지 살짝 예고해준다(잠긴
       // 레벨도 동일하게 보여줘서 궁금증 유발 — 미리보기일 뿐 실제 색은 안 보여줌).
       const previewEmoji = list.length ? list[0].emoji : '';
+      // 2026-08-16: "스크롤 없이 한 화면에" 요청으로 카드가 작아지면서, 10개 카드마다 매번
+      // 반복되던 "레벨" 글자 줄은 뺐다(숫자만으로도 어떤 카드인지 충분히 구분됨).
       let inner = '<span class="lv-preview-emoji">' + previewEmoji + '</span>' +
-        '<span class="lv-num">' + lv + '</span><span class="lv-label">' + escapeHtml(I18N.t('level.label')) + '</span>';
+        '<span class="lv-num">' + lv + '</span>';
       if (!unlocked) {
         inner += '<span class="lv-lock">🔒</span>';
       } else if (isClear) {
@@ -1290,6 +1293,7 @@
     // "다시 도전!"(showTryAgain) 오버레이가 아직 안 닫혔는데 다음 그림을 벌써 열었다면 그
     // 타이머는 이제 의미가 없다 — 정리해둔다.
     if (praiseHomeTimer) { clearTimeout(praiseHomeTimer); praiseHomeTimer = null; }
+    if (levelClearPraiseTimer) { clearTimeout(levelClearPraiseTimer); levelClearPraiseTimer = null; levelRewardPraise.hidden = true; levelRewardPraise.classList.remove('show'); }
     currentTemplate = tpl;
     currentIsChallenge = !!opts.challenge;
     // 실제로 그림을 열어서 색칠을 시작하는 이 순간에 그 레벨(또는 보스)의 타임어택을 시작(또는 이어감).
@@ -2773,10 +2777,11 @@
   // 목소리를 고르는 게 한계. child/kid/junior/young 표시가 있으면 최우선, 없으면 알려진 여성 계열
   // 이름(플랫폼별로 다 다름 — Windows/Android/iOS 흔한 이름 최대한 망라), 그것도 없으면 최소한
   // 남성으로 알려진 이름(david/mark/daniel/guy/alex 등)만이라도 피해서 고른다.
-  function pickChildishVoice() {
+  function pickChildishVoice(langPrefix) {
     if (!cachedVoices.length) return null;
-    const english = cachedVoices.filter((v) => /^en/i.test(v.lang));
-    const pool = english.length ? english : cachedVoices;
+    const re = new RegExp('^' + (langPrefix || 'en'), 'i');
+    const matched = cachedVoices.filter((v) => re.test(v.lang));
+    const pool = matched.length ? matched : cachedVoices;
     const knownMale = /david|mark|daniel|guy|alex\b|fred|ryan|christopher|eric|james/i;
     const knownYoungish = /female|zira|aria|jenny|samantha|karen|moira|tessa|susan|victoria|kate|allison|ava|serena|fiona|moira|salli|joanna|kendra|kimberly/i;
     return (
@@ -2804,14 +2809,52 @@
     } catch (e) { /* 무시 */ }
   }
 
-  // 레벨 클리어 때마다 매번 "Excellent!"만 나오면 금방 질리니 여러 문구 중 랜덤으로 고른다.
-  // 감탄사(Wow/Yay/Woohoo)를 앞에 붙여서 그냥 단어 하나 읽는 것보다 "진짜 반응하는" 느낌이 나게 함
+  // 레벨 클리어 때마다 매번 같은 말만 나오면 금방 질리니 여러 문구 중 랜덤으로 고른다.
+  // 감탄사를 앞에 붙여서 그냥 단어 하나 읽는 것보다 "진짜 반응하는" 느낌이 나게 함
   // (2026-08-10, "대본 읽는 것처럼 들린다"는 피드백으로 추가 — Web Speech API는 SSML/억양 세부
   // 제어가 안 되니 톤(pitch)·속도(rate)를 매번 살짝 흔들고 감탄사로 흥을 더하는 정도가 현실적 한계).
-  const LEVEL_CLEAR_PHRASES = [
-    'Wow, excellent!', 'Yay, awesome!', 'Wow, great job!', 'Yay, amazing!', 'Woohoo, fantastic!',
-    'Yes, you did it!', 'Woohoo, way to go!', 'Wow, wonderful!', 'Yay, you are a star!', 'Woohoo, super!'
-  ];
+  // 2026-08-16: "보상 이미지 아래에 칭찬 문구를 화면에도 띄우고 음성도 지원" 요청 — 지금 UI
+  // 언어(I18N.lang)에 맞는 문구를 골라 화면에 보여주는 동시에 그 언어 음성으로 읽어준다(예전엔
+  // UI 언어와 무관하게 항상 영어로만 읽었음).
+  const LEVEL_CLEAR_PRAISE = {
+    en: [
+      'Wow, excellent!', 'Yay, awesome!', 'Wow, great job!', 'Yay, amazing!', 'Woohoo, fantastic!',
+      'Yes, you did it!', 'Woohoo, way to go!', 'Wow, wonderful!', 'Yay, you are a star!', 'Woohoo, super!'
+    ],
+    ko: [
+      '정말 잘했어!', '최고야! 멋지게 완성했어!', '와! 대단해!', '참 잘했어요!', '너무 멋져!',
+      '색칠 천재네!', '멋진 작품 완성!', '해냈어! 정말 최고야!', '와우! 예쁘게 완성했어!', '짝짝짝! 정말 잘했어!'
+    ],
+    ja: [
+      'すごいね!よくできたよ!', 'さいこう!じょうずに仕上げたね!', 'わあ、すごい!', 'とてもよくできました!', 'すてきだね!',
+      'ぬりえの天才だね!', 'すてきな作品が完成!', 'やったね!さいこうだよ!', 'わあ、きれいに塗れたね!', 'ぱちぱちぱち!よくできました!'
+    ],
+    zh: [
+      '真棒,你做到了!', '太厉害啦,完成得真漂亮!', '哇,太棒了!', '做得非常好!', '太好看啦!',
+      '你是涂色小天才!', '完成了一幅漂亮的作品!', '你做到啦,真是太棒了!', '哇,涂得好漂亮!', '啪啪啪,做得真好!'
+    ],
+    es: [
+      '¡Muy bien hecho!', '¡Genial, lo terminaste muy bien!', '¡Wow, increíble!', '¡Qué buen trabajo!', '¡Qué lindo quedó!',
+      '¡Eres un genio coloreando!', '¡Obra terminada!', '¡Lo lograste! ¡Eres el mejor!', '¡Wow, quedó precioso!', '¡Bravo, bravo! ¡Muy bien hecho!'
+    ]
+  };
+
+  // 보상 이미지(#level-reward) 바로 아래에 칭찬 문구를 잠깐 띄운다 — 2.8초 뒤 자동으로 사라짐
+  // (praiseOverlay와 동일하게 페이드아웃 없이 바로 hidden 처리).
+  let levelClearPraiseTimer = null;
+  function showLevelClearPraise(text) {
+    if (levelClearPraiseTimer) { clearTimeout(levelClearPraiseTimer); levelClearPraiseTimer = null; }
+    levelRewardPraise.textContent = text;
+    levelRewardPraise.hidden = false;
+    levelRewardPraise.classList.remove('show');
+    void levelRewardPraise.offsetWidth; // 리플로우 강제 — 같은 문구가 연달아 떠도 팝인 애니메이션이 다시 재생되게 함
+    levelRewardPraise.classList.add('show');
+    levelClearPraiseTimer = setTimeout(() => {
+      levelClearPraiseTimer = null;
+      levelRewardPraise.hidden = true;
+      levelRewardPraise.classList.remove('show');
+    }, 2800);
+  }
 
   // opts.pitch/rate로 상황별 기본 톤을 다르게 줄 수 있음(칭찬은 더 신나게, 이름 안내는 차분하게).
   // 매번 완전히 똑같은 pitch/rate면 대본 읽듯 밋밋하게 들려서 호출마다 살짝 흔들어 자연스럽게 만든다.
@@ -2831,7 +2874,7 @@
     try {
       const utter = new SpeechSynthesisUtterance(phrase);
       pendingUtterance = utter;
-      const voice = pickChildishVoice();
+      const voice = pickChildishVoice(opts.langPrefix);
       if (voice) utter.voice = voice;
       // 2026-08-10: "성인 목소리 같다"는 피드백으로 기본값을 API 상한(pitch 2.0)까지 밀어붙임 —
       // 이게 이 방식(성인 목소리 피치만 올리기)으로 갈 수 있는 진짜 한계치. 이걸로도 부족하면
@@ -2859,8 +2902,11 @@
   }
 
   function playExcellent() {
-    const phrase = LEVEL_CLEAR_PHRASES[Math.floor(Math.random() * LEVEL_CLEAR_PHRASES.length)];
-    speakPraise(phrase, { pitch: 2, rate: 1.25 }); // 기본값보다도 더 빠르게 = 더 신난 느낌
+    const lang = (window.I18N && I18N.lang) || 'en';
+    const pool = LEVEL_CLEAR_PRAISE[lang] || LEVEL_CLEAR_PRAISE.en;
+    const phrase = pool[Math.floor(Math.random() * pool.length)];
+    showLevelClearPraise(phrase);
+    speakPraise(phrase, { pitch: 2, rate: 1.25, langPrefix: lang }); // 기본값보다도 더 빠르게 = 더 신난 느낌
   }
 
   function playBossVictory() {

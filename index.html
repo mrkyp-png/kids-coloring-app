@@ -86,24 +86,28 @@
 <section id="map-screen" class="screen" hidden>
   <div class="screen-decor" aria-hidden="true"></div>
   <header class="gallery-header">
-    <!-- 2026-08-11: "coloring fun / pick a level to start! 삭제, 그 자리엔 진행률 문구만" 요청 —
-         제목/부제 삭제, stat-line(진행률)만 그 위치에 남김. mode-selector는 absolute라 title-row
-         래퍼 없이도(가장 가까운 position:relative인 gallery-header 기준) 그대로 위치 유지됨. -->
-    <!-- 2026-08-14: "유아모드/챌린지모드에서 첫화면으로 돌아가는 버튼 필요" 요청 — 표지로 복귀 -->
-    <button id="btn-map-to-cover" class="icon-btn" aria-label="Back to title" data-i18n-aria-label="mapScreen.backToCover">⬅️</button>
+    <!-- 2026-08-16: "리셋/뒤로가기/음악/소리를 맨 위 한 줄로" 요청 — 예전엔 이 4개(+랭킹)가
+         position:absolute로 우상단에 3단 스택 + 좌상단 뒤로가기로 흩어져 있어서, header에
+         그만큼(168px) 빈 padding-top을 잡아둬야 했음. 이제 전부 한 줄(.map-top-bar, flex)에
+         나란히 놓고 stat-line은 그 아래로 내려서, header가 실제 콘텐츠 높이만큼만 차지하게 함
+         (레벨 그리드가 스크롤 없이 한 화면에 들어가게 하려고 확보한 공간). -->
+    <div class="map-top-bar">
+      <!-- 2026-08-14: "유아모드/챌린지모드에서 첫화면으로 돌아가는 버튼 필요" 요청 — 표지로 복귀 -->
+      <button id="btn-map-to-cover" class="icon-btn" aria-label="Back to title" data-i18n-aria-label="mapScreen.backToCover">⬅️</button>
+      <div class="map-top-bar-right">
+        <!-- 2026-08-14: "유아용 모드는 랭킹 삭제" 요청 — 챌린지 모드용 랭킹 시스템은 그대로 남겨두되,
+             유아용 모드 화면(이 맵 화면)에서는 진입 버튼만 숨긴다. -->
+        <button id="btn-ranking" class="ranking-btn" data-i18n="ranking.btn" hidden>🏆 Ranking</button>
+        <!-- 2026-08-11: "reset easy progress => 모드 리셋으로 변경" 요청 -->
+        <button id="btn-reset-all" class="ranking-btn reset-all-btn" hidden data-i18n="resetMode.btn">🔄 Reset Mode</button>
+        <div class="map-header-sound-group">
+          <button id="btn-music" class="icon-btn icon-btn-sm" aria-label="Toggle background music">🎵</button>
+          <button id="btn-sound" class="icon-btn icon-btn-sm" aria-label="Turn sound on or off">🔊</button>
+        </div>
+      </div>
+    </div>
     <p id="stat-line" class="stat-line" hidden></p>
     <p id="levels-left-line" class="levels-left-line" hidden></p>
-    <!-- 2026-08-14: "유아용 모드는 랭킹 삭제" 요청 — 챌린지 모드용 랭킹 시스템은 그대로 남겨두되,
-         유아용 모드 화면(이 맵 화면)에서는 진입 버튼만 숨긴다. -->
-    <button id="btn-ranking" class="ranking-btn" data-i18n="ranking.btn" hidden>🏆 Ranking</button>
-    <!-- 2026-08-11: "reset easy progress => 모드 리셋으로 변경, Ranking 아래에 같은 박스로" 요청 —
-         Ranking과 같은 알약 스타일로 그 바로 밑에 배치(reset-all-btn -> ranking-btn 스타일 재사용). -->
-    <button id="btn-reset-all" class="ranking-btn reset-all-btn" hidden data-i18n="resetMode.btn">🔄 Reset Mode</button>
-    <!-- "음악/소리 이모티콘도 메인페이지쪽으로 옮겨, 좀 작게" 요청 — Reset Mode 밑에 작게. -->
-    <div class="map-header-sound-group">
-      <button id="btn-music" class="icon-btn icon-btn-sm" aria-label="Toggle background music">🎵</button>
-      <button id="btn-sound" class="icon-btn icon-btn-sm" aria-label="Turn sound on or off">🔊</button>
-    </div>
   </header>
   <div id="map-grid" class="map-grid" role="list" aria-label="Level map"></div>
   <!-- 2026-08-14: "유아용 모드는 보스도 없게" 요청 — 보스 도전 섹션 자체를 숨긴다.
@@ -155,6 +159,9 @@
   <div id="level-reward" class="level-reward" hidden aria-hidden="true">
     <svg id="level-reward-art" class="level-reward-art"></svg>
   </div>
+  <!-- 2026-08-16: 레벨을 방금 클리어한 순간에만 잠깐 뜨는 칭찬 문구(보상 이미지 바로 아래) —
+       app.js의 showLevelClearPraise()가 문구를 채우고 노출/음성재생/자동 숨김을 담당. -->
+  <div id="level-reward-praise" class="level-reward-praise" hidden aria-live="polite"></div>
   <div id="gallery-grid" class="gallery-grid" role="list" aria-label="Coloring pictures list"></div>
 </section>
 

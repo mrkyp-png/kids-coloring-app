@@ -14,6 +14,30 @@
   font-display: swap;
 }
 
+/* 2026-08-16: 레벨클리어 칭찬 문구(.level-reward-praise) 전용 — 언어별로 통통하고 굵은 폰트를
+   씀. Fredoka는 라틴 문자 전용이라 en/es만 커버하고, ko/ja/zh는 각 언어권에서 널리 쓰이는
+   무료(OFL) 통통한 폰트를 별도로 얹는다. 이 칭찬 문구에만 실제 쓰이는 글자로 서브셋(구글 폰트
+   공식 subset API)해서 각 파일이 5~8KB 수준 — 전체 글자셋(수 MB~십수 MB)을 오프라인 PWA에
+   그대로 박아넣지 않기 위함. 새 문구를 추가하면 이 서브셋도 다시 받아야 함. */
+@font-face {
+  font-family: 'BlackHanSans';
+  src: url('assets/fonts/BlackHanSans-subset.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'MPLUSRoundedBlack';
+  src: url('assets/fonts/MPLUSRounded1c-Black-subset.woff2') format('woff2');
+  font-weight: 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'NotoSansSCBlack';
+  src: url('assets/fonts/NotoSansSC-Black-subset.woff2') format('woff2');
+  font-weight: 900;
+  font-display: swap;
+}
+
 :root {
   --bg: #FFF8ED;
   --card-bg: #FFFFFF;
@@ -418,16 +442,34 @@ button:active { transform: scale(0.94); }
 }
 
 /* ---------- 갤러리 ---------- */
-#map-screen { position: relative; } /* .screen-decor(absolute) 기준점 */
+/* 2026-08-16: "버튼 4개 맨 위 한 줄로 + 레벨 1~10 스크롤 없이 한 화면" 요청 — map-screen을
+   뷰포트 높이에 딱 맞는 flex 세로 컬럼으로 만들고(header는 콘텐츠 높이만큼만, 레벨 그리드는
+   나머지 전부), 페이지 자체는 스크롤되지 않게 한다. dvh는 모바일 브라우저 주소창 접힘/펼침에
+   따라 100vh가 흔들리는 문제를 막아줌(미지원 브라우저는 바로 위 100vh 값으로 자연히 대체됨). */
+#map-screen {
+  position: relative; /* .screen-decor(absolute) 기준점 */
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 .gallery-header {
   position: relative;
   text-align: center;
-  /* 위쪽에 모드 선택(좌상단)/Ranking+Reset Mode+소리버튼(우상단, 세로로 쌓임)이 고정으로
-     얹히므로, stat-line이 그 아래로 밀려서 겹치지 않도록 top 여백을 그 높이만큼 확보한다.
-     2026-08-11: "coloring fun/부제 삭제" 이후 우측 컬럼이 Ranking(40)+Reset Mode(40)+
-     소리버튼(36) 3단으로 쌓이면서(총 ~150px) 왼쪽 모드선택 2x2 블록(~109px)보다 더 커져서
-     그 기준으로 다시 계산 — 여유 두고 168px. */
-  padding: 168px 16px 8px;
+  flex: 0 0 auto;
+  padding: 10px 12px 4px;
+}
+.map-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.map-top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .subtitle {
   margin: 0;
@@ -456,20 +498,29 @@ button:active { transform: scale(0.94); }
 .icon-btn-spacer { width: 56px; height: 56px; flex: 0 0 auto; }
 
 /* ---------- 레벨 지도 ---------- */
+/* 2026-08-16: "레벨 1~10이 스크롤 없이 한 화면에" 요청 — 예전엔 auto-fill이라 화면 폭에 따라
+   열 수가 바뀌었는데(보통 폰에선 2열), 이제 2열x5행으로 고정하고 .map-grid 자체를 #map-screen의
+   남은 세로 공간(flex:1)에 정확히 맞춘다. minmax(0, 1fr)이 핵심 — 그냥 1fr만 쓰면 카드 내용이
+   원하는 만큼(min-content) 행 높이를 늘려버려서 작은 화면에서 스크롤이 다시 생기는데, 0을
+   최소값으로 두면 행이 무조건 5등분 몫만큼만 차지하고 카드 쪽이 거기 맞춰 눌려 들어간다. */
 .map-grid {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 14px;
-  padding: 16px;
-  max-width: 700px;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px 16px 12px;
+  max-width: 420px;
   margin: 0 auto;
   width: 100%;
+  overflow: hidden;
 }
 .level-node-wrap {
   position: relative;
   display: flex;
   flex-direction: column;
+  min-height: 0; /* 그리드 행이 5등분 몫보다 커지지 않도록 — 아래 .map-grid 주석 참고 */
   /* 2026-08-16: 배경 장식(z-index:0)이 레벨 박스의 둥근 모서리 바깥쪽(투명한 네 귀퉁이) 틈으로
      살짝 비쳐 보이는 문제 발견 — 그리드 전체를 막으면 장식이 여백에서도 거의 안 보이게
      되므로, 박스 모서리가 각진 이 래퍼(.level-node 자체보다 한 겹 바깥, 각진 사각형)에만
@@ -479,11 +530,12 @@ button:active { transform: scale(0.94); }
 .level-node-wrap .level-node {
   width: 100%;
   flex: 1;
+  min-height: 0;
 }
 .lv-time {
-  margin-top: 6px;
+  margin-top: 2px;
   text-align: center;
-  font-size: 0.78rem;
+  font-size: 0.65rem;
   font-weight: 700;
   color: var(--brand);
 }
@@ -498,11 +550,15 @@ button:active { transform: scale(0.94); }
   border: 2px solid var(--lv-bezel, #E6E0FF);
   border-radius: var(--radius-md);
   box-shadow: 0 6px 0 var(--lv-bezel, rgba(0, 0, 0, 0.16)), 0 10px 16px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  padding: 16px 8px 12px;
+  /* 2026-08-16: "레벨 1~10 스크롤 없이 한 화면에" 요청으로 카드 높이가 크게 줄어서, 여백/줄
+     간격/글자 크기를 그만큼 압축했다(패딩 16/12→6/6, 줄 간격 6px→2px, 숫자 2.5rem→1.6rem).
+     "레벨" 글자 줄(.lv-label)은 카드 10개마다 매번 똑같이 반복되던 정보라 이 김에 뺐다. */
+  padding: 6px 6px 6px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 2px;
   transition: transform 0.08s ease, box-shadow 0.08s ease;
 }
 .level-node:not(:disabled):active {
@@ -510,17 +566,13 @@ button:active { transform: scale(0.94); }
   box-shadow: 0 1px 0 var(--lv-bezel, rgba(0, 0, 0, 0.16)), 0 3px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 .level-node .lv-num {
-  font-size: 2.5rem;
+  font-size: 1.6rem;
   font-weight: 800;
   color: var(--brand);
-}
-.level-node .lv-label {
-  font-size: 1.05rem;
-  color: var(--muted);
-  font-weight: 700;
+  line-height: 1;
 }
 .level-node .lv-progress {
-  font-size: 1rem;
+  font-size: 0.7rem;
   color: var(--muted);
   font-weight: 600;
 }
@@ -725,9 +777,6 @@ button:active { transform: scale(0.94); }
 /* 헤더/보상/대기열/레벨 박스는 장식보다 위에 오도록 명시적으로 쌓임 순서 보장. */
 #gallery-screen .coloring-header, #level-next-banner, #level-reward, #gallery-grid,
 #map-screen .gallery-header, #map-grid, #boss-section { position: relative; z-index: 1; }
-/* 레벨1의 보상 이미지는 정사각형이라 폭이 넓은 컨테이너 안에서 좌우로 여백(레터박스)이
-   남을 수 있는데, 거기로 장식이 비쳐 보이지 않도록 컨테이너 자체를 배경색으로 채운다. */
-.level-reward { background: var(--bg); }
 .level-reward {
   flex: 0 0 auto;
   height: min(34vh, 280px);
@@ -744,10 +793,6 @@ button:active { transform: scale(0.94); }
   transform-box: border-box;
   transform-origin: center;
 }
-/* 실제 이모지 그림(항상 그 자리에 있음, 칸이 열리면서 드러남) — 입체감 위해 은은한 그림자 */
-.reward-emoji-img {
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.18));
-}
 /* 칸(퍼즐 조각) — 미완료면 이모지 위를 옅은 색으로 덮고, 완료되면 투명해지며 안의 그림이 드러남.
    테두리는 살짝 남겨서 격자 구분이 보이고, 열릴 때 그림자로 "떠오르는" 입체감을 준다. */
 .reward-piece.reward-cell {
@@ -761,15 +806,39 @@ button:active { transform: scale(0.94); }
   stroke: rgba(255, 255, 255, 0.55);
   filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.18));
 }
-/* 완성되면(전부 열리고 나서) 칸 구분선을 마저 지우고 그림자를 살짝 키워서, "격자" 대신
-   깔끔하게 완성된 그림 한 장으로 보이게 마무리한다. */
+/* 완성되면(전부 열리고 나서) 칸 구분선을 마저 지워서, "격자" 대신 깔끔하게 완성된 그림
+   한 장으로 보이게 마무리한다. */
 .level-reward-art.launched .reward-cell {
   stroke-opacity: 0;
   transition: stroke-opacity 0.6s ease 0.3s;
 }
-.level-reward-art.launched .reward-emoji-img {
-  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.28));
-  transition: filter 0.4s ease 0.3s;
+
+/* 레벨을 방금 클리어한 순간에만 잠깐 뜨는 칭찬 문구 — 언어별 폰트는 위 @font-face 참고.
+   등장은 통통 튀는 팝인 + 살짝 갸우뚱, 2.8초 뒤 app.js가 그냥 hidden 처리(=바로 사라짐,
+   .praise-overlay와 동일한 관례 — 이 앱은 사라질 때 별도 페이드아웃을 안 씀). */
+.level-reward-praise {
+  flex: 0 0 auto;
+  width: 100%;
+  text-align: center;
+  padding: 2px 16px 16px;
+  font-family: 'Fredoka', "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.25rem, 6vw, 1.7rem);
+  color: var(--brand);
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.6);
+}
+html:lang(ko) .level-reward-praise { font-family: 'BlackHanSans', "Malgun Gothic", sans-serif; font-weight: 400; }
+html:lang(ja) .level-reward-praise { font-family: 'MPLUSRoundedBlack', "Hiragino Maru Gothic ProN", sans-serif; font-weight: 900; }
+html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft YaHei", sans-serif; font-weight: 900; }
+.level-reward-praise.show { animation: praise-pop-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes praise-pop-in {
+  0% { transform: scale(0.3) rotate(-6deg); opacity: 0; }
+  60% { transform: scale(1.12) rotate(3deg); opacity: 1; }
+  80% { transform: scale(0.96) rotate(-1deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .level-reward-praise.show { animation: none; }
 }
 
 /* 로켓(레벨1) 전용 — 완성 후 꼬리 쪽에서 반짝이는 별빛 */
@@ -1319,11 +1388,9 @@ button:active { transform: scale(0.94); }
 /* ---------- 랭킹 ---------- */
 .ranking-btn {
   /* 2026-08-11: "랭킹/모드초기화 아이콘도 3D" 요청 — 키캡 스타일 적용(reset-all-btn도 이 클래스
-     공유라 같이 적용됨). */
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 2;
+     공유라 같이 적용됨).
+     2026-08-16: 예전엔 우상단에 position:absolute로 떠 있었는데, 이제 .map-top-bar(flex row)
+     안에 다른 버튼들과 나란히 놓이므로 absolute 좌표를 뺐다. */
   margin: 0;
   background: linear-gradient(180deg, #fff 0%, #fdfcff 55%, #F3EFFF 100%);
   color: var(--brand);
@@ -1343,17 +1410,7 @@ button:active { transform: scale(0.94); }
   transform: translateY(2px);
   box-shadow: 0 1px 0 var(--brand), 0 2px 4px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
-/* 2026-08-11: "reset easy progress => 모드 리셋으로 변경하고, Ranking 아래에 같은 박스로" 요청 —
-   .reset-all-btn이 .ranking-btn 클래스를 같이 받아서 모양은 그대로 재사용하고, top만 그 바로
-   밑으로 내림. */
-.reset-all-btn { top: 70px; } /* 2026-08-11: "랭킹이랑 너무 붙었다" — 60 -> 70으로 간격 확보 */
 .map-header-sound-group {
-  /* 2026-08-11: 리셋모드 버튼에 3D 그림자(입체감)를 추가하면서 그림자가 아래로 번져 소리 아이콘과
-     겹쳐 보이는 문제 — 여유 간격을 좀 더 줌(104 -> 118). */
-  position: absolute;
-  top: 128px;
-  right: 16px;
-  z-index: 2;
   display: flex;
   gap: 6px;
 }
