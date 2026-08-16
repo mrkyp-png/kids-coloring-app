@@ -10,12 +10,13 @@
   // 구현에 필요한 항목까지 window.__challengeInternals로 export 해뒀다(app.js:2873 부근). 여기서
   // 그대로 꺼내 쓴다.
   const {
-    goalCanvas, coloringScreen, openTemplate, computeCompletion, getTemplatesForLevel,
+    goalCanvas, coloringScreen, openTemplate, computeCompletion, getChallengeTierTemplates,
     repaintGoalWithColors, paintRegionPixels, getChallengeRegionInfo, colorDistance, COLORS,
     setWormProgress, setWormExit, resetWormForNewProblem,
   } = window.__challengeInternals;
   const goalCanvasWrap = document.getElementById('goal-canvas-wrap');
   const weatherLayer = document.getElementById('challenge-weather-layer');
+  const goalOccluder = document.getElementById('challenge-goal-occluder');
   const TOTAL_CHALLENGE_LEVELS = 10;
   const IMPLEMENTED_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // Phase 1에서 실제로 플레이 가능한 레벨. Phase 2에서 3~10 추가.
 
@@ -137,7 +138,7 @@
     totalRegionsCorrect: 0, totalRegionsAll: 0, // I1: Accuracy는 문제 단위가 아니라 영역 단위 누적
     totalRemainingSeconds: 0, // I6: TimeBonus는 마지막 문제가 아니라 문제별 남은시간 누적
     level3OccludeClass: null, level5AnimFrame: null, level6TimerId: null,
-    level7TimerId: null, level8TimerId: null, level9TimerId: null, level10TimerId: null,
+    level7TimerIds: null, level8TimerId: null, level9TimerId: null, level10TimerId: null,
     wormResetTimerId: null, wormSuppressUntil: 0,
   };
 
@@ -152,7 +153,13 @@
 
   function startLevel(level) {
     endRun(); // C1: 방어적 재진입 — 이전 run의 타이머/goalCanvas 상태가 남아있다면 먼저 정리
-    const problems = getTemplatesForLevel(level); // app.js가 이미 제공, 레벨당 10개
+    // 2026-08-14 피드백: "영역 수 적은 도안부터 나와야" — 처음엔 LEVEL6만 고정 순서로 재정렬했는데,
+    // "다른 레벨도 다 그래야 한다"는 후속 피드백으로 getTemplatesForLevel(app.js) 자체가
+    // TEMPLATE_REGION_COUNTS 기준 오름차순 정렬하도록 일반화해서 여기서 따로 처리할 필요 없어짐.
+    // 2026-08-15 피드백: 유아용/챌린지 재구성 — 유아용(COLORING_TEMPLATES)과 챌린지(CHALLENGE_TIER_
+    // TEMPLATES)가 완전히 분리된 별개 풀이 됐으므로, 챌린지 쉬움 티어도 더는 유아용 풀을 빌려 쓰지
+    // 않고 다른 티어와 똑같이 getChallengeTierTemplates에서 가져온다.
+    const problems = getChallengeTierTemplates(state.difficulty, level);
     Object.assign(run, {
       difficulty: state.difficulty, level, problems, index: 0,
       correctCount: 0, mistakeCount: 0, combo: 0, maxCombo: 0, submitting: false,
@@ -344,78 +351,84 @@
     repaintGoalWithColors(null); // 실제 정답색으로 복원
   }
 
-  // 2026-08-14: "랜덤 점프 대신 원이 지그재그로 화면을 훑고, 30초 안에 전체를 한 번 다 보여주게"
-  // 요청 — 위→아래로 줄을 내려가며 왼↔오 지그재그로 훑어서, LEVEL2_SWEEP_CYCLE_MS(30초) 안에
-  // 640x640 전체가 원 반경만큼씩 빠짐없이 지나가게 한다.
-  // 2026-08-14 피드백: 문제 번호대별로 노출 패턴을 다르게 — 1~3번은 기존 가로 지그재그,
-  // 4~6번은 세로 지그재그, 7~10번은 원래(Phase1)의 랜덤 점프로.
-  // 2026-08-14 피드백: 줄 끝에서 다음 줄로 넘어갈 때 가로 이동 없이 세로로만 툭 튀어서
-  // "잠깐 사라졌다 딴 데서 나타나는" 것처럼 보이던 문제 — 각 줄 시간의 마지막 일부를 다음 줄
-  // 시작점까지 대각선으로 부드럽게 이어지는 구간으로 써서, 순간이동 없이 계속 움직이게 한다.
-  function startLevel2Zigzag(radius, vertical) {
-    const step = radius * 2; // 원 지름만큼 이동해야 인접 줄끼리 딱 맞닿아 빈틈이 안 생김
-    const lines = Math.max(1, Math.ceil((640 - radius * 2) / step) + 1);
-    const start = radius;
-    const end = 640 - radius;
-    const span = Math.max(1, end - start);
-    const perLineMs = CFG.LEVEL2_SWEEP_CYCLE_MS / lines;
-    const transitionFrac = 0.15; // 각 줄 시간의 마지막 15%는 다음 줄로 대각선 전환하는 구간
+  // goal-canvas는 내부 해상도가 640x640(WORK_SIZE)이지만 실제 화면 표시 크기는 반응형으로
+  // 훨씬 작다(예: 313px) — left/top/width/height의 px 단위는 표시 크기 기준이라 640 좌표를
+  // 그대로 px로 쓰면 원이 화면 밖으로 벗어나 버린다. %로 변환해 정사각형 박스 어떤 크기든
+  // 맞게 스케일되게 한다.
+  function pct640(v) { return `${(v / 640) * 100}%`; }
+
+  // 2026-08-15 피드백(2차): 1~6번은 "원 안쪽만 보이는" 방식 대신 "goal은 항상 다 보이고, 원이
+  // 있는 자리만 안 보이게" — goal-canvas는 항상 클립 없이 그대로 두고, 배경색과 같은 원
+  // (challenge-goal-occluder)을 그 위에 얹어서 이동시킨다.
+  function setOccluder(x, y, r) {
+    goalOccluder.style.left = pct640(x - r);
+    goalOccluder.style.top = pct640(y - r);
+    goalOccluder.style.width = pct640(r * 2);
+    goalOccluder.style.height = pct640(r * 2);
+  }
+
+  // 2026-08-15 피드백: 원(공) 하나가 튕기면서 돌아다니게 — axis:'x'(1~3번)는 좌우로 왕복하는
+  // 것이 주 이동(왼쪽<->오른쪽), 그러면서 위아래로 튕긴다(보조축). axis:'y'(4~6번)는 그 반대로
+  // 상하 왕복이 주 이동, 좌우로 튕긴다. 주 이동은 삼각파(일정 속도 왕복), 튕기는 축은
+  // abs(sin) 파형으로 통통 튀는 느낌을 낸다.
+  function startLevel2Bounce(axis) {
+    const r = CFG.LEVEL2_REVEAL_RADIUS_PX;
+    const lo = r, hi = 640 - r, span = hi - lo;
     const startTime = Date.now();
-    function posForLine(lineIndex, progress) {
-      const cross = radius + lineIndex * step; // 줄의 고정 좌표(가로형은 y, 세로형은 x)
-      const forward = lineIndex % 2 === 0; // 지그재그: 짝수 줄은 정방향, 홀수 줄은 역방향
-      const along = forward ? start + span * progress : end - span * progress;
-      return vertical ? { x: cross, y: along } : { x: along, y: cross };
-    }
     function tick() {
-      const elapsed = (Date.now() - startTime) % CFG.LEVEL2_SWEEP_CYCLE_MS;
-      const lineIndex = Math.min(lines - 1, Math.floor(elapsed / perLineMs));
-      const t = (elapsed % perLineMs) / perLineMs; // 0~1, 이 줄 안에서의 시간 진행률
-      let pos;
-      if (t < 1 - transitionFrac) {
-        pos = posForLine(lineIndex, t / (1 - transitionFrac));
-      } else {
-        // 다음 줄(마지막 줄이면 다시 첫 줄로) 시작점까지 대각선으로 이어짐
-        const blend = (t - (1 - transitionFrac)) / transitionFrac;
-        const from = posForLine(lineIndex, 1);
-        const to = posForLine((lineIndex + 1) % lines, 0);
-        pos = { x: from.x + (to.x - from.x) * blend, y: from.y + (to.y - from.y) * blend };
-      }
-      goalCanvas.style.clipPath = `circle(${radius}px at ${pos.x}px ${pos.y}px)`;
+      const t = Date.now() - startTime;
+      const pPhase = (t % CFG.LEVEL2_BOUNCE_CYCLE_MS) / CFG.LEVEL2_BOUNCE_CYCLE_MS; // 0~1, 왕복 삼각파
+      const primary = pPhase < 0.5 ? lo + span * (pPhase * 2) : hi - span * ((pPhase - 0.5) * 2);
+      const bPhase = (t % CFG.LEVEL2_BOUNCE_ARC_MS) / CFG.LEVEL2_BOUNCE_ARC_MS; // 0~1, 튕기는 원호
+      const bounce = lo + span * Math.abs(Math.sin(bPhase * Math.PI));
+      const x = axis === 'x' ? primary : bounce;
+      const y = axis === 'x' ? bounce : primary;
+      setOccluder(x, y, r);
       run.level2RevealTimerId = requestAnimationFrame(tick);
     }
     tick();
   }
 
-  function startLevel2Random(radius) {
-    function moveOnce() {
-      const x = radius + Math.random() * (640 - radius * 2);
-      const y = radius + Math.random() * (640 - radius * 2);
-      goalCanvas.style.clipPath = `circle(${radius}px at ${x}px ${y}px)`;
+  // 문제 7~10번: 랜덤 위치에 글라이드 없이 순간적으로 나타났다(HOLD) 완전히 사라지는(GAP) "도장" 방식.
+  function startLevel2Stamp() {
+    const radius = CFG.LEVEL2_STAMP_RADIUS_PX;
+    const bound = 640 - radius * 2;
+    function randomPoint() { return { x: radius + Math.random() * bound, y: radius + Math.random() * bound }; }
+    function showStamp() {
+      const p = randomPoint();
+      goalCanvas.style.clipPath = `circle(${pct640(radius)} at ${pct640(p.x)} ${pct640(p.y)})`;
+      run.level2RevealTimerId = setTimeout(hideStamp, CFG.LEVEL2_STAMP_HOLD_MS);
     }
-    moveOnce();
-    let lastJump = Date.now();
-    function tick() {
-      const now = Date.now();
-      if (now - lastJump >= CFG.LEVEL2_RANDOM_JUMP_MS) { lastJump = now; moveOnce(); }
-      run.level2RevealTimerId = requestAnimationFrame(tick);
+    function hideStamp() {
+      goalCanvas.style.clipPath = `circle(0% at 0% 0%)`;
+      run.level2RevealTimerId = setTimeout(showStamp, CFG.LEVEL2_STAMP_GAP_MS);
     }
-    run.level2RevealTimerId = requestAnimationFrame(tick);
+    showStamp();
   }
 
   function startLevel2Reveal() {
     goalCanvas.hidden = false;
-    goalCanvas.classList.add('challenge-goal-mask');
-    const radius = CFG.LEVEL2_REVEAL_RADIUS_PX;
     const problemNum = run.index + 1;
-    if (problemNum <= 3) startLevel2Zigzag(radius, false); // 1~3번: 가로 지그재그
-    else if (problemNum <= 6) startLevel2Zigzag(radius, true); // 4~6번: 세로 지그재그
-    else startLevel2Random(radius); // 7~10번: 랜덤 점프
+    if (problemNum <= 6) {
+      // 1~6번: goal은 항상 다 보이고, 원이 도는 자리만 occluder로 가림
+      goalCanvas.classList.remove('challenge-goal-mask');
+      goalCanvas.style.clipPath = '';
+      goalOccluder.hidden = false;
+      startLevel2Bounce(problemNum <= 3 ? 'x' : 'y'); // 1~3: 좌우로 왕복(위아래로 튕김), 4~6: 상하로 왕복(좌우로 튕김)
+    } else {
+      // 7~10번: 기존 방식(도장 안쪽만 보임) 유지
+      goalOccluder.hidden = true;
+      goalCanvas.classList.add('challenge-goal-mask');
+      startLevel2Stamp();
+    }
   }
 
   function stopLevel2Reveal() {
+    // startLevel2Bounce는 requestAnimationFrame, startLevel2Stamp은 setTimeout을 쓰므로 둘 다 정리
     cancelAnimationFrame(run.level2RevealTimerId);
+    clearTimeout(run.level2RevealTimerId);
     goalCanvas.classList.remove('challenge-goal-mask');
+    goalOccluder.hidden = true;
     goalCanvas.style.clipPath = '';
   }
 
@@ -427,10 +440,14 @@
   // 2026-08-14 피드백: 구름이 화면 중간에서 갑자기 사라지던 문제 — CSS infinite 애니메이션
   // 대신 LEVEL7의 슬라이드와 같은 방식(JS로 좌표를 명시적으로 옮기고 transition)으로 바꿔서,
   // 왼쪽 밖에서 시작해 오른쪽 밖까지 확실히 다 지나간 뒤에만 다시 시작하게 한다.
+  // 2026-08-14 피드백: "시작 화면에 구름이 일부 보인다" — -70%는 구름 자기 너비 기준 오프셋이라
+  // 폭이 넓은 구름(최대 72%)은 오른쪽 일부가 박스 안에 걸쳐 보였다. 어떤 크기든 완전히 가려지도록
+  // -120%로 더 왼쪽에서 시작. 같은 피드백으로 지나가는 속도도 1.5배 빠르게(구간 rand(3000,6000)
+  // -> rand(2000,4000)).
   function startCloudCycle(cloudEl, durationMs, initialDelayMs) {
     function runOnce() {
       cloudEl.style.transition = 'none';
-      cloudEl.style.transform = 'translateX(-70%)';
+      cloudEl.style.transform = 'translateX(-120%)';
       void cloudEl.offsetWidth;
       cloudEl.style.transition = 'transform ' + durationMs + 'ms linear';
       cloudEl.style.transform = 'translateX(170%)';
@@ -446,10 +463,14 @@
   // 확실히 다 떨어진 뒤에만 다시 시작한다.
   // 주의: transform: translateY(%)는 엘리먼트 자기 자신의 높이 기준이라(작은 물방울/눈송이는
   // 100%가 몇 px밖에 안 됨) 박스를 다 못 가로지른다 — top(%)은 컨테이너 기준이라 대신 이걸 쓴다.
-  function startRaindropCycle(dropEl, durationMs, initialDelayMs) {
+  // 2026-08-14 피드백: "구름처럼 빗방울/눈도 시작 화면엔 안 보여야 하는데 보인다" — 물방울
+  // 크기가 커지면서 top(요소 위쪽 기준 좌표)만 박스 밖(-15%)이어도 높이(width*4/3, 최대 40%대)
+  // 때문에 아래쪽 절반이 이미 박스 안으로 들어와 있었다. 요소 자기 높이(heightPct)만큼 더
+  // 위에서 시작하도록 startTop을 호출부에서 계산해 넘긴다(생성 시점 초기값과 동일한 값 사용).
+  function startRaindropCycle(dropEl, durationMs, initialDelayMs, startTop) {
     function runOnce() {
       dropEl.style.transition = 'none';
-      dropEl.style.top = '-15%';
+      dropEl.style.top = startTop;
       void dropEl.offsetWidth;
       dropEl.style.transition = 'top ' + durationMs + 'ms linear';
       dropEl.style.top = '115%';
@@ -460,12 +481,10 @@
     run.level3ParticleTimerIds.push(id);
   }
 
-  // 2026-08-14 피드백: 눈은 빗방울보다 천천히, "박스 안에서만"(-10%~110%) 떨어지게 해서
-  // 박스 경계에 잘려 보이던 문제를 없앤다.
-  function startSnowflakeCycle(flakeEl, durationMs, initialDelayMs) {
+  function startSnowflakeCycle(flakeEl, durationMs, initialDelayMs, startTop) {
     function runOnce() {
       flakeEl.style.transition = 'none';
-      flakeEl.style.top = '-8%';
+      flakeEl.style.top = startTop;
       void flakeEl.offsetWidth;
       flakeEl.style.transition = 'top ' + durationMs + 'ms linear';
       flakeEl.style.top = '108%';
@@ -484,41 +503,65 @@
     weatherLayer.innerHTML = '';
     run.level3ParticleTimerIds = [];
     if (type === 'cloud') {
-      const count = 5 + Math.floor(Math.random() * 3); // 5~7개, 크기/속도/위치 제각각
+      // 2026-08-15 피드백: "구름도 비/눈처럼 goal을 80% 가리게" — 실측(캔버스에 실제 모양+겹침
+      // 그려서 픽셀 비율 측정)해보니 기존 5~7개는 정상 상태 기준 20% 안팎이라 목표(80%)에
+      // 한참 못 미침. 비/눈과 같은 방식으로 개수를 늘려서 커버리지를 채움 — 5~7 -> 38~42개로
+      // 두 차례 실측 조정, 정상 상태 커버리지 약 75~80%대로 확인.
+      const count = 38 + Math.floor(Math.random() * 5); // 38~42개 (실측 기반 조정)
       for (let i = 0; i < count; i++) {
         const cloud = document.createElement('span');
         cloud.className = 'challenge-cloud';
         cloud.style.setProperty('--cloud-size', rand(33, 72) + '%'); // 2026-08-14: 1.5배 확대(22~48 -> 33~72)
         cloud.style.setProperty('--cloud-top', rand(5, 70) + '%');
+        // 2026-08-14 피드백: "시작하자마자 구름이 이미 화면에 나와있다" — startCloudCycle의
+        // runOnce가 initialDelayMs만큼 늦게 처음 실행되는데, 그 전까지는 transform 미지정
+        // 상태(왼쪽 위 기본 위치)라 화면에 바로 보였다. 딜레이가 끝나기 전에도 왼쪽 밖에
+        // 있도록 생성 시점에 미리 같은 시작 위치를 지정해둔다.
+        cloud.style.transform = 'translateX(-120%)';
+        cloud.style.filter = `brightness(${rand(85, 115)}%)`; // 2026-08-15 피드백: 낱개마다 음영 살짝 다르게
         weatherLayer.appendChild(cloud);
-        startCloudCycle(cloud, rand(3000, 6000), rand(0, 3000));
+        startCloudCycle(cloud, rand(2000, 4000), rand(0, 3000));
       }
     } else if (type === 'rain') {
-      const count = 10 + Math.floor(Math.random() * 6); // 10~15개
-      const sizeTiers = ['10%', '9.09%', '8.33%']; // goal 대비 1/10, 1/11, 1/12
+      // 2026-08-14 피드백: "goal이 70% 이상 안 보이게"는 장막이 아니라 "떨어지는 빗방울들
+      // 자체가 goal을 가리는 것" — 장막 없이 낱개 빗방울 개수/크기로 가림. 실측(캔버스에 실제
+      // 모양+겹침 그려서 픽셀 비율 측정)해보니 기존 개수/크기론 평균 25% 안팎이라 목표(80%)에
+      // 한참 못 미쳐 크기를 크게 키움. --drop-left도 (100-크기) 범위로 제한해 오른쪽 밖으로
+      // 튀어나가 박스에 잘리는 일이 없게 한다.
+      // 2026-08-14 피드백: 방울을 크게 키워서 개수를 줄이니 겹쳐서 파란 덩어리 하나처럼
+      // 보이는 문제가 생김 — 낱개 빗방울 모양이 보이게 크기는 다시 줄이고, 대신 개수를
+      // 훨씬 늘려서(실측 기반) 커버리지를 채운다.
+      const count = 150 + Math.floor(Math.random() * 31); // 150~180개
       for (let i = 0; i < count; i++) {
         const drop = document.createElement('span');
         drop.className = 'challenge-raindrop';
-        drop.style.setProperty('--drop-size', sizeTiers[Math.floor(Math.random() * sizeTiers.length)]);
-        drop.style.setProperty('--drop-left', rand(0, 95) + '%');
-        drop.style.top = rand(-15, 115) + '%'; // 낙하 시작 전(딜레이 중)에도 흩어져 보이게
+        const size = rand(14, 26); // width%
+        const height = size * 4 / 3; // aspect-ratio 3/4(width:height)라 세로가 더 큼
+        const startTop = -(height + rand(2, 60)) + '%'; // 자기 높이만큼(+무작위 여유) 완전히 박스 밖에서 시작
+        drop.style.setProperty('--drop-size', size + '%');
+        drop.style.setProperty('--drop-left', rand(0, 100 - size) + '%'); // 오른쪽 밖으로 안 튀어나가게 범위 제한
+        drop.style.top = startTop; // 생성 시점부터 완전히 박스 밖(구름과 동일한 원칙)
+        drop.style.filter = `brightness(${rand(85, 115)}%)`; // 2026-08-15 피드백: 낱개마다 음영 살짝 다르게
         weatherLayer.appendChild(drop);
-        startRaindropCycle(drop, rand(800, 1600), rand(0, 1500));
+        startRaindropCycle(drop, rand(800, 1600), rand(0, 1500), startTop);
       }
     } else {
-      // 2026-08-14 피드백: "개수가 적어 goal을 못 가리고, 박스에 잘려 보인다" — 배경 타일
-      // 패턴 대신 빗방울과 같은 개별 엘리먼트 방식으로, 박스 안(-10%~110%)에서만 떨어지게
-      // 하고 개수를 대폭 늘림(25~35개).
-      const count = 25 + Math.floor(Math.random() * 11); // 25~35개
-      const sizeTiers = ['9%', '6%', '4%'];
+      // 2026-08-14 피드백: 비와 동일하게 goal을 80% 가리도록 크기/개수 확대, --flake-left도
+      // (100-크기) 범위로 제한해 박스에 안 잘리게 하고, 시작 화면엔 안 보이게 함.
+      // 2026-08-14 피드백: 눈도 마찬가지로 너무 커서 낱개 눈송이가 안 보이고 흰 덩어리처럼
+      // 보임 — 크기는 줄이고 개수를 대폭 늘려서 커버리지를 채운다.
+      const count = 140 + Math.floor(Math.random() * 41); // 140~180개
       for (let i = 0; i < count; i++) {
         const flake = document.createElement('span');
         flake.className = 'challenge-snowflake';
-        flake.style.setProperty('--flake-size', sizeTiers[Math.floor(Math.random() * sizeTiers.length)]);
-        flake.style.setProperty('--flake-left', rand(0, 95) + '%');
-        flake.style.top = rand(-8, 108) + '%'; // 낙하 시작 전(딜레이 중)에도 흩어져 보이게
+        const size = rand(10, 20); // 원(1:1)이라 height=width
+        const startTop = -(size + rand(2, 60)) + '%';
+        flake.style.setProperty('--flake-size', size + '%');
+        flake.style.setProperty('--flake-left', rand(0, 100 - size) + '%');
+        flake.style.top = startTop;
+        flake.style.filter = `brightness(${rand(85, 115)}%)`; // 2026-08-15 피드백: 낱개마다 음영 살짝 다르게
         weatherLayer.appendChild(flake);
-        startSnowflakeCycle(flake, rand(2000, 4000), rand(0, 3500));
+        startSnowflakeCycle(flake, rand(2000, 4000), rand(0, 3500), startTop);
       }
     }
     weatherLayer.hidden = false;
@@ -550,12 +593,21 @@
   // 3D 회전이어야 함 — 동전을 세로로 세워 돌리는 느낌. rotateY로 돌리면 180도 지점에서
   // 뒷면(backface-visibility 기본값 visible)이 자동으로 좌우반전(거울상)으로 보여서, 스펙의
   // "NORMAL -> MIRROR -> NORMAL -> MIRROR"가 별도 로직 없이 자연스럽게 나온다.
+  // 2026-08-14 피드백: "회전하면서 경계선과 만난다" — perspective+rotateY로 도는 평면은 세로
+  // 중심에서 먼 지점(머리가 높이 있는 그림 등)일수록 회전 중 원근 투영 때문에 실제로 살짝
+  // 위/옆으로 튀어나온다(순수 Y축 회전이라도 perspective 투영식 특성상 중심에서 먼 점은 회전
+  // 중 세로 위치도 미세하게 밀림). goalCanvasWrap에 overflow:hidden을 걸어 박스 밖으로 튀어나온
+  // 부분을 깔끔하게 잘라낸다(LEVEL3/LEVEL7과 같은 방식).
+  // 2026-08-15 피드백: 그래도 여전히 잘려 보인다는 재확인 — LEVEL5_ROTATE_PERSPECTIVE_PX/SCALE
+  // 튜닝으로 애초에 튀어나오는 양 자체를 0으로 만듦(실측 기반, config 주석 참고). overflow:hidden은
+  // 안전망으로 유지.
   function startLevel5Rotation() {
+    goalCanvasWrap.style.overflow = 'hidden';
     const startTime = Date.now();
     function tick() {
       const elapsed = Date.now() - startTime;
       const deg = (elapsed % CFG.LEVEL5_ROTATION_MS) / CFG.LEVEL5_ROTATION_MS * 360;
-      goalCanvas.style.transform = 'perspective(800px) rotateY(' + deg + 'deg)';
+      goalCanvas.style.transform = `perspective(${CFG.LEVEL5_ROTATE_PERSPECTIVE_PX}px) rotateY(${deg}deg) scale(${CFG.LEVEL5_ROTATE_SCALE})`;
       run.level5AnimFrame = requestAnimationFrame(tick);
     }
     tick();
@@ -564,6 +616,8 @@
   function stopLevel5Rotation() {
     if (run.level5AnimFrame) cancelAnimationFrame(run.level5AnimFrame);
     run.level5AnimFrame = null;
+    goalCanvasWrap.style.overflow = '';
+    goalCanvas.style.transform = '';
   }
 
   // 2026-08-14 피드백: 15초 주기 반복 — 처음 3초는 진짜 정답 이미지를 보여주고(암기 구간),
@@ -596,8 +650,9 @@
     repaintGoalWithColors(null); // 실제 정답색으로 복원
   }
 
-  // 2026-08-14 피드백: 문제당 한 번만 지나가고 끝이 아니라, 왼->오->퇴장 사이클을
-  // LEVEL7_CYCLE_MS(15초)마다 문제 시간 내내 반복한다.
+  // 2026-08-14 피드백: 문제당 한 번만 지나가고 끝이 아니라, 60초 안에서 0초(첫 통과)/15초/
+  // 30초/45초 — 총 4번 왼->오->퇴장 슬라이드가 나타났다 사라지게 고정 스케줄로 반복한다
+  // (기존의 "15초마다 계속 반복" 방식 대체).
   // 2026-08-14 피드백: 거북이처럼 머리/꼬리가 있는 도안은 슬라이드 방향이 틀리면 꼬리부터
   // 나와 뒤로 가는 것처럼 보인다 — tpl.faceLeft(머리가 왼쪽)면 우->좌로, 아니면(대칭/기본)
   // 기존대로 좌->우로 슬라이드한다.
@@ -618,16 +673,19 @@
       void goalCanvas.offsetWidth; // transition:none 적용을 강제로 반영(다음 transform이 즉시 안 튀도록)
       goalCanvas.style.transition = 'transform ' + sweepMs + 'ms linear';
       goalCanvas.style.transform = 'translateX(' + toPct + '%)'; // 반대편까지 쓸고 지나감
-      run.level7TimerId = setTimeout(() => {
-        goalCanvas.style.transform = 'translateX(' + outPct + '%)'; // OUT — 다음 사이클까지 화면 밖에 머무름
-        run.level7TimerId = setTimeout(runOneSweep, Math.max(0, CFG.LEVEL7_CYCLE_MS - sweepMs));
-      }, sweepMs);
+      run.level7TimerIds.push(setTimeout(() => {
+        goalCanvas.style.transform = 'translateX(' + outPct + '%)'; // OUT — 다음 스케줄까지 화면 밖에 머무름
+      }, sweepMs));
     }
-    runOneSweep();
+    run.level7TimerIds = [];
+    CFG.LEVEL7_PASS_TIMES_MS.forEach((delayMs) => {
+      run.level7TimerIds.push(setTimeout(runOneSweep, delayMs));
+    });
   }
 
   function stopLevel7Slide() {
-    clearTimeout(run.level7TimerId);
+    (run.level7TimerIds || []).forEach((id) => clearTimeout(id));
+    run.level7TimerIds = [];
   }
 
   function startLevel8Blink() {
@@ -651,10 +709,10 @@
     clearTimeout(run.level8TimerId);
   }
 
+  // 2026-08-14 피드백: "9/10번은 영역 수도 늘어나고 속도도 빨라져서 진행이 안 된다" — 문제
+  // 번호대별로 빨라지던 걸 없애고 7초 고정으로.
   function startLevel9Vanish() {
-    const problemNum = run.index + 1;
-    const intervalMs = problemNum <= 3 ? CFG.LEVEL9_INTERVAL_1
-      : problemNum <= 6 ? CFG.LEVEL9_INTERVAL_2 : CFG.LEVEL9_INTERVAL_3;
+    const intervalMs = CFG.LEVEL9_INTERVAL_MS;
     run.level9TimerId = setInterval(() => {
       const painted = getChallengeRegionInfo().filter((r) => r.painted);
       if (painted.length === 0) return;
@@ -688,12 +746,9 @@
     return farthest;
   }
 
+  // 2026-08-14 피드백: LEVEL9와 동일하게 문제 번호대별로 빨라지던 걸 없애고 7초 고정으로.
   function startLevel10Chaos() {
-    // 2026-08-14 피드백: LEVEL9처럼 문제 번호대별로 색상 변경 주기를 다르게(1~3번 5초,
-    // 4~6번 4초, 7~10번 3초).
-    const problemNum = run.index + 1;
-    const intervalMs = problemNum <= 3 ? CFG.LEVEL10_INTERVAL_1
-      : problemNum <= 6 ? CFG.LEVEL10_INTERVAL_2 : CFG.LEVEL10_INTERVAL_3;
+    const intervalMs = CFG.LEVEL10_INTERVAL_MS;
     run.level10TimerId = setInterval(() => {
       // 단순화(위 "해석이 갈리는 지점" 2번 참고): "정답 상태인 영역"을 색상 tolerance 비교 대신
       // "칠해져 있음(painted)"으로 판정한다.
@@ -717,6 +772,18 @@
       submitCurrentProblem();
     }
   }, true); // capture:true로 등록해 app.js의 버블 단계 리스너보다 먼저 가로챈다
+
+  // 2026-08-15 피드백: 챌린지 모드에서는 완료 버튼을 누르기 전에, 탭으로 색칠해서 이미 100%
+  // 다 맞았으면 자동으로 클리어 처리 — 완료 버튼을 누르는 반응속도만큼 시간 보너스가 깎이는
+  // 걸 방지. 완료 버튼 자체는 그대로 유지(미완성 상태를 수동으로 빨리 넘기고 싶을 때 용도).
+  // app.js의 handleTap(#tap-layer, pointerdown, 버블 단계)이 먼저 등록돼 칠하기를 끝내고,
+  // 같은 엘리먼트·같은 단계에 나중에 등록된 이 리스너가 그 직후에 실행되는 걸 이용한다
+  // (capture 아님 — btn-save/btn-home 가로채기와 달리 여기서는 app.js가 먼저 실행돼야 함).
+  document.getElementById('tap-layer').addEventListener('pointerdown', () => {
+    if (hud.root.hidden || run.submitting) return; // Child 모드이거나 이미 채점 중이면 무시
+    const { matched, total } = computeCompletion(CFG.COLOR_TOLERANCE);
+    if (total > 0 && matched === total) submitCurrentProblem();
+  });
 
   // 2026-08-14: "챌린지 모드에서 첫화면으로 돌아가는 버튼 필요" 요청 — 예전엔 챌린지 중 🏠을
   // 눌러도 challenge run만 정리하고 app.js의 goHome()(Child용, 갤러리/맵 화면으로 이동)이
@@ -778,6 +845,15 @@
   // 디버그/테스트용: 진행 중인 run 상태 스냅샷(콤보/미스카운트 등 HUD 텍스트만으로 확인하기 어려운 값 검증용)
   window.__debugChallengeRunState = () => ({ ...run });
 
+  // 임시 디버그용(확인 후 제거 예정): 특정 문제 번호로 강제 이동(레벨3처럼 문제 번호별로
+  // 연출이 바뀌는 레벨 검증용)
+  window.__debugChallengeGotoProblem = (idx) => {
+    const effect = LEVEL_EFFECTS[run.level];
+    if (effect && effect.stop) effect.stop();
+    run.index = idx;
+    loadNextProblem();
+  };
+
   // 레벨별 시작/정지 효과 디스패치 테이블. loadNextProblem/advanceToNextProblem/endRun이 레벨을
   // if/else로 분기하지 않고 이 테이블을 조회한다. 레벨3~10은 각 담당 Task가 자기 항목만 채운다.
   const LEVEL_EFFECTS = {
@@ -790,11 +866,14 @@
   };
 
   LEVEL_EFFECTS[3] = { start: startLevel3Occlusion, stop: stopLevel3Occlusion };
-  LEVEL_EFFECTS[4] = { start: startLevel4Vanish, stop: null };
+  // 2026-08-14 피드백: "레벨4가 엄청 어려워, 4랑 8이 바뀌어야함" — 사라짐(옛 LEVEL4)과
+  // 실루엣(옛 LEVEL8) 자리를 맞바꿈. 내부 함수/설정명(startLevel4Vanish가 CFG.LEVEL4_*를
+  // 계속 읽는 등)은 안 건드리고 이 디스패치 자리만 바꾼다 — LEVEL1↔8 교체 때와 같은 방식.
+  LEVEL_EFFECTS[4] = { start: startLevel8Silhouette, stop: stopLevel8Silhouette };
   LEVEL_EFFECTS[5] = { start: startLevel5Rotation, stop: stopLevel5Rotation };
   LEVEL_EFFECTS[6] = { start: startLevel6Flicker, stop: stopLevel6Flicker };
   LEVEL_EFFECTS[7] = { start: startLevel7Slide, stop: stopLevel7Slide };
-  LEVEL_EFFECTS[8] = { start: startLevel8Silhouette, stop: stopLevel8Silhouette };
+  LEVEL_EFFECTS[8] = { start: startLevel4Vanish, stop: null };
   LEVEL_EFFECTS[9] = { start: startLevel9Vanish, stop: stopLevel9Vanish };
   LEVEL_EFFECTS[10] = { start: startLevel10Chaos, stop: stopLevel10Chaos };
 

@@ -97,6 +97,9 @@
   let currentTemplate = null;
   let currentLevel = null;
   let currentBossMode = null; // null이 아니면 지금 파이널 보스를 색칠 중(그 모드 값 'easy'|'normal'|'hard'|'veryhard')
+  // 2026-08-14: "인접 영역 다른 색" 원칙은 챌린지 모드 전용 — 유아모드는 실물에 최대한 가까운
+  // 색을 보여줘야 해서 색을 임의로 바꾸면 안 됨(openTemplate opts.challenge로 판단).
+  let currentIsChallenge = false;
   let selectedColor = COLORS[0];
   let undoStack = [];
   let soundOn = true;
@@ -127,6 +130,8 @@
   const galleryScreen = document.getElementById('gallery-screen');
   const coloringScreen = document.getElementById('coloring-screen');
   const galleryGrid = document.getElementById('gallery-grid');
+  const levelReward = document.getElementById('level-reward');
+  const levelRewardArt = document.getElementById('level-reward-art');
   const btnMapBack = document.getElementById('btn-map-back');
   const levelTitle = document.getElementById('level-title');
   const levelProgress = document.getElementById('level-progress');
@@ -306,8 +311,24 @@
     saveAllCleared(all);
   }
 
+  // 2026-08-14: "영역 수 적은 도안부터 나와야 한다" — 유아모드 갤러리/챌린지모드 문제 순서
+  // 둘 다 이 함수 하나를 쓰므로, 여기서 한 번만 TEMPLATE_REGION_COUNTS 기준 오름차순 정렬하면
+  // 두 모드 모두에 적용된다.
   function getTemplatesForLevel(level) {
-    return COLORING_TEMPLATES.filter((t) => t.difficulty === level);
+    return COLORING_TEMPLATES
+      .filter((t) => t.difficulty === level)
+      .slice()
+      .sort((a, b) => (TEMPLATE_REGION_COUNTS[a.id] || 0) - (TEMPLATE_REGION_COUNTS[b.id] || 0));
+  }
+
+  // 2026-08-14: "챌린지모드 보통/어려움/매우어려움은 유아모드와 다른 이미지" 요청 — 별도
+  // 배열(CHALLENGE_TIER_TEMPLATES, templates.js)에서 티어+레벨로 10개를 가져온다. 유아모드가
+  // 쓰는 COLORING_TEMPLATES/getTemplatesForLevel과는 완전히 분리돼 있어 서로 안 섞인다.
+  function getChallengeTierTemplates(tier, level) {
+    return CHALLENGE_TIER_TEMPLATES
+      .filter((t) => t.challengeTier === tier && t.challengeLevel === level)
+      .slice()
+      .sort((a, b) => (CHALLENGE_TIER_REGION_COUNTS[a.id] || 0) - (CHALLENGE_TIER_REGION_COUNTS[b.id] || 0));
   }
 
   // 도안별 "가장 잘 한" 점수(재도전해도 낮은 점수로 안 떨어지게 최고점 유지) — 현재 모드 기준
@@ -1030,6 +1051,111 @@
     startLevelTimer();
   }
 
+  // 2026-08-16: 레벨별 "퍼즐 조각 보상" 그래픽 — 실제 트위모지 이모지 그림을 그 레벨의 그림
+  // 개수만큼(1/10레벨=12칸, 2~9레벨=10칸) 격자로 나눠서 씌워놓고, 그림을 완료할 때마다 칸이
+  // 하나씩 열리며 안의 실제 이모지가 드러난다. 정원이 다 채워지면 완성 연출이 재생된다.
+  function gridDims(n) {
+    return n === 12 ? { cols: 4, rows: 3 } : { cols: 5, rows: 2 };
+  }
+
+  function buildRewardSvg(emojiId, cols, rows) {
+    let cells = '';
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const x = (c * 100 / cols).toFixed(2);
+        const y = (r * 100 / rows).toFixed(2);
+        const w = (100 / cols).toFixed(2);
+        const h = (100 / rows).toFixed(2);
+        cells += '<rect class="reward-piece reward-cell" data-piece="cell-' + (r * cols + c) + '" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '"/>';
+      }
+    }
+    return '<image class="reward-emoji-img" href="assets/emoji/' + emojiId + '.svg" x="0" y="0" width="100" height="100"/>' + cells;
+  }
+
+  // flyDirection이 있는 레벨(로켓/풍선=위, 기차=오른쪽)은 완성 후 화면 밖으로 날아가며 사라지고,
+  // 없는 레벨은 제자리에서 콤보 연출(살짝 확대 + 색종이) 후 완성된 그림으로 남는다.
+  const LEVEL_REWARD_ART = {
+    1: { emoji: 'rocket', flyDirection: 'up' },       // 동물
+    2: { emoji: 'cake' },                              // 음식
+    3: { emoji: 'sunflower' },                          // 자연
+    4: { emoji: 'balloon', flyDirection: 'up' },        // 하늘
+    5: { emoji: 'starstruck' },                         // 사람
+    6: { emoji: 'robot' },                              // 생활용품
+    7: { emoji: 'ferriswheel' },                        // 놀이
+    8: { emoji: 'train', flyDirection: 'right' },       // 탈것/장소
+    9: { emoji: 'trophy' },                             // 기호/기타
+    10: { emoji: 'clock' },                             // 시계
+  };
+
+  // 2026-08-16: "완료한 그림이 보상 이미지로 흡수되는" 연출 — 카드 자체는 그대로 두고(계속 탭
+  // 가능), 방금 막 완료된 카드의 이모지 복제본이 보상 이미지의 해당 칸 위치로 날아가 사라지는
+  // 잔상만 만든다. 레벨별로 마지막에 본 "완료된 그림 id" 목록을 기억해뒀다가, 새로 늘어난
+  // 것만 애니메이션한다.
+  const lastRewardMasteredIds = {};
+
+  function flyToReward(cardEl, pieceEl) {
+    const fromImg = cardEl && cardEl.querySelector('.tpl-emoji');
+    if (!fromImg || !pieceEl) return;
+    const fromRect = fromImg.getBoundingClientRect();
+    const toRect = pieceEl.getBoundingClientRect();
+    if (!fromRect.width || !toRect.width) return; // 화면 밖(스크롤 아웃 등)이면 건너뜀
+    const ghost = fromImg.cloneNode(true);
+    ghost.className = 'reward-absorb-ghost';
+    ghost.style.left = fromRect.left + 'px';
+    ghost.style.top = fromRect.top + 'px';
+    ghost.style.width = fromRect.width + 'px';
+    ghost.style.height = fromRect.height + 'px';
+    document.body.appendChild(ghost);
+    const dx = (toRect.left + toRect.width / 2) - (fromRect.left + fromRect.width / 2);
+    const dy = (toRect.top + toRect.height / 2) - (fromRect.top + fromRect.height / 2);
+    requestAnimationFrame(() => {
+      ghost.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(0.2)';
+      ghost.style.opacity = '0';
+    });
+    setTimeout(() => ghost.remove(), 700);
+  }
+
+  function animateRewardAbsorb(level, list, scores) {
+    const art = LEVEL_REWARD_ART[level];
+    const prevIds = lastRewardMasteredIds[level];
+    const currentIds = list.filter((t) => isMastered(t.id, scores)).map((t) => t.id);
+    if (!art || !prevIds) {
+      // 이 레벨을 이번 세션에서 처음 보는 거면(또는 보상 이미지가 없으면) 기준선만 저장하고
+      // 애니메이션은 건너뛴다 — 안 그러면 이미 클리어된 레벨을 다시 열 때마다 재생돼버린다.
+      lastRewardMasteredIds[level] = currentIds;
+      return;
+    }
+    const prevSet = new Set(prevIds);
+    const newlyMastered = list.filter((t) => !prevSet.has(t.id) && currentIds.includes(t.id));
+    newlyMastered.forEach((tpl, k) => {
+      const idx = list.indexOf(tpl);
+      const card = galleryGrid.children[idx];
+      const pieceEl = levelRewardArt.querySelector('[data-piece="cell-' + (prevIds.length + k) + '"]');
+      flyToReward(card, pieceEl);
+    });
+    lastRewardMasteredIds[level] = currentIds;
+  }
+
+  function updateLevelReward(level, clearedCount, total) {
+    const art = LEVEL_REWARD_ART[level];
+    levelReward.hidden = !art;
+    if (!art) return;
+    if (levelRewardArt.dataset.level !== String(level)) {
+      const { cols, rows } = gridDims(total);
+      levelRewardArt.innerHTML = buildRewardSvg(art.emoji, cols, rows);
+      levelRewardArt.setAttribute('viewBox', '0 0 100 100');
+      levelRewardArt.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      levelRewardArt.dataset.level = String(level);
+      // 2026-08-16: SVGElement.className은 HTML과 달리 읽기 전용(SVGAnimatedString)이라
+      // 대입하면 예외가 남 — class 속성은 setAttribute로 바꿔야 함.
+      levelRewardArt.setAttribute('class', 'level-reward-art' + (art.flyDirection ? ' reward-fly-' + art.flyDirection : ''));
+    }
+    levelRewardArt.querySelectorAll('.reward-cell').forEach((el, i) => {
+      el.classList.toggle('is-active', i < clearedCount);
+    });
+    levelRewardArt.classList.toggle('launched', clearedCount >= total);
+  }
+
   function renderLevelGallery() {
     // 2026-08-11: "시간초과 확인 눌러도 체크표시 남음" 재현/원인 확인 — 아래에서 scores를 미리
     // 캡처해두는데, 그 뒤 이 함수 안에서 updateLevelTimerDisplay()가 시간초과를 감지하면 점수를
@@ -1041,6 +1167,7 @@
     const scores = getScores();
     const list = getTemplatesForLevel(currentLevel);
     const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
+    updateLevelReward(currentLevel, doneCount, list.length);
 
     levelTitle.textContent = I18N.t('level.title', { n: currentLevel });
     levelProgress.textContent = I18N.t('level.progress', { done: doneCount, total: list.length });
@@ -1084,12 +1211,13 @@
           : '<span class="tpl-done-badge tpl-badge-bad">✗</span>';
       }
       card.innerHTML =
-        '<span class="tpl-emoji">' + tpl.emoji + '</span>' +
+        '<img class="tpl-emoji" src="assets/emoji/' + tpl.id + (tpl.isBoss ? '-icon' : '') + '.svg" alt="">' +
         '<span class="tpl-label">' + escapeHtml(displayName) + '</span>' +
         badge;
       card.addEventListener('click', () => openTemplate(tpl));
       galleryGrid.appendChild(card);
     });
+    animateRewardAbsorb(currentLevel, list, scores);
   }
 
   // ================= 색칠 화면 진입 =================
@@ -1101,6 +1229,7 @@
     // 경로 말고도 놓친 경로가 있을까봐 여기서도 한 번 더 방어.
     if (praiseHomeTimer) { clearTimeout(praiseHomeTimer); praiseHomeTimer = null; }
     currentTemplate = tpl;
+    currentIsChallenge = !!opts.challenge;
     // 실제로 그림을 열어서 색칠을 시작하는 이 순간에 그 레벨(또는 보스)의 타임어택을 시작(또는 이어감).
     if (opts.challenge) {
       // 챌린지 모드는 자체 타이머/시도추적을 쓰므로 Child의 타임어택 시작 로직을 건너뛴다.
@@ -1125,8 +1254,13 @@
     // 숨긴다 — 보스는 원래도 유지, 챌린지 모드는 자체 문제별 타이머가 있으니 지렁이도 그대로 보여준다
     // (2026-08-14: "지렁이가 없어졌다" 피드백 — 챌린지 모드까지 같이 숨겨진 게 회귀였음).
     goalPanelEl.classList.toggle('no-timer', !tpl.isBoss && !opts.challenge);
-    coloringTitle.textContent = tpl.emoji + ' ' + I18N.templateName(tpl);
-    goalEmoji.textContent = tpl.emoji;
+    // 2026-08-15: "벨페퍼 이모지 안나옴" — 이 타이틀/배지는 tpl.emoji를 유니코드 텍스트 글리프로
+    // 직접 찍어서 기기에 그 이모지 폰트가 없으면(특히 최근에 추가된 이모지) 빈 네모로 보였다.
+    // 실제 그림 본체(캔버스)는 이미 Twemoji SVG 파일 기반이라 이 문제가 없으니, 여기도 같은
+    // 방식(assets/emoji/<id>[-icon].svg)으로 통일 — 기기 폰트와 무관하게 항상 보인다.
+    const titleIconSrc = 'assets/emoji/' + tpl.id + (tpl.isBoss ? '-icon' : '') + '.svg';
+    coloringTitle.innerHTML = '<img class="title-emoji-icon" src="' + titleIconSrc + '" alt=""> ' + escapeHtml(I18N.templateName(tpl));
+    goalEmoji.innerHTML = '<img class="title-emoji-icon" src="' + titleIconSrc + '" alt="">';
     galleryScreen.hidden = true;
     coloringScreen.hidden = false;
     // 2026-08-11: "한 캐릭터 색칠 후 다음 물체 색칠 전에 이전 그림이 보인다" 제보 — loadTemplateSource가
@@ -1149,7 +1283,7 @@
       currentGradableRegions = computeGradableRegions();
       currentGradableLabelSet = new Set(currentGradableRegions.map((r) => r.label));
 
-      // 목표(정답) 이미지 렌더링 + 영역별 정답색 배정
+      // 목표(정답) 이미지 렌더링 + 영역별 정답색 배정(인접 영역 색 중복 보정 포함 — renderGoalPreview 내부)
       renderGoalPreview(lineSource);
 
       // 정답색이 정해진 뒤에 팔레트 구성(그 도안에 실제 필요한 색이 반드시 포함되게)
@@ -1188,7 +1322,45 @@
         const rawC = document.createElement('canvas');
         rawC.width = WORK_SIZE; rawC.height = WORK_SIZE;
         const rawCtx = rawC.getContext('2d', { willReadFrequently: true });
-        rawCtx.drawImage(img, 0, 0, WORK_SIZE, WORK_SIZE);
+        // 2026-08-14 피드백: "선이 끊어진 게 많고 경계선과 만난다" + "이미지마다 크기가 들쭉날쭉하다"
+        // — 챌린지 보통/어려움/매우어려움 전용 도안 300개는 기존 100개와 달리 사전 검수 없이
+        // Twemoji에서 그대로 가져와서, 원본 SVG 자체가 자기 캔버스를 꽉 채워 그린 것(시계, 소파+램프
+        // 등)과 여백이 많은 것이 섞여있어 단순 고정 배율(여백 %)만으로는 (a) 꽉 찬 것은 여전히 잘리고
+        // (b) 여백 많은 것은 실제 그림이 작게 나와 눈에 보이는 크기가 도안마다 들쭉날쭉했다.
+        // 실제 그림 내용(투명하지 않은 픽셀)의 경계 상자를 먼저 구해서, 그 상자의 큰 쪽 변이 항상
+        // 캔버스의 TARGET_FILL 비율을 채우도록 배율/위치를 역산해 다시 그린다 — 원본 여백과
+        // 무관하게 모든 새 도안의 그림 크기가 서로 비슷해짐. 기존 100개는 문제 없었으므로 그대로 둠.
+        if (tpl.challengeTier) {
+          const probeC = document.createElement('canvas');
+          probeC.width = WORK_SIZE; probeC.height = WORK_SIZE;
+          const probeCtx = probeC.getContext('2d', { willReadFrequently: true });
+          probeCtx.drawImage(img, 0, 0, WORK_SIZE, WORK_SIZE);
+          const probeData = probeCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE).data;
+          let minX = WORK_SIZE, minY = WORK_SIZE, maxX = -1, maxY = -1;
+          for (let y = 0; y < WORK_SIZE; y++) {
+            for (let x = 0; x < WORK_SIZE; x++) {
+              if (probeData[(y * WORK_SIZE + x) * 4 + 3] > 10) { // 실질적으로 보이는(거의 불투명한) 픽셀만
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+              }
+            }
+          }
+          if (maxX >= minX && maxY >= minY) {
+            const TARGET_FILL = 0.98; // 그림 내용이 캔버스의 98%를 채우도록
+            const contentW = maxX - minX + 1;
+            const contentH = maxY - minY + 1;
+            const scale = (WORK_SIZE * TARGET_FILL) / Math.max(contentW, contentH);
+            const dx = WORK_SIZE / 2 - ((minX + maxX) / 2) * scale;
+            const dy = WORK_SIZE / 2 - ((minY + maxY) / 2) * scale;
+            rawCtx.drawImage(img, dx, dy, WORK_SIZE * scale, WORK_SIZE * scale);
+          } else {
+            rawCtx.drawImage(img, 0, 0, WORK_SIZE, WORK_SIZE); // 안전장치(투명 픽셀만 감지된 극단적 경우)
+          }
+        } else {
+          rawCtx.drawImage(img, 0, 0, WORK_SIZE, WORK_SIZE);
+        }
         const data = rawCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE).data;
         const W = WORK_SIZE, H = WORK_SIZE;
 
@@ -1765,24 +1937,72 @@
 
   // 서로 맞닿은 두 영역(라벨)이 같은 색으로 배정되면 경계가 안 보여서 하나로 뭉개져 보이므로,
   // 라벨맵에서 이웃 관계를 한 번 스캔해두고 색 배정 시 참고한다.
+  // 2026-08-14: labelRegions는 벽(윤곽선) 픽셀을 사이에 두고서만 영역을 나누므로, "두 색칠 영역이
+  // 픽셀 한 칸을 사이에 두고 바로 붙어있는" 경우는 구조적으로 절대 발생하지 않는다(그랬다면애초에
+  // 같은 영역으로 합쳐졌을 것) — 그래서 예전 버전(픽셀 직접 인접만 검사)은 항상 빈 인접 그래프만
+  // 반환했다("태양/전갈/귀뚜라미 인접색 원칙 안 먹힘" 제보로 발견). 실제로는 두 영역 사이에 그려진
+  // 윤곽선(벽)이 몇 픽셀 두께인지가 관건이므로, 벽 픽셀만 통과하는 BFS로 각 영역을 ADJACENCY_BRIDGE_PX
+  // 만큼 확장해 서로 닿으면(=사이 윤곽선이 그 두께 이하면) 인접으로 본다.
+  // 실측(전갈/귀뚜라미 등): 6px에선 대부분 못 잡고, 15~20px부터 인접 그래프가 안정됨(20→30에서
+  // 더 안 늘어남) — 20px로 확정.
+  const ADJACENCY_BRIDGE_PX = 20;
   function buildLabelAdjacency(labelMap) {
+    const total = WORK_SIZE * WORK_SIZE;
+    const reach = new Array(total); // 벽 픽셀마다 지금까지 도달한 라벨 Set(칠할 픽셀은 안 씀)
     const adj = new Map();
-    const add = (a, b) => {
-      if (a < 0 || b < 0 || a === b) return;
+    const addAdj = (a, b) => {
+      if (a === b) return;
       if (!adj.has(a)) adj.set(a, new Set());
       if (!adj.has(b)) adj.set(b, new Set());
       adj.get(a).add(b);
       adj.get(b).add(a);
     };
-    for (let y = 0; y < WORK_SIZE; y++) {
-      const row = y * WORK_SIZE;
-      for (let x = 0; x < WORK_SIZE; x++) {
-        const i = row + x;
-        const lab = labelMap[i];
-        if (lab < 0) continue;
-        if (x < WORK_SIZE - 1) add(lab, labelMap[i + 1]);
-        if (y < WORK_SIZE - 1) add(lab, labelMap[i + WORK_SIZE]);
+    const registerIfMulti = (set) => {
+      if (set.size < 2) return;
+      const arr = Array.from(set);
+      for (let i = 0; i < arr.length; i++) {
+        for (let j = i + 1; j < arr.length; j++) addAdj(arr[i], arr[j]);
       }
+    };
+    let queue = [];
+    // 0단계: 영역과 맞닿은 벽 픽셀에 그 영역의 라벨을 등록
+    for (let i = 0; i < total; i++) {
+      const lab = labelMap[i];
+      if (lab < 0) continue;
+      const x = i % WORK_SIZE, y = (i / WORK_SIZE) | 0;
+      const seed = (n) => {
+        if (labelMap[n] !== -1) return;
+        if (!reach[n]) { reach[n] = new Set(); queue.push(n); }
+        if (!reach[n].has(lab)) { reach[n].add(lab); registerIfMulti(reach[n]); }
+      };
+      if (x > 0) seed(i - 1);
+      if (x < WORK_SIZE - 1) seed(i + 1);
+      if (y > 0) seed(i - WORK_SIZE);
+      if (y < WORK_SIZE - 1) seed(i + WORK_SIZE);
+    }
+    // 1~(BRIDGE-1)단계: 벽 픽셀에서 벽 픽셀로만(칠할 픽셀은 침범하지 않고) 라벨 집합을 계속 퍼뜨림
+    for (let step = 1; step < ADJACENCY_BRIDGE_PX; step++) {
+      const nextQueue = [];
+      queue.forEach((p) => {
+        const set = reach[p];
+        const x = p % WORK_SIZE, y = (p / WORK_SIZE) | 0;
+        const spread = (n) => {
+          if (labelMap[n] !== -1) return;
+          if (!reach[n]) reach[n] = new Set();
+          let grew = false;
+          set.forEach((lab) => { if (!reach[n].has(lab)) { reach[n].add(lab); grew = true; } });
+          if (grew) {
+            nextQueue.push(n);
+            registerIfMulti(reach[n]);
+          }
+        };
+        if (x > 0) spread(p - 1);
+        if (x < WORK_SIZE - 1) spread(p + 1);
+        if (y > 0) spread(p - WORK_SIZE);
+        if (y < WORK_SIZE - 1) spread(p + WORK_SIZE);
+      });
+      if (!nextQueue.length) break;
+      queue = nextQueue;
     }
     return adj;
   }
@@ -1867,6 +2087,9 @@
       const randomColors = seededRegionColors(currentGradableRegions, currentLabelMap, cyclePalette, seed);
       currentGradableRegions.forEach((r) => currentLabelToColor.set(r.label, randomColors.get(r.label)));
     }
+    // 2026-08-14: "유아모드는 실물색 그대로, 챌린지 모드는 실물색 기반이되 인접 영역만 다른 색으로"
+    // — 인접 보정은 챌린지 모드에서만 적용한다.
+    if (currentIsChallenge) enforceAdjacentDistinctColors();
     repaintGoalWithColors(currentLabelToColor);
   }
 
@@ -1888,6 +2111,38 @@
     }
     goalCtx.putImageData(imgData, 0, 0);
     if (currentLineImg) goalCtx.drawImage(currentLineImg, 0, 0, WORK_SIZE, WORK_SIZE);
+  }
+
+  // 2026-08-14: "인접한 색칠영역은 같은 색깔이 될 수 없다" — Goal 색 배정의 기본 원칙(전체
+  // 도안/전체 레벨 공통). buildLabelAdjacency로 맞닿은 영역 쌍을 찾아, 같은 색인 쌍이 있으면
+  // 한쪽을 이웃과 겹치지 않는 팔레트(COLORS) 색으로 바꾼다. 한 번 바꾸면 다른 이웃과 새로
+  // 충돌할 수 있어(예: 3개 이상 서로 맞닿은 경우) 더 바뀌는 게 없어질 때까지 반복한다.
+  function enforceAdjacentDistinctColors() {
+    if (!currentGradableRegions || currentGradableRegions.length < 2) return;
+    const adj = buildLabelAdjacency(currentLabelMap);
+    let changed = true;
+    let guard = 0;
+    while (changed && guard < 5) {
+      changed = false;
+      guard++;
+      currentGradableRegions.forEach((r) => {
+        const neighbors = adj.get(r.label);
+        if (!neighbors || neighbors.size === 0) return;
+        const myHex = currentLabelToColor.get(r.label);
+        const neighborHexes = new Set();
+        neighbors.forEach((n) => {
+          const nh = currentLabelToColor.get(n);
+          if (nh) neighborHexes.add(nh);
+        });
+        if (neighborHexes.has(myHex)) {
+          const free = COLORS.find((c) => !neighborHexes.has(c));
+          if (free && free !== myHex) {
+            currentLabelToColor.set(r.label, free);
+            changed = true;
+          }
+        }
+      });
+    }
   }
 
   // ================= 색칠 영역 자동 인식(연결 요소 탐색) =================
@@ -2836,6 +3091,24 @@
   // 디버그/테스트용: 현재 도안의 채점 대상 영역 개수 확인
   window.__debugRegionCount = () => (currentGradableRegions ? currentGradableRegions.length : 0);
 
+  // 디버그/테스트용(2026-08-14 새 도안 300개 "선 끊김/경계선 걸침" 문제로 추가): wallMask
+  // (윤곽선 픽셀) 자체가 캔버스 테두리에 닿았는지 확인 — 닿았으면 그림(선 포함)이 캔버스 밖으로
+  // 잘렸다는 뜻(닿은 지점에서 선이 캔버스 경계에 뚝 끊긴 것처럼 보이는 원인). 채점 대상 영역만
+  // 보던 이전 버전은 "테두리에 닿은 조각은 배경으로 병합되어 애초에 채점 대상에서 빠짐" 케이스를
+  // 못 잡아서 실제로는 항상 0을 반환했음 — wallMask 직접 검사로 수정.
+  window.__debugBorderTouch = () => {
+    if (!wallMask) return false;
+    for (let x = 0; x < WORK_SIZE; x++) {
+      if (wallMask[x] === 1) return true; // 윗줄
+      if (wallMask[(WORK_SIZE - 1) * WORK_SIZE + x] === 1) return true; // 아랫줄
+    }
+    for (let y = 0; y < WORK_SIZE; y++) {
+      if (wallMask[y * WORK_SIZE] === 1) return true; // 왼쪽줄
+      if (wallMask[y * WORK_SIZE + WORK_SIZE - 1] === 1) return true; // 오른쪽줄
+    }
+    return false;
+  };
+
   // 디버그/테스트용: 현재 도안의 영역별 정답색(label -> hex) 확인 — 쉬움모드 실사색 정확도 검증용.
   window.__debugLabelColors = () => (currentLabelToColor ? Array.from(currentLabelToColor.entries()) : []);
 
@@ -2899,11 +3172,14 @@
     });
   });
 
-  // 디버그/테스트용: 챌린지 모드로 도안을 열어서(opts.challenge=true) 영역 수 확인
+  // 디버그/테스트용: 챌린지 모드로 도안을 열어서(opts.challenge=true) 영역 수/정답색 확인
   window.__debugChallengeOpenTemplate = (tplId) => new Promise((resolve) => {
     const tpl = COLORING_TEMPLATES.find((t) => t.id === tplId);
     if (!tpl) return resolve(null);
-    openTemplate(tpl, () => resolve({ regionCount: currentGradableRegions.length }), { challenge: true });
+    openTemplate(tpl, () => resolve({
+      regionCount: currentGradableRegions.length,
+      targetColors: currentGradableRegions.map((r) => currentLabelToColor.get(r.label)),
+    }), { challenge: true });
   });
 
   // 디버그/테스트용: tolerance 값으로 computeCompletion 직접 호출(ColorTolerance 검증용)
@@ -2923,6 +3199,7 @@
     setWormExit,
     resetWormForNewProblem,
     getTemplatesForLevel,
+    getChallengeTierTemplates,
     repaintGoalWithColors,
     paintRegionPixels,
     getChallengeRegionInfo,

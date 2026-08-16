@@ -24,12 +24,16 @@ async function main() {
     const selectScreenOpen = await page.evaluate(() => !document.getElementById('challenge-select-screen').hidden);
     if (!selectScreenOpen) throw new Error('챌린지 선택 화면이 열리지 않음');
 
-    // 2) Config 로드 확인
-    const cfgOk = await page.evaluate(() => typeof CHALLENGE_CONFIG === 'object' && CHALLENGE_CONFIG.DIFFICULTY_TIME.easy === 30);
+    // 2) Config 로드 확인 (2026-08-15: DIFFICULTY_TIME.easy 값이 이후 밸런스 조정으로 30->60이 됨
+    //    - 이 테스트는 값 자체가 아니라 config 객체가 정상 로드되는지만 확인하면 되므로 존재 여부만 체크)
+    const cfgOk = await page.evaluate(() => typeof CHALLENGE_CONFIG === 'object' && typeof CHALLENGE_CONFIG.DIFFICULTY_TIME.easy === 'number');
     if (!cfgOk) throw new Error('CHALLENGE_CONFIG 로드 실패');
 
     // 3) 엔진 재사용 확인(회귀 없이 challenge 옵션으로 열리는지)
-    const openResult = await page.evaluate(() => window.__debugChallengeOpenTemplate('sun'));
+    // 2026-08-15: 유아용/챌린지 재구성으로 'sun'이 COLORING_TEMPLATES 밖으로 이동해서(이제
+    // CHALLENGE_TIER_TEMPLATES 소속) 이 테스트가 깨졌음 — __debugChallengeOpenTemplate는
+    // COLORING_TEMPLATES에서만 찾으므로(설계상 의도), 여전히 그 안에 있는 'star'로 교체.
+    const openResult = await page.evaluate(() => window.__debugChallengeOpenTemplate('star'));
     if (!openResult || openResult.regionCount <= 0) throw new Error('__debugChallengeOpenTemplate 실패');
 
     // 4) ColorTolerance 옵션이 기존 정확매치 판정을 깨지 않는지(둘 다 같은 도안, tolerance=0 결과가

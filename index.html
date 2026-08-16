@@ -125,7 +125,6 @@
     <button class="challenge-diff-btn" data-difficulty="easy" data-i18n="challenge.difficulty.easy" type="button">EASY</button>
     <button class="challenge-diff-btn" data-difficulty="normal" data-i18n="challenge.difficulty.normal" type="button">NORMAL</button>
     <button class="challenge-diff-btn" data-difficulty="hard" data-i18n="challenge.difficulty.hard" type="button">HARD</button>
-    <button class="challenge-diff-btn" data-difficulty="veryhard" data-i18n="challenge.difficulty.veryhard" type="button">VERY HARD</button>
   </div>
 
   <div id="challenge-level-grid" class="challenge-level-grid"></div>
@@ -145,6 +144,12 @@
     <button id="btn-level-back" class="back-btn" hidden data-i18n="level.back">◀ Back</button>
     <span id="level-next-text"></span>
     <button id="btn-level-next" class="next-btn" hidden data-i18n="level.next">Next ▶</button>
+  </div>
+  <!-- 2026-08-16: 레벨1 "로켓 퍼즐" 보상 그래픽 — 그림을 완료할 때마다 로켓 조각이 하나씩
+       채색되고, 12조각이 다 채워지면 발사 애니메이션이 재생된다. 지금은 레벨1 전용(currentLevel
+       기준으로 app.js에서 hidden 토글), 추후 레벨2~10도 같은 방식으로 이미지만 바꿔 확장 예정. -->
+  <div id="level-reward" class="level-reward" hidden aria-hidden="true">
+    <svg id="level-reward-art" class="level-reward-art"></svg>
   </div>
   <div id="gallery-grid" class="gallery-grid" role="list" aria-label="Coloring pictures list"></div>
 </section>
@@ -175,6 +180,12 @@
     <div id="goal-canvas-wrap" class="goal-canvas-wrap" role="button" aria-label="Zoom in on the picture" data-i18n-aria-label="goalZoom.openLabel">
       <canvas id="goal-canvas" class="goal-canvas"></canvas>
       <span id="goal-emoji" class="goal-emoji" hidden></span>
+      <!-- 2026-08-14: 챌린지 LEVEL 3 — 구름/비/눈이 실제로 움직이는 레이어. goal 실루엣으로
+           mask 처리해서 캐릭터 안쪽에만 보이게 함(challenge.js가 매 문제마다 채움). -->
+      <div id="challenge-weather-layer" class="challenge-weather-layer" aria-hidden="true" hidden></div>
+      <!-- 2026-08-15: 챌린지 LEVEL 2(1~6번) — goal 이미지는 항상 보이고, 원이 회전하는 자리만
+           이 엘리먼트로 가림(배경색과 같은 원). challenge.js가 위치/크기를 매 프레임 갱신. -->
+      <span id="challenge-goal-occluder" class="challenge-goal-occluder" aria-hidden="true" hidden></span>
       <span class="goal-zoom-badge" aria-hidden="true">🔍</span>
     </div>
   </div>
