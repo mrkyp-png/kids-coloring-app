@@ -1066,13 +1066,62 @@
     return n === 12 ? { cols: 4, rows: 3 } : { cols: 5, rows: 2 };
   }
 
-  // 로켓(레벨1) 전용 — 완성 후 꼬리(화염) 쪽에서 반짝이는 별빛 파티클. 실제 이모지 그림의
-  // 화염이 있는 좌하단 자리(0~100 좌표계 기준)에 배치.
-  const ROCKET_SPARKLES =
-    '<g class="reward-sparkles" aria-hidden="true">' +
-    '<path class="reward-sparkle" d="M0,-4 L1,-1 L4,0 L1,1 L0,4 L-1,1 L-4,0 L-1,-1 Z" transform="translate(8,72)"/>' +
-    '<path class="reward-sparkle" d="M0,-3 L0.8,-0.8 L3,0 L0.8,0.8 L0,3 L-0.8,0.8 L-3,0 L-0.8,-0.8 Z" transform="translate(23,84)"/>' +
-    '<path class="reward-sparkle" d="M0,-3.5 L0.9,-0.9 L3.5,0 L0.9,0.9 L0,3.5 L-0.9,0.9 L-3.5,0 L-0.9,-0.9 Z" transform="translate(13,94)"/>' +
+  // 2026-08-16: "날아가서 사라지는 로켓/풍선/기차는 효과가 큰데 나머지는 밋밋하다" 피드백으로
+  // 화면에 남는 7개 레벨(2/3/5/6/7/9/10)에도 그림마다 다른 완성 연출을 추가. 별/색종이/꽃잎처럼
+  // 여러 조각을 흩뿌리는 효과는 매번 마크업을 새로 안 쓰고 좌표 배열만 넘기면 되도록 작은
+  // 헬퍼로 만들어둠.
+  // 2026-08-16: "반짝임이 위치가 다 뭉쳐서 한 점에 찍힌다" 버그 — SVG 요소에 위치용
+  // transform="translate(...)" 속성을 걸어두고 그 위에 CSS 애니메이션으로도 transform(scale/
+  // translate 등)을 주면, CSS 쪽이 속성을 완전히 덮어써서(합쳐지지 않음) 위치가 통째로
+  // 사라지고 전부 원점 부근에 겹쳐버림. 그래서 각 조각을 "위치만 잡는 바깥 <g>"와 "애니메이션만
+  // 받는 안쪽 도형"으로 분리 — 바깥 transform 속성과 안쪽 CSS transform 애니메이션이 서로 다른
+  // 요소에 있으면 정상적으로 합쳐짐(부모 좌표계 위에서 자식이 움직임).
+  const SPARKLE_PATH = 'M0,-4 L1,-1 L4,0 L1,1 L0,4 L-1,1 L-4,0 L-1,-1 Z';
+  // points: [x, y, scale]
+  function sparkleGroup(cls, points) {
+    return '<g class="' + cls + '" aria-hidden="true">' +
+      points.map(([x, y, s]) =>
+        '<g transform="translate(' + x + ',' + y + ') scale(' + (s || 1) + ')">' +
+        '<path class="reward-sparkle" d="' + SPARKLE_PATH + '"/>' +
+        '</g>'
+      ).join('') +
+      '</g>';
+  }
+  // points: [x, y, rotateDeg]
+  function confettiGroup(points) {
+    return '<g class="reward-confetti" aria-hidden="true">' +
+      points.map(([x, y, r]) =>
+        '<g transform="translate(' + x + ',' + y + ') rotate(' + r + ')">' +
+        '<rect x="-1.4" y="-1.4" width="2.8" height="2.8"/>' +
+        '</g>'
+      ).join('') +
+      '</g>';
+  }
+  // points: [x, y, dx, dy, delay] — dx/dy는 흩날려 갈 방향(px), delay는 초 단위 시작 지연
+  function petalGroup(points) {
+    return '<g class="reward-petals" aria-hidden="true">' +
+      points.map(([x, y, dx, dy, delay]) =>
+        '<g transform="translate(' + x + ',' + y + ')">' +
+        '<circle class="reward-petal" cx="0" cy="0" r="2.2" style="--petal-dx:' + dx + 'px;--petal-dy:' + dy + 'px;--petal-delay:' + delay + 's"/>' +
+        '</g>'
+      ).join('') +
+      '</g>';
+  }
+
+  // 로켓(레벨1) 전용 — 완성 후 꼬리(화염) 쪽에서 반짝이는 별빛. 불꽃 자체가 노란색이라
+  // 반짝이(금색)를 불꽃 위에 얹으면 색이 묻혀 안 보이므로, 불꽃 바로 옆 크림색 배경 쪽
+  // (화면 왼쪽 가장자리)에 배치해서 대비가 나게 함.
+  const ROCKET_SPARKLES = sparkleGroup('reward-sparkles', [[6, 55, 0.9], [3, 74, 1], [9, 90, 0.8]]);
+
+  // 시계(레벨10) 전용 — clock.svg를 <image href>로 통째로 박으면 내부 시침/분침을 따로
+  // 움직일 수 없어서, 원본 SVG의 두 바늘 path만 그대로 가져와 클래스를 붙여 인라인으로
+  // 그린다(문/판/테두리는 그대로 <image>로 깔고, 그 위에 바늘만 겹쳐 그림 — 원본과 100%
+  // 같은 그림이면서 바늘만 CSS로 회전시킬 수 있게 됨). 원본 좌표계(중심 18,18)를 0~100으로
+  // 맞추는 변환은 <image>와 동일(scale 2.315, offset 8.33)하게 group에 적용.
+  const CLOCK_HANDS =
+    '<g transform="translate(8.333,8.333) scale(2.3148)" aria-hidden="true">' +
+    '<path class="reward-clock-hand reward-clock-hand-hour" fill="#66757F" d="M19 18c0 .553-.447 1-1 1-.552 0-1-.447-1-1V7c0-.552.448-1 1-1 .553 0 1 .448 1 1v11z"/>' +
+    '<path class="reward-clock-hand reward-clock-hand-min" fill="#66757F" d="M23.25 9.237c.479.276.643.888.367 1.366l-4.5 7.795c-.276.478-.889.642-1.367.365-.478-.276-.642-.888-.365-1.365l4.5-7.795c.276-.478.887-.642 1.365-.366z"/>' +
     '</g>';
 
   function buildRewardSvg(art, cols, rows) {
@@ -1086,23 +1135,48 @@
         cells += '<rect class="reward-piece reward-cell" data-piece="cell-' + (r * cols + c) + '" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '"/>';
       }
     }
-    return '<image class="reward-emoji-img" href="assets/emoji/' + art.emoji + '.svg" x="0" y="0" width="100" height="100"/>' + cells + (art.sparkles ? ROCKET_SPARKLES : '');
+    let extra = '';
+    if (art.sparkles) extra += ROCKET_SPARKLES;
+    if (art.effect === 'candles') { // 케이크 — 촛불 위에서 반짝임
+      extra += sparkleGroup('reward-sparkles', [[32, 8, 0.8], [50, 4, 1], [68, 8, 0.8]]);
+    } else if (art.effect === 'petals') { // 해바라기 — 꽃잎이 사방으로 흩날림
+      extra += petalGroup([
+        [50, 36, 30, -10, 0], [50, 36, -30, -6, 0.06], [50, 36, 10, -32, 0.03],
+        [50, 36, -10, 32, 0.09], [50, 36, 32, 14, 0.12], [50, 36, -32, 12, 0.15],
+      ]);
+    } else if (art.effect === 'stars') { // 놀란표정 — 얼굴 둘레로 별빛 후광
+      extra += sparkleGroup('reward-star-halo', [
+        [50, 15, 1], [78, 30, 0.9], [85, 55, 1], [70, 78, 0.9],
+        [30, 78, 1], [15, 55, 0.9], [22, 30, 1], [50, 85, 0.8],
+      ]);
+    } else if (art.effect === 'glow') { // 로봇 — 파란 빛이 한 번 확 퍼짐 + 스파크
+      extra += '<circle class="reward-glow" cx="50" cy="42" r="26"/>' +
+        confettiGroup([[38, 20, -15], [58, 18, 20], [70, 40, -10], [30, 42, 15], [50, 55, 0], [62, 60, 25]]);
+    } else if (art.effect === 'shine') { // 트로피 — 광택 훑기 + 색종이
+      extra += '<rect class="reward-shine" x="0" y="-20" width="18" height="150"/>' +
+        confettiGroup([[30, 20, -15], [50, 12, 10], [70, 20, -20], [25, 35, 20], [75, 35, -10], [50, 8, 0]]);
+    } else if (art.effect === 'clock-hands') { // 시계 — 바늘이 빙글빙글
+      extra += CLOCK_HANDS + confettiGroup([[20, 20, -15], [80, 20, 15], [50, 10, 0], [20, 80, 20], [80, 80, -20], [50, 90, 0]]);
+    } else if (!art.flyDirection) { // 위 특수 연출이 없는 나머지(관람차 포함)는 기본 색종이
+      extra += confettiGroup([[38, 40, -10], [50, 32, 15], [62, 40, -20], [44, 48, 20], [56, 46, -15], [50, 54, 10]]);
+    }
+    return '<image class="reward-emoji-img" href="assets/emoji/' + art.emoji + '.svg" x="0" y="0" width="100" height="100"/>' + cells + extra;
   }
 
   // flyDirection이 있는 레벨(로켓=대각선, 풍선=위, 기차=왼쪽)은 완성 후 화면 밖으로 날아가며
-  // 사라지고, 없는 레벨은 제자리에서 콤보 연출(살짝 확대 + 색종이) 후 완성된 그림으로 남는다.
+  // 사라지고, 나머지는 제자리에서 콤보 연출 후 그림마다 다른 완성 연출이 재생된다(effect).
   // 로켓은 이모지 그림 자체가 오른쪽 위 대각선을 향하고 있어(코 방향) 그 방향 그대로 날아간다.
   const LEVEL_REWARD_ART = {
     1: { emoji: 'rocket', flyDirection: 'diagonal', sparkles: true }, // 동물
-    2: { emoji: 'cake' },                              // 음식
-    3: { emoji: 'sunflower' },                          // 자연
+    2: { emoji: 'cake', effect: 'candles' },            // 음식
+    3: { emoji: 'sunflower', effect: 'petals' },        // 자연
     4: { emoji: 'balloon', flyDirection: 'up' },        // 하늘
-    5: { emoji: 'starstruck' },                         // 사람
-    6: { emoji: 'robot' },                              // 생활용품
-    7: { emoji: 'ferriswheel' },                        // 놀이
+    5: { emoji: 'starstruck', effect: 'stars' },        // 사람
+    6: { emoji: 'robot', effect: 'glow' },              // 생활용품
+    7: { emoji: 'ferriswheel', effect: 'spin' },        // 놀이 — 완성되면 바퀴가 한 바퀴 돎
     8: { emoji: 'train', flyDirection: 'left' },        // 탈것/장소
-    9: { emoji: 'trophy' },                             // 기호/기타
-    10: { emoji: 'clock' },                             // 시계
+    9: { emoji: 'trophy', effect: 'shine' },            // 기호/기타
+    10: { emoji: 'clock', effect: 'clock-hands' },      // 시계 — 완성되면 바늘이 빙글빙글
   };
 
   // 2026-08-16: 흡수되는 순간 짧은 "휙" 효과음(별도 음원 파일 없이 WebAudio로 직접 합성) +
@@ -1168,7 +1242,9 @@
       levelRewardArt.dataset.level = String(level);
       // 2026-08-16: SVGElement.className은 HTML과 달리 읽기 전용(SVGAnimatedString)이라
       // 대입하면 예외가 남 — class 속성은 setAttribute로 바꿔야 함.
-      levelRewardArt.setAttribute('class', 'level-reward-art' + (art.flyDirection ? ' reward-fly-' + art.flyDirection : ''));
+      levelRewardArt.setAttribute('class', 'level-reward-art' +
+        (art.flyDirection ? ' reward-fly-' + art.flyDirection : '') +
+        (art.effect === 'spin' ? ' reward-effect-spin' : ''));
     }
     levelRewardArt.querySelectorAll('.reward-cell').forEach((el, i) => {
       el.classList.toggle('is-active', i < clearedCount);
