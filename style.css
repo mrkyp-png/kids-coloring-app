@@ -693,12 +693,34 @@ button:active { transform: scale(0.94); }
   z-index: 0;
   overflow: hidden;
 }
+/* 상단 여백 한 줄을 왼쪽에서 오른쪽으로 천천히 흘러가는 "트랙" — 아이콘 세트가 두 벌 이어
+   붙어 있어서(app.js) 정확히 그 절반 폭만큼 옮기면 이음새 없이 계속 흐르는 것처럼 보인다.
+   글자와 안 겹치게 화면마다 top 위치가 다름(레벨1 등 갤러리 화면은 2줄 제목이라 더 아래로). */
+.screen-decor-track {
+  position: absolute;
+  left: 0;
+  top: 6%;
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  width: max-content;
+  animation: screen-decor-scroll 24s linear infinite;
+}
+/* 갤러리 화면은 제목 바로 아래에 보상 이미지가 여백 없이 붙어 있어서(상단이 안전지대가
+   아님) 대신 보상 이미지와 대기열 박스 사이의 빈 틈에 배치한다. */
+#gallery-screen .screen-decor-track { top: 46%; }
 .screen-decor-item {
   /* 2026-08-16: "무채색으로 하니 이상해" 피드백 — brightness(0) 흑백 실루엣 제거하고 원래
      색 그대로, 은은하게 비치는 정도로만(opacity)로 조절. */
-  position: absolute;
   opacity: 0.24;
-  transform: translate(-50%, -50%);
+  flex: none;
+}
+@keyframes screen-decor-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen-decor-track { animation: none; }
 }
 /* 헤더/보상/대기열/레벨 박스는 장식보다 위에 오도록 명시적으로 쌓임 순서 보장. */
 #gallery-screen .coloring-header, #level-next-banner, #level-reward, #gallery-grid,

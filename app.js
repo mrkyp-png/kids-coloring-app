@@ -3109,28 +3109,29 @@
     onboardingModal.hidden = false;
   }
 
-  // 2026-08-16: 갤러리/맵 화면 배경 장식 — "장식이 너무 튀고 지저분해 보인다" 피드백으로 대폭
-  // 축소: 10개, 작게, 연하게, 박스가 있는 영역은 아예 피해서 상단 여백 한 줄에만 규칙적으로 배치.
+  // 2026-08-16: 갤러리/맵 화면 배경 장식 — 상단 여백 한 줄, 왼쪽에서 오른쪽으로 천천히 흘러감.
+  // 세트를 통째로 두 번 이어붙인 "트랙"을 정확히 그 세트 폭(50%)만큼 옮기는 방식이라, 끊김
+  // 없이 계속 흐르는 것처럼 보인다(고전적인 마퀴 기법). 제목 글자와 안 겹치게 화면별로 top을
+  // 다르게 준다(#gallery-screen은 "레벨 N / n/12 완벽" 두 줄 제목이 있어 더 아래로).
   const SCREEN_DECOR_ICONS = ['star', 'heart', 'rabbit', 'duck', 'balloon', 'rainbow', 'apple', 'butterfly', 'cloud', 'tulip'];
   const SCREEN_DECOR_SIZE = 22;
   function buildScreenDecor() {
     document.querySelectorAll('.screen-decor').forEach((el) => {
       if (el.children.length) return; // 이미 채워져 있으면 다시 안 함
-      const frag = document.createDocumentFragment();
-      SCREEN_DECOR_ICONS.forEach((icon, i) => {
-        const img = document.createElement('img');
-        img.className = 'screen-decor-item';
-        img.src = 'assets/emoji/' + icon + '.svg';
-        img.alt = '';
-        // 박스/보상 이미지가 시작되기 전, 화면 맨 위 여백 한 줄에만 고르게 배치 — 박스 영역은
-        // 아예 건드리지 않아서 가려져 삐져나오는 일 자체가 없다.
-        img.style.left = ((i + 0.5) * 100 / SCREEN_DECOR_ICONS.length).toFixed(1) + '%';
-        img.style.top = '5%';
-        img.style.width = SCREEN_DECOR_SIZE + 'px';
-        img.style.height = SCREEN_DECOR_SIZE + 'px';
-        frag.appendChild(img);
-      });
-      el.appendChild(frag);
+      const track = document.createElement('div');
+      track.className = 'screen-decor-track';
+      for (let copy = 0; copy < 2; copy++) { // 두 벌 이어붙여서 이음새 없이 순환
+        SCREEN_DECOR_ICONS.forEach((icon) => {
+          const img = document.createElement('img');
+          img.className = 'screen-decor-item';
+          img.src = 'assets/emoji/' + icon + '.svg';
+          img.alt = '';
+          img.style.width = SCREEN_DECOR_SIZE + 'px';
+          img.style.height = SCREEN_DECOR_SIZE + 'px';
+          track.appendChild(img);
+        });
+      }
+      el.appendChild(track);
     });
   }
 
