@@ -155,30 +155,6 @@ button:active { transform: scale(0.94); }
   text-align: center;
   overflow: hidden;
 }
-.cover-decor {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0; /* cover-content(z-index:1)보다 뒤 */
-}
-.cover-decor-item {
-  position: absolute;
-  opacity: 0.55;
-  animation: cover-decor-float 3.4s ease-in-out infinite;
-}
-@keyframes cover-decor-float {
-  0%, 100% { transform: translateY(0) rotate(-6deg) scale(1); }
-  50% { transform: translateY(-10px) rotate(6deg) scale(1.12); }
-}
-.cd-1 { top: 4%;  left: 9%;  font-size: 1.7rem; animation-delay: 0s; }
-.cd-2 { top: 8%;  left: 80%; font-size: 1.3rem; animation-delay: 0.6s; }
-.cd-3 { top: 15%; left: 46%; font-size: 1.1rem; animation-delay: 1.2s; }
-.cd-4 { top: 3%;  left: 56%; font-size: 1.2rem; animation-delay: 1.8s; }
-.cd-5 { bottom: 7%;  left: 12%; font-size: 1.6rem; animation-delay: 0.3s; }
-.cd-6 { bottom: 11%; left: 72%; font-size: 1.2rem; animation-delay: 0.9s; }
-.cd-7 { bottom: 4%;  left: 42%; font-size: 1.1rem; animation-delay: 1.5s; }
-.cd-8 { bottom: 15%; left: 86%; font-size: 1.3rem; animation-delay: 2.1s; }
-
 /* 2026-08-11: 다국어 지원 — 표지 화면 우상단 🌐 버튼 + 드롭다운 언어 목록 (i18n.js가 채우고 연결). */
 .lang-btn {
   position: absolute;
@@ -447,7 +423,7 @@ button:active { transform: scale(0.94); }
    나머지 전부), 페이지 자체는 스크롤되지 않게 한다. dvh는 모바일 브라우저 주소창 접힘/펼침에
    따라 100vh가 흔들리는 문제를 막아줌(미지원 브라우저는 바로 위 100vh 값으로 자연히 대체됨). */
 #map-screen {
-  position: relative; /* .screen-decor(absolute) 기준점 */
+  position: relative;
   height: 100vh;
   height: 100dvh;
   display: flex;
@@ -734,58 +710,6 @@ button:active { transform: scale(0.94); }
   height: 100svh;
   overflow: hidden;
 }
-/* 2026-08-16: 커버 화면의 .cover-decor와 같은 패턴 — 배경에 무채색 작은 이모지 실루엣을
-   ~30개 흩뿌린다(app.js의 buildScreenDecor()가 채움. 좌표는 JS에서 랜덤 생성). 보상
-   이미지/대기열 박스/레벨 박스는 전부 불투명한 배경 위에 그려지므로(아래 z-index 규칙 +
-   .level-reward 자체 배경색) 장식이 그 뒤에 있어도 저절로 가려진다 — 좌표 회피 불필요. */
-.screen-decor {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
-}
-/* 상단 여백 한 줄을 왼쪽에서 오른쪽으로 천천히 흘러가는 "트랙" — 아이콘 세트가 두 벌 이어
-   붙어 있어서(app.js) 정확히 그 절반 폭만큼 옮기면 이음새 없이 계속 흐르는 것처럼 보인다.
-   글자와 안 겹치게 화면마다 top 위치가 다름(레벨1 등 갤러리 화면은 2줄 제목이라 더 아래로). */
-.screen-decor-track {
-  position: absolute;
-  left: 0;
-  top: 6%;
-  display: flex;
-  align-items: center;
-  gap: 40px;
-  width: max-content;
-  animation: screen-decor-scroll 24s linear infinite;
-}
-/* 갤러리 화면은 제목 바로 아래에 보상 이미지가 여백 없이 붙어 있어서(상단이 안전지대가
-   아님) 대신 보상 이미지와 대기열 박스 사이의 빈 틈에 배치한다.
-   2026-08-16: "보상이미지에 배경장식 비침" 제보로 실측 — 보상 이미지는 배경색이 없어서(요청에
-   따라 뺌) 장식이 그 뒤에 있으면 레터박스 틈으로 그대로 비친다. 흔한 폰 높이(667~844px)에서
-   레벨클리어 배너까지 보이는 최악의 경우 보상 이미지 하단이 뷰포트의 50~56% 지점까지 내려오는
-   걸 실측 확인 — 62%로 넉넉히 내려서 확실히 그 아래(대기열 박스 사이 틈)에서만 보이게 한다. */
-#gallery-screen .screen-decor-track { top: 62%; }
-/* 2026-08-16: "뒤로가기/리셋 버튼이 바탕화면 움직이는 이미지와 겹친다" 제보 — 맵 화면 헤더가
-   한 줄(버튼 4개)로 압축되면서 기본 top:6%(예전의 큰 헤더 여백 기준)가 그 버튼 줄과 겹치게
-   됐다. 헤더+진행률 문구 아래, 레벨 그리드 쪽으로 내림(카드가 불투명이라 그 뒤에서는 안
-   보이지만 겹치던 문제 자체가 사라짐). */
-#map-screen .screen-decor-track { top: 15%; }
-.screen-decor-item {
-  /* 2026-08-16: "무채색으로 하니 이상해" 피드백 — brightness(0) 흑백 실루엣 제거하고 원래
-     색 그대로, 은은하게 비치는 정도로만(opacity)로 조절. */
-  opacity: 0.24;
-  flex: none;
-}
-@keyframes screen-decor-scroll {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .screen-decor-track { animation: none; }
-}
-/* 헤더/보상/대기열/레벨 박스는 장식보다 위에 오도록 명시적으로 쌓임 순서 보장. */
-#gallery-screen .coloring-header, #level-next-banner, #level-reward, #gallery-grid,
-#map-screen .gallery-header, #map-grid, #boss-section { position: relative; z-index: 1; }
 .level-reward {
   flex: 0 0 auto;
   height: min(34vh, 280px);
