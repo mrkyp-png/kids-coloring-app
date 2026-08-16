@@ -647,11 +647,12 @@ button:active { transform: scale(0.94); }
   min-height: 0; /* flex 자식이 내용만큼 커지지 않고 실제로 줄어들어 스크롤되게 하는 필수 설정 */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
   padding: 16px;
-  max-width: 900px;
+  max-width: 480px;
   margin: 0 auto;
   width: 100%;
 }
@@ -697,6 +698,30 @@ button:active { transform: scale(0.94); }
   stroke: rgba(255, 255, 255, 0.55);
   filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.18));
 }
+/* 완성되면(전부 열리고 나서) 칸 구분선을 마저 지우고 그림자를 살짝 키워서, "격자" 대신
+   깔끔하게 완성된 그림 한 장으로 보이게 마무리한다. */
+.level-reward-art.launched .reward-cell {
+  stroke-opacity: 0;
+  transition: stroke-opacity 0.6s ease 0.3s;
+}
+.level-reward-art.launched .reward-emoji-img {
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.28));
+  transition: filter 0.4s ease 0.3s;
+}
+
+/* 로켓(레벨1) 전용 — 완성 후 꼬리 쪽에서 반짝이는 별빛 */
+.reward-sparkles { opacity: 0; }
+.reward-sparkle { fill: #FFF3BF; transform-box: fill-box; transform-origin: center; }
+.level-reward-art.launched .reward-sparkles { opacity: 1; }
+.level-reward-art.launched .reward-sparkle {
+  animation: reward-sparkle-twinkle 0.5s ease-in-out infinite;
+}
+.reward-sparkle:nth-child(2) { animation-delay: 0.15s; }
+.reward-sparkle:nth-child(3) { animation-delay: 0.3s; }
+@keyframes reward-sparkle-twinkle {
+  0%, 100% { opacity: 0.2; transform: scale(0.6); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
 
 /* 완료한 카드 이모지가 보상 이미지 칸으로 날아가 흡수되는 잔상 (JS가 body에 붙였다 뗌) */
 .reward-absorb-ghost {
@@ -732,13 +757,16 @@ button:active { transform: scale(0.94); }
 .level-reward-art.reward-fly-right.launched {
   animation: reward-launch-right 1.8s cubic-bezier(0.55, 0, 0.85, 0.35) 0.5s forwards;
 }
-.level-reward-art.launched:not(.reward-fly-up):not(.reward-fly-right) {
+.level-reward-art.reward-fly-diagonal.launched {
+  animation: reward-launch-diagonal 1.8s cubic-bezier(0.55, 0, 0.85, 0.35) 0.5s forwards;
+}
+.level-reward-art.launched:not(.reward-fly-up):not(.reward-fly-right):not(.reward-fly-diagonal) {
   animation: reward-celebrate 0.6s ease-out 0.3s both;
 }
-.level-reward-art.launched:not(.reward-fly-up):not(.reward-fly-right) .reward-confetti {
+.level-reward-art.launched:not(.reward-fly-up):not(.reward-fly-right):not(.reward-fly-diagonal) .reward-confetti {
   opacity: 1;
 }
-.level-reward-art.launched:not(.reward-fly-up):not(.reward-fly-right) .reward-confetti > * {
+.level-reward-art.launched:not(.reward-fly-up):not(.reward-fly-right):not(.reward-fly-diagonal) .reward-confetti > * {
   animation-name: reward-confetti-burst;
   animation-duration: 1.1s;
   animation-timing-function: ease-out;
@@ -753,6 +781,10 @@ button:active { transform: scale(0.94); }
   0% { transform: translate(0, 0); }
   100% { transform: translate(280px, -10px); opacity: 0; }
 }
+@keyframes reward-launch-diagonal {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(230px, -230px); opacity: 0; }
+}
 @keyframes reward-celebrate {
   0% { transform: scale(1); }
   35% { transform: scale(1.12); }
@@ -764,73 +796,61 @@ button:active { transform: scale(0.94); }
   .reward-piece.reward-cell { transition: fill 0.2s ease; }
   .level-reward-art.launched { animation: none; }
   .level-reward-art.reward-fly-up.launched,
-  .level-reward-art.reward-fly-right.launched { opacity: 0; }
+  .level-reward-art.reward-fly-right.launched,
+  .level-reward-art.reward-fly-diagonal.launched { opacity: 0; }
   .level-reward-art.launched .reward-confetti { opacity: 0; }
+  .level-reward-art.launched .reward-sparkles,
+  .level-reward-art.launched .reward-sparkle { animation: none; opacity: 0; }
 }
 
-/* 2026-08-11: "카드가 밋밋하고 차가운 느낌" 개선 — 맵 화면 레벨 박스와 같은 방식(키캡 입체감 +
-   무지개 순환색)을 갤러리 카드에도 적용. 카드 수가 10개보다 많을 수 있어 10개 주기로 순환
-   (:nth-child(10n+N))시켜서 팔레트를 재사용한다. */
-.tpl-card {
+/* 2026-08-16: "그림 카드 여러 개 그리드"에서 "한 번에 2개짜리 대기열"로 교체 — 한 줄(.tpl-row)에
+   원형 이미지 + 이름을 큼직하게 담고, 완료되면 그 줄이 보상 이미지 쪽으로 흡수되며 사라진다.
+   2개뿐이라 색은 hue-1/hue-2 두 가지만 번갈아 쓴다(기존 맵 화면 무지개 팔레트 재사용). */
+.tpl-row {
   position: relative;
   background: var(--lv-bg, var(--card-bg));
   border: 2px solid var(--lv-bezel, #E6E0FF);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   box-shadow: 0 5px 0 var(--lv-bezel, rgba(0, 0, 0, 0.14)), 0 8px 12px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  padding: 14px 8px;
+  padding: 20px 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  transition: transform 0.08s ease, box-shadow 0.08s ease;
+  gap: 10px;
+  width: 100%;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, opacity 0.55s ease, transform 0.55s ease;
 }
-.tpl-card:active {
+.tpl-row:active {
   transform: translateY(4px);
   box-shadow: 0 1px 0 var(--lv-bezel, rgba(0, 0, 0, 0.14)), 0 3px 6px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
-.tpl-card:nth-child(10n+1) { --lv-bg: hsl(var(--lv-hue-1), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-1), var(--lv-sat), var(--lv-bezel-light)); }
-.tpl-card:nth-child(10n+2) { --lv-bg: hsl(var(--lv-hue-2), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-2), var(--lv-sat), var(--lv-bezel-light)); }
-.tpl-card:nth-child(10n+3) { --lv-bg: hsl(var(--lv-hue-3), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-3), var(--lv-sat), var(--lv-bezel-light)); }
-.tpl-card:nth-child(10n+4) { --lv-bg: hsl(var(--lv-hue-4), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-4), var(--lv-sat), var(--lv-bezel-light)); }
-.tpl-card:nth-child(10n+5) { --lv-bg: hsl(var(--lv-hue-5), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-5), var(--lv-sat), var(--lv-bezel-light)); }
-.tpl-card:nth-child(10n+6) { --lv-bg: hsl(var(--lv-hue-6), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-6), var(--lv-sat), var(--lv-bezel-light)); }
-.tpl-card:nth-child(10n+7) { --lv-bg: hsl(var(--lv-hue-7), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-7), var(--lv-sat), var(--lv-bezel-light)); }
-.tpl-card:nth-child(10n+8) { --lv-bg: hsl(var(--lv-hue-8), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-8), var(--lv-sat), var(--lv-bezel-light)); }
-.tpl-card:nth-child(10n+9) { --lv-bg: hsl(var(--lv-hue-9), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-9), var(--lv-sat), var(--lv-bezel-light)); }
-.tpl-card:nth-child(10n+10) { --lv-bg: hsl(var(--lv-hue-10), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-10), var(--lv-sat), var(--lv-bezel-light)); }
-.tpl-card .tpl-emoji {
-  /* 2026-08-11: "레벨 안 아이콘도 동일하게" 요청 — 레벨박스 배지(.lv-preview-emoji)와 같은
-     볼록한 유리구슬 스타일 적용. */
-  font-size: 2rem;
+.tpl-row:nth-child(odd) { --lv-bg: hsl(var(--lv-hue-1), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-1), var(--lv-sat), var(--lv-bezel-light)); }
+.tpl-row:nth-child(even) { --lv-bg: hsl(var(--lv-hue-2), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-2), var(--lv-sat), var(--lv-bezel-light)); }
+.tpl-row .tpl-emoji {
+  font-size: 3rem;
   line-height: 1;
-  width: 56px;
-  height: 56px;
+  width: 88px;
+  height: 88px;
   border-radius: 50%;
   background: linear-gradient(155deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.8) 55%, rgba(255, 255, 255, 0.55) 100%);
   box-shadow:
-    0 3px 0 rgba(0, 0, 0, 0.16),
-    0 4px 8px rgba(0, 0, 0, 0.22),
+    0 4px 0 rgba(0, 0, 0, 0.16),
+    0 6px 12px rgba(0, 0, 0, 0.22),
     inset 0 2px 2px rgba(255, 255, 255, 0.95),
     inset 0 -3px 4px rgba(0, 0, 0, 0.14);
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.tpl-card .tpl-label {
-  font-size: 1rem;
-  font-weight: 600;
-}
-.tpl-card .tpl-difficulty {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  background: var(--brand);
-  color: #fff;
-  font-size: 0.7rem;
+.tpl-row .tpl-label {
+  font-size: 1.15rem;
   font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 999px;
+}
+/* 완료돼서 보상 이미지로 흡수되는 동안(paintQueue로 실제 제거되기 전) 살짝 오그라들며 사라짐 */
+.tpl-row-absorbing {
+  opacity: 0;
+  transform: scale(0.7);
+  pointer-events: none;
 }
 
 /* ---------- 색칠 화면 ---------- */

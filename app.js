@@ -1058,7 +1058,16 @@
     return n === 12 ? { cols: 4, rows: 3 } : { cols: 5, rows: 2 };
   }
 
-  function buildRewardSvg(emojiId, cols, rows) {
+  // 로켓(레벨1) 전용 — 완성 후 꼬리(화염) 쪽에서 반짝이는 별빛 파티클. 실제 이모지 그림의
+  // 화염이 있는 좌하단 자리(0~100 좌표계 기준)에 배치.
+  const ROCKET_SPARKLES =
+    '<g class="reward-sparkles" aria-hidden="true">' +
+    '<path class="reward-sparkle" d="M0,-4 L1,-1 L4,0 L1,1 L0,4 L-1,1 L-4,0 L-1,-1 Z" transform="translate(8,72)"/>' +
+    '<path class="reward-sparkle" d="M0,-3 L0.8,-0.8 L3,0 L0.8,0.8 L0,3 L-0.8,0.8 L-3,0 L-0.8,-0.8 Z" transform="translate(23,84)"/>' +
+    '<path class="reward-sparkle" d="M0,-3.5 L0.9,-0.9 L3.5,0 L0.9,0.9 L0,3.5 L-0.9,0.9 L-3.5,0 L-0.9,-0.9 Z" transform="translate(13,94)"/>' +
+    '</g>';
+
+  function buildRewardSvg(art, cols, rows) {
     let cells = '';
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
@@ -1069,13 +1078,14 @@
         cells += '<rect class="reward-piece reward-cell" data-piece="cell-' + (r * cols + c) + '" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '"/>';
       }
     }
-    return '<image class="reward-emoji-img" href="assets/emoji/' + emojiId + '.svg" x="0" y="0" width="100" height="100"/>' + cells;
+    return '<image class="reward-emoji-img" href="assets/emoji/' + art.emoji + '.svg" x="0" y="0" width="100" height="100"/>' + cells + (art.sparkles ? ROCKET_SPARKLES : '');
   }
 
-  // flyDirection이 있는 레벨(로켓/풍선=위, 기차=오른쪽)은 완성 후 화면 밖으로 날아가며 사라지고,
-  // 없는 레벨은 제자리에서 콤보 연출(살짝 확대 + 색종이) 후 완성된 그림으로 남는다.
+  // flyDirection이 있는 레벨(로켓=대각선, 풍선=위, 기차=오른쪽)은 완성 후 화면 밖으로 날아가며
+  // 사라지고, 없는 레벨은 제자리에서 콤보 연출(살짝 확대 + 색종이) 후 완성된 그림으로 남는다.
+  // 로켓은 이모지 그림 자체가 오른쪽 위 대각선을 향하고 있어(코 방향) 그 방향 그대로 날아간다.
   const LEVEL_REWARD_ART = {
-    1: { emoji: 'rocket', flyDirection: 'up' },       // 동물
+    1: { emoji: 'rocket', flyDirection: 'diagonal', sparkles: true }, // 동물
     2: { emoji: 'cake' },                              // 음식
     3: { emoji: 'sunflower' },                          // 자연
     4: { emoji: 'balloon', flyDirection: 'up' },        // 하늘
@@ -1087,12 +1097,9 @@
     10: { emoji: 'clock' },                             // 시계
   };
 
-  // 2026-08-16: "완료한 그림이 보상 이미지로 흡수되는" 연출 — 카드 자체는 그대로 두고(계속 탭
-  // 가능), 방금 막 완료된 카드의 이모지 복제본이 보상 이미지의 해당 칸 위치로 날아가 사라지는
-  // 잔상만 만든다. 레벨별로 마지막에 본 "완료된 그림 id" 목록을 기억해뒀다가, 새로 늘어난
-  // 것만 애니메이션한다.
-  const lastRewardMasteredIds = {};
-
+  // 2026-08-16: "완료한 그림이 보상 이미지로 흡수되는" 연출 — 완료된 줄의 이모지 복제본이
+  // 보상 이미지의 해당 칸 위치로 날아가 사라지는 잔상을 만든다. 실제 줄 제거/대기열 교체는
+  // renderQueue()가 담당.
   function flyToReward(cardEl, pieceEl) {
     const fromImg = cardEl && cardEl.querySelector('.tpl-emoji');
     if (!fromImg || !pieceEl) return;
@@ -1115,34 +1122,13 @@
     setTimeout(() => ghost.remove(), 700);
   }
 
-  function animateRewardAbsorb(level, list, scores) {
-    const art = LEVEL_REWARD_ART[level];
-    const prevIds = lastRewardMasteredIds[level];
-    const currentIds = list.filter((t) => isMastered(t.id, scores)).map((t) => t.id);
-    if (!art || !prevIds) {
-      // 이 레벨을 이번 세션에서 처음 보는 거면(또는 보상 이미지가 없으면) 기준선만 저장하고
-      // 애니메이션은 건너뛴다 — 안 그러면 이미 클리어된 레벨을 다시 열 때마다 재생돼버린다.
-      lastRewardMasteredIds[level] = currentIds;
-      return;
-    }
-    const prevSet = new Set(prevIds);
-    const newlyMastered = list.filter((t) => !prevSet.has(t.id) && currentIds.includes(t.id));
-    newlyMastered.forEach((tpl, k) => {
-      const idx = list.indexOf(tpl);
-      const card = galleryGrid.children[idx];
-      const pieceEl = levelRewardArt.querySelector('[data-piece="cell-' + (prevIds.length + k) + '"]');
-      flyToReward(card, pieceEl);
-    });
-    lastRewardMasteredIds[level] = currentIds;
-  }
-
   function updateLevelReward(level, clearedCount, total) {
     const art = LEVEL_REWARD_ART[level];
     levelReward.hidden = !art;
     if (!art) return;
     if (levelRewardArt.dataset.level !== String(level)) {
       const { cols, rows } = gridDims(total);
-      levelRewardArt.innerHTML = buildRewardSvg(art.emoji, cols, rows);
+      levelRewardArt.innerHTML = buildRewardSvg(art, cols, rows);
       levelRewardArt.setAttribute('viewBox', '0 0 100 100');
       levelRewardArt.setAttribute('preserveAspectRatio', 'xMidYMid meet');
       levelRewardArt.dataset.level = String(level);
@@ -1194,30 +1180,76 @@
     levelNextBanner.hidden = !(isClear || hasBack || hasTimer);
     updateLevelTimerDisplay();
 
+    renderQueue(currentLevel, list, scores);
+  }
+
+  // 2026-08-16: "카드 그리드 대신 2개씩 대기열" 요청 — 한 번에 딱 2개(QUEUE_SIZE)만 보여주고,
+  // 그림을 완료하면 그 줄이 보상 이미지로 흡수되며 사라진 뒤, 대기 중이던 다음 그림이 그 자리로
+  // 올라온다. 레벨별로 "지금 화면에 보이는 두 그림의 id"를 기억해뒀다가(queueByLevel), 매
+  // 렌더마다 그중 새로 클리어된 게 있는지 비교해서 흡수 애니메이션을 트리거한다.
+  const QUEUE_SIZE = 2;
+  const queueByLevel = {};
+
+  function renderQueueRow(tpl) {
+    const row = document.createElement('button');
+    row.className = 'tpl-row';
+    row.dataset.tplId = tpl.id;
+    const displayName = I18N.templateName(tpl);
+    row.setAttribute('aria-label', 'Color the ' + displayName);
+    row.innerHTML =
+      '<img class="tpl-emoji" src="assets/emoji/' + tpl.id + (tpl.isBoss ? '-icon' : '') + '.svg" alt="">' +
+      '<span class="tpl-label">' + escapeHtml(displayName) + '</span>';
+    row.addEventListener('click', () => openTemplate(tpl));
+    return row;
+  }
+
+  function paintQueue(ids, byId) {
     galleryGrid.innerHTML = '';
-    list.forEach((tpl) => {
-      const card = document.createElement('button');
-      card.className = 'tpl-card';
-      card.setAttribute('role', 'listitem');
-      const displayName = I18N.templateName(tpl);
-      card.setAttribute('aria-label', 'Color the ' + displayName);
-      const score = scores[tpl.id];
-      const attempted = score !== undefined;
-      const mastered = score === 100;
-      let badge = '';
-      if (attempted) {
-        badge = mastered
-          ? '<span class="tpl-done-badge tpl-badge-good">✓</span>'
-          : '<span class="tpl-done-badge tpl-badge-bad">✗</span>';
-      }
-      card.innerHTML =
-        '<img class="tpl-emoji" src="assets/emoji/' + tpl.id + (tpl.isBoss ? '-icon' : '') + '.svg" alt="">' +
-        '<span class="tpl-label">' + escapeHtml(displayName) + '</span>' +
-        badge;
-      card.addEventListener('click', () => openTemplate(tpl));
-      galleryGrid.appendChild(card);
+    ids.forEach((id) => { if (byId[id]) galleryGrid.appendChild(renderQueueRow(byId[id])); });
+  }
+
+  function renderQueue(level, list, scores) {
+    const byId = {};
+    list.forEach((t) => { byId[t.id] = t; });
+    const pending = list.filter((t) => !isMastered(t.id, scores));
+    const pendingIds = new Set(pending.map((t) => t.id));
+    const prevIds = queueByLevel[level];
+
+    if (!prevIds) {
+      // 이 레벨을 이번 세션에서 처음 그리는 거면 애니메이션 없이 바로 대기열을 채운다.
+      const initial = pending.slice(0, QUEUE_SIZE).map((t) => t.id);
+      queueByLevel[level] = initial;
+      paintQueue(initial, byId);
+      return;
+    }
+
+    const justCleared = prevIds.filter((id) => !pendingIds.has(id));
+    if (justCleared.length === 0) {
+      if (!galleryGrid.children.length) paintQueue(prevIds, byId); // 레벨 전환 등으로 DOM이 비었으면 다시 그림
+      return;
+    }
+
+    // 방금 클리어된 줄들을 보상 이미지 쪽으로 흡수시키고, 끝나면 다음 대기열로 교체한다.
+    const doneCountAfter = list.length - pending.length;
+    const doneCountBefore = doneCountAfter - justCleared.length;
+    const art = LEVEL_REWARD_ART[level];
+    justCleared.forEach((id, k) => {
+      const row = galleryGrid.querySelector('[data-tpl-id="' + id + '"]');
+      if (!row) return;
+      row.classList.add('tpl-row-absorbing');
+      const pieceEl = art && levelRewardArt.querySelector('[data-piece="cell-' + (doneCountBefore + k) + '"]');
+      flyToReward(row, pieceEl);
     });
-    animateRewardAbsorb(currentLevel, list, scores);
+
+    const remaining = prevIds.filter((id) => pendingIds.has(id));
+    const used = new Set(remaining);
+    for (const t of pending) {
+      if (used.size >= QUEUE_SIZE) break;
+      if (!used.has(t.id)) { remaining.push(t.id); used.add(t.id); }
+    }
+    queueByLevel[level] = remaining;
+
+    setTimeout(() => paintQueue(queueByLevel[level], byId), 650);
   }
 
   // ================= 색칠 화면 진입 =================
