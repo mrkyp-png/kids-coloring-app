@@ -1240,8 +1240,12 @@
     '<path fill="#FFCC4D" d="M34.259 10c0-3 0-7-1-7s-3 4-4 6 5 1 5 1z"/>' +
     '<path fill="#FFCC4D" d="M34.259 10c0-2.209-8-3-19-3h-2C6.632 7 .509 12.451.509 18.25S4.259 28 13.259 28s12-4.701 12-10.5c0-.881-.138-1.731-.371-2.549C29.259 14 34.259 12.006 34.259 10z"/>' +
     '<path fill="#3B88C3" d="M4.259 13c-2.091 2.918-3.068 7.589 1.213 7.784 4.787.216 6.787.216 7.85-2.372 1.364-3.32.937-7.413-.276-8.195-2.32-1.497-6.695-.135-8.787 2.783zm16.841-.465C23.259 16 23.17 18.696 19.259 20c-3 1-4-2-3.841-5.535.112-2.483.206-4.195 1.841-4.465 1.447-.24 2.526.426 3.841 2.535z"/>' +
+    // 2026-08-17: "뒤쪽 프로펠러(꼬리 로터)도 돌아가야" 요청 — 위 메인 로터와 같은 방식으로,
+    // 꼬리 날개 2개만 따로 묶어서 회전시킨다(허브 조각은 고정).
+    '<g class="reward-heli-rotor">' +
     '<path fill="#99AAB5" d="M31.441 7.114c.903 1.273 1.271 2.564.82 2.884-.45.32-1.548-.454-2.451-1.726-.903-1.273-1.271-2.564-.82-2.884.45-.321 1.547.453 2.451 1.726z"/>' +
     '<path fill="#99AAB5" d="M34.72 11.735c.909 1.279 1.28 2.575.83 2.894-.45.32-1.553-.458-2.46-1.737-.909-1.279-1.279-2.576-.829-2.896.45-.318 1.551.46 2.459 1.739z"/>' +
+    '</g>' +
     '<path fill="#66757F" d="M33.076 9.419c.319.45.214 1.074-.236 1.394-.45.32-1.074.214-1.395-.236-.319-.45-.214-1.074.237-1.394.451-.321 1.075-.214 1.394.236z"/>' +
     '<path fill="#99AAB5" d="M25.26 32c0 1.104-.896 2-2 2h-20c-1.104 0-2-.896-2-2s.896-2 2-2h20c1.104 0 2 .896 2 2z"/>' +
     '</g>';
@@ -1480,7 +1484,7 @@
       '<g clip-path="url(#' + clipId + ')">' +
       '<image href="assets/emoji/' + emoji + '.svg" x="' + imgX + '" y="' + imgY + '" width="' + imgSize + '" height="' + imgSize + '"/>' +
       '</g>' +
-      '<path d="' + outline + '" fill="none" stroke="#fff" stroke-width="3"/>' +
+      '<path class="reward-puzzle-outline" d="' + outline + '" fill="none" stroke="#000" stroke-width="3"/>' +
       '</svg>';
   }
 
@@ -1576,44 +1580,53 @@
     // 페이드/축소 연출을 덮어써버리는 버그가 있었음.
     renderLevelGallery();
 
-    // ① 완성 이미지를 정답 칸과 같은 자리(둘 다 CSS grid-area:1/1 — .level-reward의 grid가
-    // 자동으로 겹쳐줌)에 투명하게 깔아둔 뒤, 정답 칸은 페이드아웃시키고 완성 이미지는
-    // 페이드인시킨다.
-    levelRewardArt.innerHTML = buildRewardSvg(art, cols, rows);
-    levelRewardArt.querySelectorAll('.reward-cell').forEach((el) => el.classList.add('is-active'));
-    // reward-puzzle-clean: 칸 구분선 없이 깔끔한 한 장의 그림으로 보이게(밑에서 커지는
-    // 동안에도 계속 유지해야 해서 이후 class를 바꿀 때도 계속 같이 붙여줌).
-    // reward-puzzle-shrunk: 조각이 있던 자리와 같은 축소 크기로 시작 — "분리되기 전 크기로
-    // 합쳐진다"는 요청대로, 크로스페이드가 원본 크기가 아니라 이 축소 크기에서 시작됨.
-    levelRewardArt.setAttribute('class', 'level-reward-art reward-puzzle-clean reward-puzzle-shrunk');
-    levelRewardArt.removeAttribute('hidden');
-    levelRewardArt.style.opacity = '0';
-    levelRewardArt.style.transition = 'opacity 1s ease';
-    rewardPuzzleTargetGrid.style.transition = 'opacity 1s ease';
-    requestAnimationFrame(() => {
-      levelRewardArt.style.opacity = '1';
-      rewardPuzzleTargetGrid.style.opacity = '0';
-    });
+    // ① 조각들의 흰 윤곽선만 먼저 슬쩍 지운다(칸 사이 빈틈은 이미 0이라, 이것만으로 그림이
+    // 거의 다 붙어 보임 — 이 상태에서 완성 그림으로 바꿔치기하면 두 그림이 어긋난 채 겹쳐
+    // 보이는 이중노출 없이 훨씬 자연스럽다).
+    rewardPuzzleTargetGrid.classList.add('reward-puzzle-seams-clean');
 
     setTimeout(() => {
       if (currentLevel !== level) return; // 그 사이 다른 레벨로 이동했으면 건너뜀
-      // 임시로 씌웠던 크로스페이드용 인라인 스타일 정리.
-      rewardPuzzleTargetGrid.hidden = true;
-      rewardPuzzleTargetGrid.style.opacity = '';
-      rewardPuzzleTargetGrid.style.transition = '';
-      levelRewardArt.style.opacity = '';
-      levelRewardArt.style.transition = '';
+      // ② 완성 이미지를 정답 칸과 같은 자리(둘 다 CSS grid-area:1/1 — .level-reward의 grid가
+      // 자동으로 겹쳐줌)에 투명하게 깔아둔 뒤, 정답 칸은 페이드아웃시키고 완성 이미지는
+      // 페이드인시킨다. ①에서 이미 거의 같은 그림이 됐으니 이 크로스페이드는 짧게.
+      levelRewardArt.innerHTML = buildRewardSvg(art, cols, rows);
+      levelRewardArt.querySelectorAll('.reward-cell').forEach((el) => el.classList.add('is-active'));
+      // reward-puzzle-clean: 칸 구분선 없이 깔끔한 한 장의 그림으로 보이게(밑에서 커지는
+      // 동안에도 계속 유지해야 해서 이후 class를 바꿀 때도 계속 같이 붙여줌).
+      // reward-puzzle-shrunk: 조각이 있던 자리와 같은 축소 크기로 시작 — "분리되기 전 크기로
+      // 합쳐진다"는 요청대로, 크로스페이드가 원본 크기가 아니라 이 축소 크기에서 시작됨.
+      levelRewardArt.setAttribute('class', 'level-reward-art reward-puzzle-clean reward-puzzle-shrunk');
+      levelRewardArt.removeAttribute('hidden');
+      levelRewardArt.style.opacity = '0';
+      levelRewardArt.style.transition = 'opacity 0.35s ease';
+      rewardPuzzleTargetGrid.style.transition = 'opacity 0.35s ease';
+      requestAnimationFrame(() => {
+        levelRewardArt.style.opacity = '1';
+        rewardPuzzleTargetGrid.style.opacity = '0';
+      });
 
-      // ② 축소 크기에서 원본 크기로 천천히 커지는 연출
-      levelRewardArt.setAttribute('class', 'level-reward-art reward-puzzle-clean reward-puzzle-grow');
       setTimeout(() => {
         if (currentLevel !== level) return;
-        // ③ 원본 크기 그대로(=1배) 정해진 방향으로 날아가며 사라짐 + 칭찬 — 위 확대가
-        // 딱 원본 크기(scale 1)에서 끝나므로 공용 연출을 그대로 써도 크기 튐이 없음.
-        levelRewardArt.setAttribute('class', 'level-reward-art' + (art.flyDirection ? ' reward-fly-' + art.flyDirection + ' launched' : ''));
-        playExcellent();
-      }, 2000);
-    }, 1000);
+        // 임시로 씌웠던 크로스페이드용 인라인 스타일 정리.
+        rewardPuzzleTargetGrid.hidden = true;
+        rewardPuzzleTargetGrid.classList.remove('reward-puzzle-seams-clean');
+        rewardPuzzleTargetGrid.style.opacity = '';
+        rewardPuzzleTargetGrid.style.transition = '';
+        levelRewardArt.style.opacity = '';
+        levelRewardArt.style.transition = '';
+
+        // ③ 축소 크기에서 원본 크기로 천천히 커지는 연출
+        levelRewardArt.setAttribute('class', 'level-reward-art reward-puzzle-clean reward-puzzle-grow');
+        setTimeout(() => {
+          if (currentLevel !== level) return;
+          // ④ 원본 크기 그대로(=1배) 정해진 방향으로 날아가며 사라짐 + 칭찬 — 위 확대가
+          // 딱 원본 크기(scale 1)에서 끝나므로 공용 연출을 그대로 써도 크기 튐이 없음.
+          levelRewardArt.setAttribute('class', 'level-reward-art' + (art.flyDirection ? ' reward-fly-' + art.flyDirection + ' launched' : ''));
+          playExcellent();
+        }, 2000);
+      }, 600);
+    }, 400);
   }
 
   // 조각을 손가락/마우스로 끌어서 정답 칸 위에 놓으면 붙고(소리+짧은 진동), 아니면
