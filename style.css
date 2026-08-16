@@ -687,10 +687,8 @@ button:active { transform: scale(0.94); }
 }
 .gd-1 { top: 6%;  left: 8%;  width: 34px; }
 .gd-2 { top: 10%; left: 78%; width: 30px; }
-.gd-3 { top: 22%; left: 42%; width: 32px; }
 .gd-4 { bottom: 30%; left: 14%; width: 36px; }
 .gd-5 { bottom: 26%; left: 72%; width: 34px; }
-.gd-6 { bottom: 6%;  left: 44%; width: 44px; }
 /* 헤더/보상/대기열은 장식보다 위에 오도록(z-index 0인 장식은 자연히 뒤로 가지만, 명시적으로
    보장 — coloring-header 등은 이미 배경색이 있어서 실제로는 안 겹쳐도 되지만 안전하게). */
 #gallery-screen .coloring-header, #level-next-banner, #level-reward, #gallery-grid { position: relative; z-index: 1; }
