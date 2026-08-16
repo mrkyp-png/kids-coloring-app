@@ -711,6 +711,7 @@ button:active { transform: scale(0.94); }
   overflow: hidden;
 }
 .level-reward {
+  position: relative; /* 조각맞추기 완성 크로스페이드 때 두 요소를 겹쳐 놓는 기준점 */
   flex: 0 0 auto;
   height: min(34vh, 280px);
   display: flex;
@@ -1019,7 +1020,7 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 }
 /* 레벨1 실험 기능 — 조각 4개를 다 맞춰서 한 그림으로 합쳐진 순간, 그 자리에서 한 번 커졌다가
    (이후 날아가는 연출로 이어짐) */
-.reward-puzzle-grow { animation: reward-puzzle-grow-anim 0.38s ease-out both; }
+.reward-puzzle-grow { animation: reward-puzzle-grow-anim 0.9s ease-out both; }
 @keyframes reward-puzzle-grow-anim {
   0% { transform: scale(1); }
   100% { transform: scale(1.35); }

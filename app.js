@@ -1484,24 +1484,58 @@
     }, 250);
   }
 
-  // 조각을 다 맞추면(로켓 완성) 정답 칸 격자를 원래 svg로 되돌리고(퍼즐 이전과 동일한 완성
-  // 그림) 그 자리에서 한 번 커졌다가, 원래 정해진 방향으로 날아가며 사라지는 기존 연출 +
-  // 칭찬 문구(다국어+음성, 기존 playExcellent/showLevelClearPraise 재활용)를 재생하며
-  // "다음" 버튼을 연다("다음"은 애니메이션을 기다리지 않고 즉시 열림 — 다른 레벨들과 동일).
+  // 조각을 다 맞추면(로켓 완성) ①조각들이 서서히 사라지며 완성된 그림이 서서히 나타나는
+  // 크로스페이드(조각이 "천천히 붙어 하나가 되는" 느낌) → ②그 자리에서 천천히 커짐 →
+  // ③원래 정해진 방향으로 날아가며 사라지는 기존 연출 + 칭찬 문구(다국어+음성, 기존
+  // playExcellent/showLevelClearPraise 재활용)를 재생. "다음" 버튼은 애니메이션을 기다리지
+  // 않고 즉시 열림(다른 레벨들과 동일).
   function finishRewardPuzzle(level) {
     const art = LEVEL_REWARD_ART[level];
     const total = getTemplatesForLevel(level).length;
     const { cols, rows } = gridDims(total);
-    rewardPuzzleTargetGrid.hidden = true;
+
+    // ① 완성 이미지를 정답 칸과 같은 자리에 겹쳐서 투명하게 깔아둔 뒤, 정답 칸은 페이드아웃
+    // 시키고 완성 이미지는 페이드인시킨다 — 둘 다 잠깐 position:absolute로 같은 자리에
+    // 겹쳐야 자연스럽게 크로스페이드됨(평소엔 flex라 나란히 놓이므로 이때만 임시로 겹침).
     levelRewardArt.innerHTML = buildRewardSvg(art, cols, rows);
     levelRewardArt.querySelectorAll('.reward-cell').forEach((el) => el.classList.add('is-active'));
-    levelRewardArt.setAttribute('class', 'level-reward-art reward-puzzle-grow');
+    levelRewardArt.setAttribute('class', 'level-reward-art');
     levelRewardArt.removeAttribute('hidden');
+    levelRewardArt.style.position = 'absolute';
+    levelRewardArt.style.inset = '0';
+    levelRewardArt.style.opacity = '0';
+    levelRewardArt.style.transition = 'opacity 0.6s ease';
+    rewardPuzzleTargetGrid.style.position = 'absolute';
+    rewardPuzzleTargetGrid.style.inset = '0';
+    rewardPuzzleTargetGrid.style.transition = 'opacity 0.6s ease';
+    requestAnimationFrame(() => {
+      levelRewardArt.style.opacity = '1';
+      rewardPuzzleTargetGrid.style.opacity = '0';
+    });
+
     setTimeout(() => {
       if (currentLevel !== level) return; // 그 사이 다른 레벨로 이동했으면 건너뜀
-      levelRewardArt.setAttribute('class', 'level-reward-art' + (art.flyDirection ? ' reward-fly-' + art.flyDirection + ' launched' : ''));
-      playExcellent();
-    }, 380);
+      // 임시로 씌웠던 겹침용 스타일 정리 — 평소의 flex 흐름으로 되돌림.
+      rewardPuzzleTargetGrid.hidden = true;
+      rewardPuzzleTargetGrid.style.position = '';
+      rewardPuzzleTargetGrid.style.inset = '';
+      rewardPuzzleTargetGrid.style.opacity = '';
+      rewardPuzzleTargetGrid.style.transition = '';
+      levelRewardArt.style.position = '';
+      levelRewardArt.style.inset = '';
+      levelRewardArt.style.opacity = '';
+      levelRewardArt.style.transition = '';
+
+      // ② 천천히 커지는 연출
+      levelRewardArt.setAttribute('class', 'level-reward-art reward-puzzle-grow');
+      setTimeout(() => {
+        if (currentLevel !== level) return;
+        // ③ 날아가며 사라짐 + 칭찬
+        levelRewardArt.setAttribute('class', 'level-reward-art' + (art.flyDirection ? ' reward-fly-' + art.flyDirection + ' launched' : ''));
+        playExcellent();
+      }, 900);
+    }, 600);
+
     renderLevelGallery(); // 막혀있던 "다음" 버튼 열기
   }
 
