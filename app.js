@@ -1564,6 +1564,12 @@
       targetSlotEl.innerHTML = puzzleTileInnerSvg(art.emoji, cellIndex);
       targetSlotEl.classList.add('filled');
     }
+    // 2026-08-17: "맞춰도 안 사라진다" 버그 원인 — 튀어나오는 연출(explodeIntoPuzzle)이
+    // 인라인 style.opacity/transition을 남겨뒀는데, 인라인 스타일은 우선순위가 CSS 클래스
+    // 규칙(.placed{opacity:0})보다 항상 높아서 클래스를 추가해도 그 인라인 값에 가려
+    // 실제로는 안 사라지고 있었음. 여기서 인라인 값을 지워야 클래스 규칙이 다시 먹는다.
+    piece.style.opacity = '';
+    piece.style.transition = '';
     piece.classList.add('placed');
     if (rewardPuzzle) rewardPuzzle.solved.add(cellIndex);
     playPuzzleCorrectSfx();
