@@ -57,6 +57,7 @@
   const MODE_KEY = 'gameMode';
   const LEVEL_ATTEMPTS_KEY = 'levelAttempts'; // { [level]: 시작한 시각(ms) } — 타임어택 진행 중인 레벨
   const LEVEL_TIMES_KEY = 'levelClearTimes'; // { [mode]: { [level]: seconds } } — 모드별로 완전히 분리 저장(아래 참고)
+  const REWARD_PUZZLE_SOLVED_KEY = 'rewardPuzzleSolved'; // { [mode]: { [level]: true } } — 한 번 푼 레벨은 다시 안 보여줌(아래 maybeShowRewardPuzzle 참고)
   const PLAYER_KEY = 'playerProfile'; // {nickname, flag} — Start 버튼 직후 1회 입력, 이후 랭킹 등록 시 재사용
 
   // 2026-08-11: "랭킹은 경쟁심 유도가 목적이라 로컬만이면 의미없다"는 피드백으로 기기별 로컬
@@ -100,6 +101,9 @@
   // 2026-08-14: "인접 영역 다른 색" 원칙은 챌린지 모드 전용 — 유아모드는 실물에 최대한 가까운
   // 색을 보여줘야 해서 색을 임의로 바꾸면 안 됨(openTemplate opts.challenge로 판단).
   let currentIsChallenge = false;
+  // 2026-08-17: "이미 클리어한 그림을 다시 열면 완성본만 보여달라" 요청 — true면 openTemplate이
+  // 정답색으로 채워서 열고, 탭 채색/undo/clear/done 등 편집은 전부 막는다(보기 전용).
+  let currentIsViewOnly = false;
   let selectedColor = COLORS[0];
   let undoStack = [];
   let soundOn = true;
@@ -182,6 +186,7 @@
   const regionStagePraise = document.getElementById('region-stage-praise');
   const pictureCompletePraise = document.getElementById('picture-complete-praise');
   const palette = document.getElementById('palette');
+  const coloringToolbar = document.getElementById('coloring-toolbar');
   const btnHome = document.getElementById('btn-home');
   const btnSound = document.getElementById('btn-sound');
   const btnMusic = document.getElementById('btn-music');
@@ -416,6 +421,14 @@
 
     try { localStorage.removeItem(LEVEL_ATTEMPTS_KEY); } catch (e) { /* 무시 */ } // 진행 중이던 타임어택도 함께 정리
 
+    // 2026-08-17: "초기화하면 처음부터 다시 진행해야 한다" — 보상 퍼즐 영구기록도 그 모드만 지운다.
+    // 안 지우면 초기화 후 레벨을 처음부터 다시 깨도 예전에 풀어놨던 기록 때문에 보상 퍼즐이 다시는 안 뜬다.
+    try {
+      const solved = JSON.parse(localStorage.getItem(REWARD_PUZZLE_SOLVED_KEY) || '{}');
+      delete solved[mode];
+      localStorage.setItem(REWARD_PUZZLE_SOLVED_KEY, JSON.stringify(solved));
+    } catch (e) { /* 무시 */ }
+
     // 2026-08-16: "리셋하고 레벨1 들어가니 아래 박스가 안나와" 버그 — renderQueue()가 세션 중
     // "지금 화면에 보이는 2개"를 queueByLevel에 캐싱해두는데, 리셋 전에 그 레벨을 이미 100%
     // 클리어한 적이 있으면 캐시가 빈 배열([])로 남아있다. 빈 배열도 truthy라 renderQueue의
@@ -443,6 +456,26 @@
     const times = all[mode] || (all[mode] = {});
     times[level] = Math.round(seconds);
     saveAllLevelTimes(all);
+  }
+
+  // 2026-08-17: "Back으로 예전에 클리어한 레벨에 다시 들어가면 보상 퍼즐이 또 뜬다" 버그 수정 —
+  // 예전엔 "이번 세션에 이미 풂"만 메모리(rewardPuzzleSolvedLevels)로 기억해서, 새로고침하거나
+  // 다른 세션에서 다시 들어가면 매번 재생됐다. localStorage에 영구 기록해서 한 번 풀면 다신
+  // 안 뜨게 한다.
+  function isRewardPuzzleSolvedPersisted(level) {
+    try {
+      const all = JSON.parse(localStorage.getItem(REWARD_PUZZLE_SOLVED_KEY) || '{}');
+      return !!(all[getMode()] || {})[level];
+    } catch (e) { return false; }
+  }
+  function markRewardPuzzleSolvedPersisted(level) {
+    try {
+      const all = JSON.parse(localStorage.getItem(REWARD_PUZZLE_SOLVED_KEY) || '{}');
+      const mode = getMode();
+      const solved = all[mode] || (all[mode] = {});
+      solved[level] = true;
+      localStorage.setItem(REWARD_PUZZLE_SOLVED_KEY, JSON.stringify(all));
+    } catch (e) { /* 무시 */ }
   }
 
   // 예전 버전은 levelClearTimes 값이 {seconds, mode} 객체였다 — 옛 기록(마이그레이션 누락 케이스)도
@@ -1010,6 +1043,7 @@
   }
 
   function goToMap() {
+    clearPendingCelebrationOverlays();
     stopLevelTimer();
     coloringScreen.hidden = true;
     galleryScreen.hidden = true;
@@ -1054,6 +1088,7 @@
 
   // ================= 레벨별 도안 갤러리 =================
   function openLevel(level) {
+    clearPendingCelebrationOverlays();
     currentBossMode = null;
     currentLevel = level;
     if (isLevelCleared(level)) clearLevelAttempt(level); // 이미 클리어된 레벨은 타이머 불필요
@@ -1402,8 +1437,16 @@
     // 불려도 launched를 건드리지 않는다 — 그림이 다 채워졌다고 여기서 자동으로 날아가거나
     // 바운스 연출이 끼어들면 안 되고, 퍼즐을 다 풀었을 때 finishRewardPuzzle()이 직접
     // 관리한다.
+    // 2026-08-17: "Back으로 이미 완성한 레벨에 재진입하면 로켓이 매번 다시 날아간다" 버그 수정 —
+    // 예전엔 재렌더링될 때마다 무조건 .launched를 다시 붙여서 CSS 발사 애니메이션이 매번 새로
+    // 재생됐다. 이미 퍼즐까지 다 푼(=발사 연출을 한 번 봤던) 레벨이면 다시 붙이지 않고, 12칸이
+    // 전부 채워진 완성 그림이 날아가지 않고 그 자리에 정지된 채로 보이게 한다.
     if (!isRewardPuzzleBlocking(level)) {
-      levelRewardArt.classList.toggle('launched', clearedCount >= total);
+      const alreadySolved = rewardPuzzleSolvedLevels.has(level) || isRewardPuzzleSolvedPersisted(level);
+      levelRewardArt.classList.toggle('launched', clearedCount >= total && !alreadySolved);
+      // reward-puzzle-clean: launched와 별개로 칸 사이 흰 구분선만 지워서, 정지된 완성본이
+      // 격자무늬가 아니라 깔끔한 그림 한 장으로 보이게 한다(퍼즐 미니게임이 이미 쓰던 것과 같은 클래스).
+      levelRewardArt.classList.toggle('reward-puzzle-clean', clearedCount >= total && alreadySolved);
     }
   }
 
@@ -1418,8 +1461,8 @@
   const PUZZLE_ROWS = 2;
   const PUZZLE_TOTAL = PUZZLE_COLS * PUZZLE_ROWS;
   let rewardPuzzle = null; // { level, solved: Set<number> }
-  // 이번 세션에 이미 다 맞춘 레벨(다시 들어가도 매번 또 안 뜨게). 새로고침하면 초기화되는
-  // 세션 한정 상태 — 테스트 기능이라 영구 저장까지는 아직 안 함.
+  // 이번 세션에 이미 다 맞춘 레벨(다시 들어가도 매번 또 안 뜨게) — 세션 한정 캐시일 뿐, 진짜
+  // 영구 기록은 REWARD_PUZZLE_SOLVED_KEY(localStorage)에 있다(아래 maybeShowRewardPuzzle 참고).
   const rewardPuzzleSolvedLevels = new Set();
 
   function isRewardPuzzleBlocking(level) {
@@ -1431,9 +1474,11 @@
   // 안 나서 미니게임이 절대 안 떴다. renderLevelGallery가 호출될 때마다(레벨 진입/재진입 포함)
   // "지금 다 깼는데 아직 안 풀었으면" 조건으로 다시 판단하도록 바꿈 — 여러 번 호출돼도
   // rewardPuzzle/rewardPuzzleSolvedLevels로 중복 시작은 막는다.
+  // 2026-08-17: "Back으로 예전에 클리어한 레벨에 재진입하면 매번 다시 뜬다" 버그 수정 —
+  // isRewardPuzzleSolvedPersisted(영구 기록)도 같이 확인한다.
   function maybeShowRewardPuzzle(level) {
     if (rewardPuzzle && rewardPuzzle.level === level) return; // 이미 진행 중
-    if (rewardPuzzleSolvedLevels.has(level)) return; // 이번 세션에 이미 다 품
+    if (rewardPuzzleSolvedLevels.has(level) || isRewardPuzzleSolvedPersisted(level)) return; // 이미 다 품(이번 세션 또는 예전에)
     const list = getTemplatesForLevel(level);
     const scores = getScores();
     const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
@@ -1746,6 +1791,7 @@
     if (rewardPuzzle && rewardPuzzle.solved.size >= PUZZLE_TOTAL) {
       const solvedLevel = rewardPuzzle.level;
       rewardPuzzleSolvedLevels.add(solvedLevel);
+      markRewardPuzzleSolvedPersisted(solvedLevel);
       rewardPuzzleTrayTop.hidden = true;
       rewardPuzzleTrayBottom.hidden = true;
       finishRewardPuzzle(solvedLevel);
@@ -1853,9 +1899,34 @@
     return wrap;
   }
 
-  function paintQueue(ids, byId) {
+  function paintQueue(ids, byId, level) {
+    galleryGrid.classList.remove('gallery-grid-cleared');
+    galleryGrid.dataset.paintedLevel = String(level);
     galleryGrid.innerHTML = '';
     ids.forEach((id) => { if (byId[id]) galleryGrid.appendChild(renderQueueRow(byId[id])); });
+  }
+
+  // 2026-08-17: "다 깬 12개가 세로 카드로 늘어서 스크롤해야 보인다" 피드백 — 진행 중 대기열
+  // 카드(.tpl-row)와 달리, 이미 다 깬 그림들은 이름표 없이 원형 아이콘(.tpl-row .tpl-emoji와
+  // 같은 스타일)만 줄바꿈되는 그리드로 한 화면에 다 보이게 한다.
+  function renderClearedBadge(tpl) {
+    const badge = document.createElement('button');
+    badge.className = 'tpl-badge';
+    badge.dataset.tplId = tpl.id;
+    const displayName = I18N.templateName(tpl);
+    badge.setAttribute('aria-label', displayName);
+    badge.innerHTML = '<img class="tpl-emoji" src="assets/emoji/' + tpl.id + (tpl.isBoss ? '-icon' : '') + '.svg" alt="">';
+    badge.addEventListener('click', () => openTemplate(tpl));
+    return badge;
+  }
+
+  function paintClearedGrid(ids, byId, level) {
+    galleryGrid.classList.add('gallery-grid-cleared');
+    galleryGrid.dataset.paintedLevel = String(level);
+    // 위 보상 이미지 칸 배치와 같은 규칙(10개=5x2, 12개=4x3)을 그대로 써서 열 수를 정한다.
+    galleryGrid.style.gridTemplateColumns = 'repeat(' + gridDims(ids.length).cols + ', 1fr)';
+    galleryGrid.innerHTML = '';
+    ids.forEach((id) => { if (byId[id]) galleryGrid.appendChild(renderClearedBadge(byId[id])); });
   }
 
   function renderQueue(level, list, scores) {
@@ -1864,22 +1935,41 @@
     const pending = list.filter((t) => !isMastered(t.id, scores));
     const pendingIds = new Set(pending.map((t) => t.id));
     const prevIds = queueByLevel[level];
+    const allIds = list.map((t) => t.id);
+    // 2026-08-17(3차): "레벨3(안 깬 레벨)로 가도 레벨2 뱃지가 그대로 남는다" 버그 수정 —
+    // #gallery-grid는 모든 레벨이 공유하는 하나의 DOM이라, "지금 화면에 뭔가 그려져 있다"는
+    // 것만으로는 그게 이 레벨 것인지 알 수 없었다(children.length만 보던 아래 최적화들이 이걸
+    // 놓쳤다). paintQueue/paintClearedGrid가 그릴 때마다 어느 레벨 것인지 dataset에 남겨두고,
+    // 지금 레벨과 다르면 "새로 그려야 함"으로 확정한다.
+    const domStale = galleryGrid.dataset.paintedLevel !== String(level);
 
-    if (!prevIds) {
-      // 이 레벨을 이번 세션에서 처음 그리는 거면 애니메이션 없이 바로 대기열을 채운다.
-      const initial = pending.slice(0, QUEUE_SIZE).map((t) => t.id);
-      queueByLevel[level] = initial;
-      paintQueue(initial, byId);
+    // "이미 다 깬 레벨에 다시 들어옴"(Back/Next로 재진입 등) — 새로 완료된 그림이 없으므로
+    // 아래 "방금 클리어됨" 흡수 연출/1.1초 지연 없이 곧장 뱃지 그리드로 그린다.
+    if (pending.length === 0 && prevIds && prevIds.length === allIds.length) {
+      paintClearedGrid(allIds, byId, level);
+      return;
+    }
+
+    if (!prevIds || domStale) {
+      // 이 레벨을 이번 세션에서 처음 그리는 거면(또는 화면에 다른 레벨 것이 남아있으면)
+      // 애니메이션 없이 바로 채운다. 이미 예전에 다 깬 레벨이면 대기열 대신 뱃지 그리드로.
+      if (pending.length === 0) {
+        queueByLevel[level] = allIds;
+        paintClearedGrid(allIds, byId, level);
+      } else {
+        const initial = prevIds || pending.slice(0, QUEUE_SIZE).map((t) => t.id);
+        queueByLevel[level] = initial;
+        paintQueue(initial, byId, level);
+      }
       return;
     }
 
     const justCleared = prevIds.filter((id) => !pendingIds.has(id));
     if (justCleared.length === 0) {
-      if (!galleryGrid.children.length) paintQueue(prevIds, byId); // 레벨 전환 등으로 DOM이 비었으면 다시 그림
       return;
     }
 
-    // 방금 클리어된 줄들을 보상 이미지 쪽으로 흡수시키고, 끝나면 다음 대기열로 교체한다.
+    // 방금 클리어된 줄들을 보상 이미지 쪽으로 흡수시키고, 끝나면 다음 상태로 교체한다.
     const doneCountAfter = list.length - pending.length;
     const doneCountBefore = doneCountAfter - justCleared.length;
     const art = LEVEL_REWARD_ART[level];
@@ -1892,6 +1982,16 @@
       flyToReward(row, pieceEl);
     });
 
+    if (pending.length === 0) {
+      // 방금 이 레벨의 마지막 그림까지 다 깼다 — 흡수 연출이 끝나면 전체를 뱃지 그리드로 바꾼다.
+      queueByLevel[level] = allIds;
+      setTimeout(() => {
+        if (currentLevel !== level) return; // 2026-08-17: 그 사이 다른 레벨로 넘어갔으면 건너뜀
+        paintClearedGrid(allIds, byId, level);
+      }, 1100);
+      return;
+    }
+
     const remaining = prevIds.filter((id) => pendingIds.has(id));
     const used = new Set(remaining);
     for (const t of pending) {
@@ -1900,20 +2000,37 @@
     }
     queueByLevel[level] = remaining;
 
-    setTimeout(() => paintQueue(queueByLevel[level], byId), 1100);
+    setTimeout(() => {
+      if (currentLevel !== level) return; // 2026-08-17: "Next를 빨리 누르면 다음 레벨 화면이
+      // 이전 레벨 그림으로 덮어써진다" 버그 수정 — 이 타이머엔 레벨 전환 확인이 없어서, 예약된
+      // 뒤 다른 레벨로 넘어가도 그대로 발동해 그 레벨의 #gallery-grid를 덮어쓰고 있었다.
+      paintQueue(queueByLevel[level], byId, level);
+    }, 1100);
+  }
+
+  // "다시 도전!"/레벨클리어/구역단계/그림완성 축하 중 어느 하나라도 아직 안 끝났는데 다른
+  // 화면으로 넘어가면(Next/Back으로 레벨을 넘기거나 지도로 나가는 등) 그 타이머가 남아있다가
+  // 엉뚱한 화면 위에 문구가 눌어붙어 있는 상태로 계속 보인다 — 화면을 옮기는 진입점마다
+  // 여기서 한 번에 정리한다.
+  // 2026-08-17: "완료 직후 바로 Next/Back 누르면 PERFECT! 문구가 다음 화면에 그대로 남아있음"
+  // 제보로 추가 — openTemplate()만 정리하고 openLevel()/goToMap()은 안 하고 있었음.
+  function clearPendingCelebrationOverlays() {
+    if (praiseHomeTimer) { clearTimeout(praiseHomeTimer); praiseHomeTimer = null; }
+    if (levelClearPraiseTimer) { clearTimeout(levelClearPraiseTimer); levelClearPraiseTimer = null; levelRewardPraise.hidden = true; levelRewardPraise.classList.remove('show'); }
+    if (regionStageTimer) { clearTimeout(regionStageTimer); regionStageTimer = null; regionStagePraise.hidden = true; regionStagePraise.classList.remove('show'); }
+    if (pictureCompleteTimer) { clearTimeout(pictureCompleteTimer); pictureCompleteTimer = null; pictureCompletePraise.hidden = true; pictureCompletePraise.classList.remove('show'); }
   }
 
   // ================= 색칠 화면 진입 =================
   function openTemplate(tpl, onReady, opts) {
     opts = opts || {};
-    // "다시 도전!"(showTryAgain) 오버레이가 아직 안 닫혔는데 다음 그림을 벌써 열었다면 그
-    // 타이머는 이제 의미가 없다 — 정리해둔다.
-    if (praiseHomeTimer) { clearTimeout(praiseHomeTimer); praiseHomeTimer = null; }
-    if (levelClearPraiseTimer) { clearTimeout(levelClearPraiseTimer); levelClearPraiseTimer = null; levelRewardPraise.hidden = true; levelRewardPraise.classList.remove('show'); }
-    if (regionStageTimer) { clearTimeout(regionStageTimer); regionStageTimer = null; regionStagePraise.hidden = true; regionStagePraise.classList.remove('show'); }
-    if (pictureCompleteTimer) { clearTimeout(pictureCompleteTimer); pictureCompleteTimer = null; pictureCompletePraise.hidden = true; pictureCompletePraise.classList.remove('show'); }
+    clearPendingCelebrationOverlays();
     currentTemplate = tpl;
     currentIsChallenge = !!opts.challenge;
+    // 2026-08-17: 이미 클리어한 그림을 다시 열면 채색은 막고 정답 완성본만 보여준다(보기 전용).
+    currentIsViewOnly = !opts.challenge && !tpl.isBoss && isMastered(tpl.id, getScores());
+    palette.hidden = currentIsViewOnly;
+    coloringToolbar.hidden = currentIsViewOnly;
     // 실제로 그림을 열어서 색칠을 시작하는 이 순간에 그 레벨(또는 보스)의 타임어택을 시작(또는 이어감).
     if (opts.challenge) {
       // 챌린지 모드는 자체 타이머/시도추적을 쓰므로 Child의 타임어택 시작 로직을 건너뛴다.
@@ -1967,6 +2084,7 @@
       currentGradableRegions = computeGradableRegions();
       currentGradableLabelSet = new Set(currentGradableRegions.map((r) => r.label));
       lastRegionStageShown = 0;
+      countedRegionLabels = new Set();
 
       // 목표(정답) 이미지 렌더링 + 영역별 정답색 배정(인접 영역 색 중복 보정 포함 — renderGoalPreview 내부)
       renderGoalPreview(lineSource);
@@ -1974,8 +2092,10 @@
       // 정답색이 정해진 뒤에 팔레트 구성(그 도안에 실제 필요한 색이 반드시 포함되게)
       renderPalette();
 
-      // 채우기 레이어 초기화
+      // 채우기 레이어 초기화 — 보기 전용이면 방금 그린 정답 이미지(goalCanvas)를 그대로 옮겨서
+      // 처음부터 완성된 상태로 보여준다.
       fillCtx.clearRect(0, 0, WORK_SIZE, WORK_SIZE);
+      if (currentIsViewOnly) fillCtx.drawImage(goalCanvas, 0, 0);
       undoStack = [];
       pushUndo();
       updateUndoButton();
@@ -3006,26 +3126,40 @@
     }, duration);
   }
 
-  // 지금 화면에 실제로 칠해져 있는(정답 여부 무관) 구역 수. Undo/Clear 후에도 항상 캔버스
-  // 상태에서 다시 계산하므로 별도 되돌리기 처리가 필요 없다 — 다만 그만큼 이미 한 번 띄운
-  // 단계보다 낮아져도(Undo) 다시 그 단계까지 채워질 때까진 재알림하지 않는다(lastRegionStageShown
-  // 이 최고 기록만 기억).
-  function countFilledGradableRegions() {
-    if (!currentGradableRegions || currentGradableRegions.length === 0) return 0;
-    const data = fillCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE).data;
-    let filled = 0;
-    currentGradableRegions.forEach((r) => { if (data[r.seed * 4 + 3] !== 0) filled++; });
-    return filled;
-  }
+  // 단계 카운트에 이미 반영된 구역 label 모음 — 도안을 새로 열 때(openTemplate) 비운다.
+  // 2026-08-17: "틀린 색 고쳐도 메시지가 안 뜬다" 제보 — 한 번 칠한 구역은 다시 칠해도(재색칠)
+  // 새로 안 세는 게 기본이지만, "다시 도전!"으로 되돌아왔을 때는 그때 틀려 있던 구역만
+  // showTryAgain()이 이 Set에서 미리 빼둬서, 그 구역을 다시 건드리면 다음 단계로 이어서 올라간다
+  // (처음부터 GOOD으로 리셋하지 않음 — 이미 꽤 진행된 그림에서 제일 약한 단계를 다시 보여주는
+  // 건 부자연스럽고, 어차피 리셋해도 칠해진 구역 수 자체는 안 줄어서 다음 탭에 곧장 최고
+  // 단계로 튀어버림).
+  let countedRegionLabels = new Set();
 
-  function maybeShowRegionStagePraise() {
+  function maybeShowRegionStagePraise(label) {
     // 챌린지 모드는 자체 HUD(콤보/정확도) 피드백이 따로 있고, 보스는 팡파레가 따로 있어서 제외.
     if (currentIsChallenge || (currentTemplate && currentTemplate.isBoss)) return;
-    const filled = countFilledGradableRegions();
-    if (filled > lastRegionStageShown) {
-      lastRegionStageShown = filled;
-      showRegionStagePraise(Math.min(filled, 7));
-    }
+    if (label == null || countedRegionLabels.has(label)) return;
+    countedRegionLabels.add(label);
+    lastRegionStageShown = countedRegionLabels.size;
+    showRegionStagePraise(Math.min(lastRegionStageShown, 7));
+  }
+
+  // 지금 화면에 칠해져 있지만(정답 여부와 무관하게 채색됨) 정답색과 다른 구역의 label 목록.
+  // showTryAgain()이 이 구역들만 countedRegionLabels에서 빼서 "다시 칠하면 다음 단계로 이어짐"을
+  // 만든다. computeCompletion()과 같은 판정 로직이지만 label을 모아 돌려준다는 점만 다르다.
+  function wrongPaintedLabels() {
+    if (!currentGradableRegions || currentGradableRegions.length === 0) return [];
+    const data = fillCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE).data;
+    const wrong = [];
+    currentGradableRegions.forEach((r) => {
+      const p = r.seed * 4;
+      if (data[p + 3] === 0) return; // 안 칠한 구역 —애초에 아직 카운트 안 됐을 것
+      const targetHex = currentLabelToColor ? currentLabelToColor.get(r.label) : null;
+      if (!targetHex) return;
+      const [tr, tg, tb] = hexToRgba(targetHex);
+      if (!(data[p] === tr && data[p + 1] === tg && data[p + 2] === tb)) wrong.push(r.label);
+    });
+    return wrong;
   }
 
   // ================= 플러드필 =================
@@ -3037,10 +3171,11 @@
     return [r, g, b, 255];
   }
 
-  function floodFill(startX, startY, hexColor) {
-    if (startX < 0 || startY < 0 || startX >= WORK_SIZE || startY >= WORK_SIZE) return;
-    const startIdx = startY * WORK_SIZE + startX;
-    if (!wallMask || wallMask[startIdx] === 1) return; // 선을 눌렀으면 무시
+  // 실제로 픽셀을 채우는 부분만 뺀 것 — 소리/되돌리기 기록/단계 칭찬 같은 "사용자가 지금 막
+  // 칠했다"는 부수효과 없이, 캔버스에만 색을 채워야 할 때(2026-08-17: 이미 클리어된 그림을
+  // 다시 열 때 자동으로 미리 다 칠해두는 용도, autoFillIfMastered 참고) 재사용한다.
+  function fillRegionPixels(startIdx, hexColor) {
+    if (!wallMask || wallMask[startIdx] === 1) return false; // 선을 눌렀으면 무시
 
     const imgData = fillCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE);
     const data = imgData.data;
@@ -3050,7 +3185,7 @@
     // 이미 같은 색이면 스킵
     if (data[startPixel] === r && data[startPixel + 1] === g &&
         data[startPixel + 2] === b && data[startPixel + 3] === a) {
-      return;
+      return false;
     }
 
     const visited = new Uint8Array(WORK_SIZE * WORK_SIZE);
@@ -3077,10 +3212,17 @@
     }
 
     fillCtx.putImageData(imgData, 0, 0);
+    return true;
+  }
+
+  function floodFill(startX, startY, hexColor) {
+    if (startX < 0 || startY < 0 || startX >= WORK_SIZE || startY >= WORK_SIZE) return;
+    const startIdx = startY * WORK_SIZE + startX;
+    if (!fillRegionPixels(startIdx, hexColor)) return;
     pushUndo();
     updateUndoButton();
     playPop();
-    maybeShowRegionStagePraise();
+    maybeShowRegionStagePraise(currentLabelMap ? currentLabelMap[startIdx] : null);
   }
 
   // Task2(챌린지 Phase2): floodFill과 같은 벽(wallMask) 경계 연결 채우기지만, 시스템이 자동으로
@@ -3185,6 +3327,7 @@
     return null; // 근처에 색칠 가능한 곳이 전혀 없으면 그냥 무시
   }
   function handleTap(clientX, clientY) {
+    if (currentIsViewOnly) return; // 보기 전용 완성본은 채색 편집을 막는다.
     const rect = tapLayer.getBoundingClientRect();
     const x = Math.floor(((clientX - rect.left) / rect.width) * WORK_SIZE);
     const y = Math.floor(((clientY - rect.top) / rect.height) * WORK_SIZE);
@@ -3303,6 +3446,11 @@
   // (색칠 화면을 떠난 적이 없으므로 별도 화면 전환 없이 오버레이만 닫으면 됨).
   function showTryAgain(matched, total) {
     if (praiseHomeTimer) { clearTimeout(praiseHomeTimer); praiseHomeTimer = null; }
+    // 2026-08-17: 지금 틀려 있는 구역만 구역별 단계 칭찬 카운트에서 다시 빼둔다 — 그래야 그
+    // 구역을 고쳐 칠했을 때 "다시 칠했지만 메시지가 안 뜬다"가 안 생기고, 그 시점의 다음
+    // 단계로 자연스럽게 이어서 올라간다(맨 처음 GOOD으로 리셋하지 않음).
+    wrongPaintedLabels().forEach((lbl) => countedRegionLabels.delete(lbl));
+    lastRegionStageShown = countedRegionLabels.size;
     praiseOverlay.classList.add('fail');
     praiseEmoji.textContent = RATING_LEVELS[4].emoji;
     praiseText.textContent = ratingLabel(RATING_LEVELS[4].level);
@@ -3490,31 +3638,12 @@
   // 감탄사를 앞에 붙여서 그냥 단어 하나 읽는 것보다 "진짜 반응하는" 느낌이 나게 함
   // (2026-08-10, "대본 읽는 것처럼 들린다"는 피드백으로 추가 — Web Speech API는 SSML/억양 세부
   // 제어가 안 되니 톤(pitch)·속도(rate)를 매번 살짝 흔들고 감탄사로 흥을 더하는 정도가 현실적 한계).
-  // 2026-08-16: "보상 이미지 아래에 칭찬 문구를 화면에도 띄우고 음성도 지원" 요청 — 지금 UI
-  // 언어(I18N.lang)에 맞는 문구를 골라 화면에 보여주는 동시에 그 언어 음성으로 읽어준다(예전엔
-  // UI 언어와 무관하게 항상 영어로만 읽었음).
-  const LEVEL_CLEAR_PRAISE = {
-    en: [
-      'Wow, excellent!', 'Yay, awesome!', 'Wow, great job!', 'Yay, amazing!', 'Woohoo, fantastic!',
-      'Yes, you did it!', 'Woohoo, way to go!', 'Wow, wonderful!', 'Yay, you are a star!', 'Woohoo, super!'
-    ],
-    ko: [
-      '정말 잘했어!', '최고야! 멋지게 완성했어!', '와! 대단해!', '참 잘했어요!', '너무 멋져!',
-      '색칠 천재네!', '멋진 작품 완성!', '해냈어! 정말 최고야!', '와우! 예쁘게 완성했어!', '짝짝짝! 정말 잘했어!'
-    ],
-    ja: [
-      'すごいね!よくできたよ!', 'さいこう!じょうずに仕上げたね!', 'わあ、すごい!', 'とてもよくできました!', 'すてきだね!',
-      'ぬりえの天才だね!', 'すてきな作品が完成!', 'やったね!さいこうだよ!', 'わあ、きれいに塗れたね!', 'ぱちぱちぱち!よくできました!'
-    ],
-    zh: [
-      '真棒,你做到了!', '太厉害啦,完成得真漂亮!', '哇,太棒了!', '做得非常好!', '太好看啦!',
-      '你是涂色小天才!', '完成了一幅漂亮的作品!', '你做到啦,真是太棒了!', '哇,涂得好漂亮!', '啪啪啪,做得真好!'
-    ],
-    es: [
-      '¡Muy bien hecho!', '¡Genial, lo terminaste muy bien!', '¡Wow, increíble!', '¡Qué buen trabajo!', '¡Qué lindo quedó!',
-      '¡Eres un genio coloreando!', '¡Obra terminada!', '¡Lo lograste! ¡Eres el mejor!', '¡Wow, quedó precioso!', '¡Bravo, bravo! ¡Muy bien hecho!'
-    ]
-  };
+  // 2026-08-17: "칭찬은 UI 언어와 무관하게 항상 영어로만" 요청 — 한국어 TTS 음성이 어색하게
+  // 들린다는 피드백으로, 2026-08-16에 넣었던 언어별(ko/ja/zh/es) 문구를 다시 뺐다.
+  const LEVEL_CLEAR_PRAISE = [
+    'Wow, excellent!', 'Yay, awesome!', 'Wow, great job!', 'Yay, amazing!', 'Woohoo, fantastic!',
+    'Yes, you did it!', 'Woohoo, way to go!', 'Wow, wonderful!', 'Yay, you are a star!', 'Woohoo, super!'
+  ];
 
   // 보상 이미지(#level-reward) 바로 아래에 칭찬 문구를 잠깐 띄운다 — 2.8초 뒤 자동으로 사라짐
   // (praiseOverlay와 동일하게 페이드아웃 없이 바로 hidden 처리).
@@ -3579,11 +3708,9 @@
   }
 
   function playExcellent() {
-    const lang = (window.I18N && I18N.lang) || 'en';
-    const pool = LEVEL_CLEAR_PRAISE[lang] || LEVEL_CLEAR_PRAISE.en;
-    const phrase = pool[Math.floor(Math.random() * pool.length)];
+    const phrase = LEVEL_CLEAR_PRAISE[Math.floor(Math.random() * LEVEL_CLEAR_PRAISE.length)];
     showLevelClearPraise(phrase);
-    speakPraise(phrase, { pitch: 2, rate: 1.25, langPrefix: lang }); // 기본값보다도 더 빠르게 = 더 신난 느낌
+    speakPraise(phrase, { pitch: 2, rate: 1.3, langPrefix: 'en' }); // 기본값보다도 더 빠르게 = 더 신난 느낌
   }
 
   // 2026-08-17: 그림 한 장이 완료 버튼으로 100% 확정된 순간 — 구역별 단계 칭찬의 마지막 단계
@@ -3595,15 +3722,16 @@
   let pictureCompleteTimer = null;
   function playPictureCompletePraise() {
     if (pictureCompleteTimer) { clearTimeout(pictureCompleteTimer); pictureCompleteTimer = null; }
-    pictureCompletePraise.textContent = regionStageText(7); // 'PERFECT! ⭐' — REGION_STAGE_TEXT와 같은 문구 재사용
+    // 2026-08-17: "음성이랑 화면 문구가 다르다(화면은 항상 PERFECT, 음성은 랜덤)" 제보 — 같은
+    // 문구를 뽑아서 화면 텍스트와 음성 둘 다에 쓴다(playExcellent와 동일한 방식).
+    const phrase = LEVEL_CLEAR_PRAISE[Math.floor(Math.random() * LEVEL_CLEAR_PRAISE.length)];
+    pictureCompletePraise.textContent = phrase;
     pictureCompletePraise.hidden = false;
     pictureCompletePraise.classList.remove('show');
     void pictureCompletePraise.offsetWidth; // 리플로우 강제 — 연달아 떠도 팝인이 다시 재생되게 함
     pictureCompletePraise.classList.add('show');
     if (navigator.vibrate) { try { navigator.vibrate(400); } catch (e) { /* 무시 */ } } // 기존 보스 큰 승리와 동일한 세기
-    const lang = (window.I18N && I18N.lang) || 'en';
-    const pool = LEVEL_CLEAR_PRAISE[lang] || LEVEL_CLEAR_PRAISE.en;
-    speakPraise(pool[Math.floor(Math.random() * pool.length)], { pitch: 2, rate: 1.2, langPrefix: lang });
+    speakPraise(phrase, { pitch: 2, rate: 1.25, langPrefix: 'en' });
     goHome();
     pictureCompleteTimer = setTimeout(() => {
       pictureCompleteTimer = null;

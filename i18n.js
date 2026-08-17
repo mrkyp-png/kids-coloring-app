@@ -607,7 +607,7 @@
     tongue: { ko: '혀', ja: '舌', zh: '舌头', es: 'Lengua' },
     lips: { ko: '입술', ja: '唇', zh: '嘴唇', es: 'Labios' },
     sweatdroplets: { ko: '땀방울', ja: '汗', zh: '汗滴', es: 'Gotas de sudor' },
-    thongsandal: { ko: '쪼리', ja: 'ビーチサンダル', zh: '人字拖', es: 'Chancla' },
+    thongsandal: { ko: '플립플롭', ja: 'ビーチサンダル', zh: '人字拖', es: 'Chancla' },
     tshirt: { ko: '티셔츠', ja: 'Tシャツ', zh: 'T恤', es: 'Camiseta' },
     sandal: { ko: '샌들', ja: 'サンダル', zh: '凉鞋', es: 'Sandalia' },
     tophat: { ko: '중절모', ja: 'シルクハット', zh: '礼帽', es: 'Sombrero de copa' },
