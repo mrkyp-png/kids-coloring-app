@@ -3135,6 +3135,36 @@
   // 단계로 튀어버림).
   let countedRegionLabels = new Set();
 
+  // 2026-08-17: "구역 7개 넘으면 다 PERFECT인데, 다른 색 칠해도 뜬다" 제보 — 예전엔 정답색인지
+  // 상관없이 "새 구역을 칠했는지"만 셌다. 이제 정답색으로 칠했을 때만 단계가 올라간다.
+  function isCorrectColorForLabel(label, hexColor) {
+    if (label == null || !currentLabelToColor || !hexColor) return false;
+    const targetHex = currentLabelToColor.get(label);
+    if (!targetHex) return false;
+    const [tr, tg, tb] = hexToRgba(targetHex);
+    const [hr, hg, hb] = hexToRgba(hexColor);
+    return tr === hr && tg === hg && tb === hb;
+  }
+
+  // 지금 화면에 칠해져 있지만(정답 여부와 무관하게 채색됨) 정답색과 다른 구역의 label 목록.
+  // showTryAgain()이 이 구역들만 countedRegionLabels에서 빼서 "한 번 맞게 칠했다가 다시
+  // 틀리게 덧칠한" 구역을 반영한다. computeCompletion()과 같은 판정 로직이지만 label을
+  // 모아 돌려준다는 점만 다르다.
+  function wrongPaintedLabels() {
+    if (!currentGradableRegions || currentGradableRegions.length === 0) return [];
+    const data = fillCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE).data;
+    const wrong = [];
+    currentGradableRegions.forEach((r) => {
+      const p = r.seed * 4;
+      if (data[p + 3] === 0) return; // 안 칠한 구역 — 애초에 아직 카운트 안 됐을 것
+      const targetHex = currentLabelToColor ? currentLabelToColor.get(r.label) : null;
+      if (!targetHex) return;
+      const [tr, tg, tb] = hexToRgba(targetHex);
+      if (!(data[p] === tr && data[p + 1] === tg && data[p + 2] === tb)) wrong.push(r.label);
+    });
+    return wrong;
+  }
+
   function maybeShowRegionStagePraise(label) {
     // 챌린지 모드는 자체 HUD(콤보/정확도) 피드백이 따로 있고, 보스는 팡파레가 따로 있어서 제외.
     if (currentIsChallenge || (currentTemplate && currentTemplate.isBoss)) return;
@@ -3142,24 +3172,6 @@
     countedRegionLabels.add(label);
     lastRegionStageShown = countedRegionLabels.size;
     showRegionStagePraise(Math.min(lastRegionStageShown, 7));
-  }
-
-  // 지금 화면에 칠해져 있지만(정답 여부와 무관하게 채색됨) 정답색과 다른 구역의 label 목록.
-  // showTryAgain()이 이 구역들만 countedRegionLabels에서 빼서 "다시 칠하면 다음 단계로 이어짐"을
-  // 만든다. computeCompletion()과 같은 판정 로직이지만 label을 모아 돌려준다는 점만 다르다.
-  function wrongPaintedLabels() {
-    if (!currentGradableRegions || currentGradableRegions.length === 0) return [];
-    const data = fillCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE).data;
-    const wrong = [];
-    currentGradableRegions.forEach((r) => {
-      const p = r.seed * 4;
-      if (data[p + 3] === 0) return; // 안 칠한 구역 —애초에 아직 카운트 안 됐을 것
-      const targetHex = currentLabelToColor ? currentLabelToColor.get(r.label) : null;
-      if (!targetHex) return;
-      const [tr, tg, tb] = hexToRgba(targetHex);
-      if (!(data[p] === tr && data[p + 1] === tg && data[p + 2] === tb)) wrong.push(r.label);
-    });
-    return wrong;
   }
 
   // ================= 플러드필 =================
@@ -3222,7 +3234,8 @@
     pushUndo();
     updateUndoButton();
     playPop();
-    maybeShowRegionStagePraise(currentLabelMap ? currentLabelMap[startIdx] : null);
+    const label = currentLabelMap ? currentLabelMap[startIdx] : null;
+    if (isCorrectColorForLabel(label, hexColor)) maybeShowRegionStagePraise(label);
   }
 
   // Task2(챌린지 Phase2): floodFill과 같은 벽(wallMask) 경계 연결 채우기지만, 시스템이 자동으로
@@ -3446,9 +3459,11 @@
   // (색칠 화면을 떠난 적이 없으므로 별도 화면 전환 없이 오버레이만 닫으면 됨).
   function showTryAgain(matched, total) {
     if (praiseHomeTimer) { clearTimeout(praiseHomeTimer); praiseHomeTimer = null; }
-    // 2026-08-17: 지금 틀려 있는 구역만 구역별 단계 칭찬 카운트에서 다시 빼둔다 — 그래야 그
-    // 구역을 고쳐 칠했을 때 "다시 칠했지만 메시지가 안 뜬다"가 안 생기고, 그 시점의 다음
-    // 단계로 자연스럽게 이어서 올라간다(맨 처음 GOOD으로 리셋하지 않음).
+    // 2026-08-17: 구역별 단계 칭찬은 이제 정답색으로 칠한 순간에만 카운트되지만(위
+    // isCorrectColorForLabel 참고), "한 번 맞게 칠했다가 다시 다른(틀린) 색으로 덧칠"한
+    // 구역은 여전히 countedRegionLabels에 남아있을 수 있다(recolor 시점엔 그 카운트를
+    // 건드리지 않으므로). 완료 실패 시점에 지금 화면 기준으로 다시 확인해서 그런 구역만
+    // 빼준다 — 그래야 그 구역을 다시 맞게 고쳐 칠했을 때 다음 단계로 자연스럽게 이어진다.
     wrongPaintedLabels().forEach((lbl) => countedRegionLabels.delete(lbl));
     lastRegionStageShown = countedRegionLabels.size;
     praiseOverlay.classList.add('fail');
