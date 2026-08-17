@@ -1705,6 +1705,14 @@
           // 딱 원본 크기(scale 1)에서 끝나므로 공용 연출을 그대로 써도 크기 튐이 없음.
           levelRewardArt.setAttribute('class', 'level-reward-art' + (art.flyDirection ? ' reward-fly-' + art.flyDirection + ' launched' : ''));
           playExcellent();
+          // 2026-08-17: "아래 뱃지 그리드는 뜨는데 위 완성 그림은 안 보인다" 피드백 — 날아가서
+          // 사라진 채로(opacity 0, 화면 밖) 그대로 방치돼 있었다. 발사 연출(1.8s + 0.5s 지연)이
+          // 끝나면 launched를 떼고 다시 제자리의 정지된 완성 그림으로 되돌려서, 아래 뱃지
+          // 그리드와 같이 계속 보이게 한다(Back/Next로 재진입했을 때와 동일한 최종 모습).
+          setTimeout(() => {
+            if (currentLevel !== level) return;
+            levelRewardArt.setAttribute('class', 'level-reward-art reward-puzzle-clean');
+          }, 2300);
         }, 2000);
       }, 600);
     }, 400);

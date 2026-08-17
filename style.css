@@ -765,9 +765,12 @@ button:active { transform: scale(0.94); }
    자체가 조각 윤곽(흰 테두리+그림자는 SVG 안에서 path로 직접 그림, puzzleTileInnerSvg 참고)을
    그대로 드러내도록 함. viewBox에 돌출부가 들어갈 여백(JIG_PAD)까지 미리 포함돼 있어서
    overflow:hidden이어도 안 잘림. */
+/* 2026-08-17(3차): "조각/타겟박스가 너무 작고, 트레이가 타겟박스와 너무 멀다" 피드백 —
+   타일을 72px→96px로 키우고(target-grid도 같이 키워야 어긋나지 않음), 트레이를 위/아래
+   보상 박스 쪽으로 음수 마진으로 당겨서 더 가깝게 붙인다. */
 .reward-puzzle-tile {
-  width: 72px;
-  height: 72px;
+  width: 96px;
+  height: 96px;
   overflow: hidden;
 }
 .reward-puzzle-tile svg { width: 100%; height: 100%; display: block; overflow: visible; }
@@ -777,12 +780,16 @@ button:active { transform: scale(0.94); }
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
-  padding: 8px 16px;
+  padding: 0 16px;
 }
+#reward-puzzle-tray-top { margin-bottom: -24px; }
+/* 아래쪽은 .level-reward 자체에 이미 margin-bottom:28px가 있어서(보상 이미지 아래 콘텐츠와의
+   기본 여백), 위쪽과 같은 정도로 당기려면 그만큼(28px)을 더 빼야 한다(-24-28=-52). */
+#reward-puzzle-tray-bottom { margin-top: -52px; }
 .reward-puzzle-target-grid {
   grid-area: 1 / 1; /* .level-reward-art와 같은 칸에 둬서 크로스페이드 때 겹치게 함 */
   display: grid;
-  grid-template-columns: repeat(2, 72px);
+  grid-template-columns: repeat(2, 96px);
   /* 2026-08-17: "조각 4개가 합쳐지는 게 어색해" 제보 — 칸 사이 빈틈(gap)이 있는 채로
      완성 그림에 오퍼시티 크로스페이드하면 두 그림이 서로 어긋난 채 겹쳐 보여(이중노출)
      지저분했음. 빈틈을 없애 조각들이 서로 딱 붙게 하고, 흰 테두리선만 먼저 사라지게
