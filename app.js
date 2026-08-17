@@ -179,6 +179,8 @@
   const goalZoomModal = document.getElementById('goal-zoom-modal');
   const goalZoomCanvas = document.getElementById('goal-zoom-canvas');
   const tapLayer = document.getElementById('tap-layer');
+  const regionStagePraise = document.getElementById('region-stage-praise');
+  const pictureCompletePraise = document.getElementById('picture-complete-praise');
   const palette = document.getElementById('palette');
   const btnHome = document.getElementById('btn-home');
   const btnSound = document.getElementById('btn-sound');
@@ -237,6 +239,7 @@
   let wallMask = null; // Uint8Array WORK_SIZE*WORK_SIZE, 1 = 벽(선), 0 = 칠할 수 있음
   let currentLabelMap = null; // Int32Array WORK_SIZE*WORK_SIZE, 픽셀 -> 영역 라벨(없으면 -1)
   let currentGradableRegions = []; // [{seed, size, label}] 채점 대상 영역(배경 제외)
+  let lastRegionStageShown = 0; // 지금 도안에서 마지막으로 보여준 구역별 칭찬 단계(openTemplate에서 리셋)
   let currentGradableLabelSet = new Set(); // currentGradableRegions의 label만 모아둔 Set(탭 보정용 빠른 조회)
   let currentLabelToColor = null; // Map<label, hex> 영역별 정답색(컬러바이넘버)
   let currentSampledColors = null; // Map<label, hex> 이모지 원본에서 뽑은 실제 색(있으면 우선 사용)
@@ -1907,6 +1910,8 @@
     // 타이머는 이제 의미가 없다 — 정리해둔다.
     if (praiseHomeTimer) { clearTimeout(praiseHomeTimer); praiseHomeTimer = null; }
     if (levelClearPraiseTimer) { clearTimeout(levelClearPraiseTimer); levelClearPraiseTimer = null; levelRewardPraise.hidden = true; levelRewardPraise.classList.remove('show'); }
+    if (regionStageTimer) { clearTimeout(regionStageTimer); regionStageTimer = null; regionStagePraise.hidden = true; regionStagePraise.classList.remove('show'); }
+    if (pictureCompleteTimer) { clearTimeout(pictureCompleteTimer); pictureCompleteTimer = null; pictureCompletePraise.hidden = true; pictureCompletePraise.classList.remove('show'); }
     currentTemplate = tpl;
     currentIsChallenge = !!opts.challenge;
     // 실제로 그림을 열어서 색칠을 시작하는 이 순간에 그 레벨(또는 보스)의 타임어택을 시작(또는 이어감).
@@ -1961,6 +1966,7 @@
       // 채점 대상 영역(선으로 닫힌 칸) 자동 인식 — 가장 큰 영역(배경)은 채점에서 제외
       currentGradableRegions = computeGradableRegions();
       currentGradableLabelSet = new Set(currentGradableRegions.map((r) => r.label));
+      lastRegionStageShown = 0;
 
       // 목표(정답) 이미지 렌더링 + 영역별 정답색 배정(인접 영역 색 중복 보정 포함 — renderGoalPreview 내부)
       renderGoalPreview(lineSource);
@@ -2968,6 +2974,60 @@
     return '#' + [clamp(r), clamp(g), clamp(b)].map((v) => v.toString(16).padStart(2, '0')).join('');
   }
 
+  // ================= 구역별 단계 칭찬(GOOD~PERFECT) =================
+  // 2026-08-17: "유아모드에서 색칠 1개 완료되면 칭찬" 요청 — 도안 안의 구역을 하나씩 채울 때마다
+  // 텍스트+애니메이션+진동으로 단계가 올라간다(7단계 고정, 도안 구역 수가 그보다 적으면 그
+  // 구역 수까지만 도달). 정답 색인지는 여기서 안 따진다 — 정답 채점은 완료 버튼 눌렀을 때만
+  // (computeCompletion) 하고, 여긴 "빈 구역을 새로 칠했는지"만 본다.
+  // 2026-08-17: "이 부분은 영어로만" 요청 — 언어 상관없이 항상 영어 단어로 고정.
+  const REGION_STAGE_TEXT = ['GOOD!', 'GREAT!', 'AWESOME!', 'EXCELLENT!', 'AMAZING!', 'FANTASTIC!', 'PERFECT! ⭐'];
+  function regionStageText(tier) {
+    return REGION_STAGE_TEXT[Math.min(Math.max(tier, 1), REGION_STAGE_TEXT.length) - 1];
+  }
+
+  let regionStageTimer = null;
+  // duration: 구역마다 자주 뜨니까 그림을 오래 가리지 않게 기본은 짧게(900ms) 잡는다.
+  function showRegionStagePraise(tier, duration) {
+    duration = duration || 900;
+    if (regionStageTimer) { clearTimeout(regionStageTimer); regionStageTimer = null; }
+    regionStagePraise.textContent = regionStageText(tier);
+    regionStagePraise.style.setProperty('--tier', tier);
+    regionStagePraise.hidden = false;
+    regionStagePraise.classList.remove('show');
+    void regionStagePraise.offsetWidth; // 리플로우 강제 — 같은 단계가 연달아 떠도 팝인이 다시 재생되게 함
+    regionStagePraise.classList.add('show');
+    // 진동 세기도 단계별로 키운다 — 기존 코드의 35~40ms(가벼운 반응)~400ms(보스 큰 승리) 범위를
+    // 그대로 따라감. iOS(Safari/홈화면 PWA)는 Vibration API 자체가 없어서 조용히 무시됨.
+    if (navigator.vibrate) { try { navigator.vibrate(tier >= 7 ? 400 : 20 + tier * 20); } catch (e) { /* 무시 */ } }
+    regionStageTimer = setTimeout(() => {
+      regionStageTimer = null;
+      regionStagePraise.hidden = true;
+      regionStagePraise.classList.remove('show');
+    }, duration);
+  }
+
+  // 지금 화면에 실제로 칠해져 있는(정답 여부 무관) 구역 수. Undo/Clear 후에도 항상 캔버스
+  // 상태에서 다시 계산하므로 별도 되돌리기 처리가 필요 없다 — 다만 그만큼 이미 한 번 띄운
+  // 단계보다 낮아져도(Undo) 다시 그 단계까지 채워질 때까진 재알림하지 않는다(lastRegionStageShown
+  // 이 최고 기록만 기억).
+  function countFilledGradableRegions() {
+    if (!currentGradableRegions || currentGradableRegions.length === 0) return 0;
+    const data = fillCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE).data;
+    let filled = 0;
+    currentGradableRegions.forEach((r) => { if (data[r.seed * 4 + 3] !== 0) filled++; });
+    return filled;
+  }
+
+  function maybeShowRegionStagePraise() {
+    // 챌린지 모드는 자체 HUD(콤보/정확도) 피드백이 따로 있고, 보스는 팡파레가 따로 있어서 제외.
+    if (currentIsChallenge || (currentTemplate && currentTemplate.isBoss)) return;
+    const filled = countFilledGradableRegions();
+    if (filled > lastRegionStageShown) {
+      lastRegionStageShown = filled;
+      showRegionStagePraise(Math.min(filled, 7));
+    }
+  }
+
   // ================= 플러드필 =================
   function hexToRgba(hex) {
     const h = hex.replace('#', '');
@@ -3020,6 +3080,7 @@
     pushUndo();
     updateUndoButton();
     playPop();
+    maybeShowRegionStagePraise();
   }
 
   // Task2(챌린지 Phase2): floodFill과 같은 벽(wallMask) 경계 연결 채우기지만, 시스템이 자동으로
@@ -3175,15 +3236,15 @@
       saveHistory(RATING_LEVELS[0]); // justBecameBossCleared/justBecameLevelCleared를 여기서 계산해서 세팅해둠
       if (justBecameBossCleared) {
         showBossFanfare(); // 보스는 그대로 팡파레 유지
-      } else {
-        // 2026-08-16: "칭찬 메시지 빼고 흡수되는 이미지로만" 요청 — 그림 하나는 팝업 없이 바로
-        // 갤러리로 돌아가고, 대기열 박스가 보상 이미지로 흡수되는 애니메이션이 축하 역할을 한다.
-        // 레벨 전체를 다 클리어한 순간엔 조각 맞추기 미니게임부터 재생되고, 그걸 다 풀었을
-        // 때가 진짜 완성 순간이라 그때 finishRewardPuzzle()이 축하를 대신 재생한다(여기서
-        // 미리 축하하지 않음).
-        // 조각 맞추기 미니게임 트리거는 renderLevelGallery() 안의 maybeShowRewardPuzzle()이
-        // 담당 — goHome()이 그 함수를 호출한다.
+      } else if (currentTemplate && currentTemplate.isBoss) {
+        // 보스 재도전(이미 클리어했던 보스를 또 완료) — 팡파레도 아래 그림완성 칭찬도 없이 조용히.
         goHome();
+      } else {
+        // 2026-08-17: "마지막 색칠이 완료되면(=완료 버튼으로 100% 확인됐을 때) 음성+텍스트+
+        // 애니메이션 후 흡수" 요청 — playPictureCompletePraise() 참고.
+        // 레벨 전체를 다 클리어한 순간엔 그대로 조각 맞추기 미니게임 → finishRewardPuzzle()이
+        // 별도로 축하한다(여기서 미리 축하하지 않음, renderLevelGallery()의 maybeShowRewardPuzzle() 참고).
+        playPictureCompletePraise();
       }
     } else {
       showTryAgain(matched, total);
@@ -3523,6 +3584,32 @@
     const phrase = pool[Math.floor(Math.random() * pool.length)];
     showLevelClearPraise(phrase);
     speakPraise(phrase, { pitch: 2, rate: 1.25, langPrefix: lang }); // 기본값보다도 더 빠르게 = 더 신난 느낌
+  }
+
+  // 2026-08-17: 그림 한 장이 완료 버튼으로 100% 확정된 순간 — 구역별 단계 칭찬의 마지막 단계
+  // (PERFECT)와 같은 문구로 음성+텍스트+애니메이션을 보여준 뒤 흡수 애니메이션으로 이어간다.
+  // #picture-complete-praise는 #coloring-screen 밖에 있는 고정(position:fixed) 오버레이라서
+  // goHome()으로 화면이 갤러리로 바뀌어도 그 위에 계속 떠 있는다(#praise-overlay와 같은 방식).
+  // 그래서 여기서는 goHome()을 지연 없이 그대로 바로 호출한다 — recordLevelClearTime 등 기존
+  // 타이밍(완료 버튼 누른 그 순간 즉시 기록)을 하나도 안 건드림.
+  let pictureCompleteTimer = null;
+  function playPictureCompletePraise() {
+    if (pictureCompleteTimer) { clearTimeout(pictureCompleteTimer); pictureCompleteTimer = null; }
+    pictureCompletePraise.textContent = regionStageText(7); // 'PERFECT! ⭐' — REGION_STAGE_TEXT와 같은 문구 재사용
+    pictureCompletePraise.hidden = false;
+    pictureCompletePraise.classList.remove('show');
+    void pictureCompletePraise.offsetWidth; // 리플로우 강제 — 연달아 떠도 팝인이 다시 재생되게 함
+    pictureCompletePraise.classList.add('show');
+    if (navigator.vibrate) { try { navigator.vibrate(400); } catch (e) { /* 무시 */ } } // 기존 보스 큰 승리와 동일한 세기
+    const lang = (window.I18N && I18N.lang) || 'en';
+    const pool = LEVEL_CLEAR_PRAISE[lang] || LEVEL_CLEAR_PRAISE.en;
+    speakPraise(pool[Math.floor(Math.random() * pool.length)], { pitch: 2, rate: 1.2, langPrefix: lang });
+    goHome();
+    pictureCompleteTimer = setTimeout(() => {
+      pictureCompleteTimer = null;
+      pictureCompletePraise.hidden = true;
+      pictureCompletePraise.classList.remove('show');
+    }, 2800);
   }
 
   function playBossVictory() {

@@ -1333,6 +1333,59 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Ctext x='0' y='28' font-size='28'%3E%E2%9C%8F%EF%B8%8F%3C/text%3E%3C/svg%3E") 3 29, pointer;
 }
 
+/* 2026-08-17: 구역을 하나씩 채울 때마다 잠깐 뜨는 단계별 칭찬(GOOD~PERFECT, 7단계) — 유아모드
+   전용. 텍스트는 언어 상관없이 항상 영어 고정이라(REGION_STAGE_TEXT 참고) 언어별 폰트 전환 없이
+   Fredoka(라틴 전용 가변 폰트) 하나만 쓴다. 단계(--tier, app.js가 인라인으로 설정)가 오를수록
+   글자만 커지고 애니메이션/진동은 공용 — 도안마다 구역 4~40개로 편차가 커서 단계별로 다른
+   연출을 다 만들면 과할 것 같아 세기 변화만 준다. */
+.region-stage-praise {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  pointer-events: none;
+  text-align: center;
+  white-space: nowrap;
+  font-family: 'Fredoka', "Segoe UI", sans-serif;
+  font-weight: 700;
+  font-size: calc(1.1rem + (var(--tier, 1) - 1) * 0.2rem);
+  color: var(--brand);
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.75);
+}
+.region-stage-praise.show { animation: region-stage-pop-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes region-stage-pop-in {
+  0% { transform: translate(-50%, -50%) scale(0.3) rotate(-6deg); opacity: 0; }
+  60% { transform: translate(-50%, -50%) scale(1.15) rotate(3deg); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .region-stage-praise.show { animation: none; }
+}
+
+/* 2026-08-17: 그림 1장 완료(N단계, PERFECT) 축하 — #region-stage-praise와 달리 캔버스에 묶이지
+   않고 화면 전체에 고정(position:fixed)돼서, goHome()이 곧장 실행돼 갤러리로 화면이 바뀌어도
+   그 위에 계속 떠 있는다(#praise-overlay와 같은 관례). */
+.picture-complete-praise {
+  position: fixed;
+  left: 50%;
+  top: 20%;
+  transform: translate(-50%, -50%);
+  z-index: 65; /* .praise-overlay(60)보다 위 */
+  pointer-events: none;
+  text-align: center;
+  white-space: nowrap;
+  font-family: 'Fredoka', "Segoe UI", sans-serif;
+  font-weight: 700;
+  font-size: 2.4rem;
+  color: var(--brand);
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.85);
+}
+.picture-complete-praise.show { animation: region-stage-pop-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .picture-complete-praise.show { animation: none; }
+}
+
 .palette {
   /* 2026-08-10: 캔버스 밑 가로줄 → 캔버스 오른쪽 세로줄로 변경(색칠 캔버스 공간을 최대한 확보하려는
      요청) — 색이 늘어나면(레벨 오를수록 최대 11개) 세로로 다 안 들어갈 수 있어서 세로 스크롤.
