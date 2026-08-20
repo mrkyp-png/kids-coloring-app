@@ -959,56 +959,133 @@
   }
 
   // ================= 레벨 지도(맵) =================
-  function renderMap() {
+  // 2026-08-21: "박스는 아예 없애고, 원을 중앙에 30% 크기로, 카테고리N 글자는 원 위쪽에
+  // 곡선으로" 요청 — 사각 박스(.level-node)를 없애고 큰 원형 버튼(.lv-circle)으로 교체.
+  // 이 원 하나(레벨 lv, 100%=화면 너비 30% 또는 미리보기용 70% 축소)를 만드는 부분만 따로
+  // 뺐다 — 아래 renderMap()에서 "중앙 큰 원"과 "위/아래 70% 미리보기 원"을 만들 때 재사용.
+  function buildLevelCircle(lv, scores, isPeek) {
+    const list = getTemplatesForLevel(lv);
+    const isClear = isLevelCleared(lv, scores);
+    const unlocked = isLevelUnlocked(lv, scores);
+    // TODO: 다국어 문구 확정되면 i18n.js로 옮길 것 — 지금은 디자인 확정 전이라 한국어 하드코딩.
+    const categoryLabel = '카테고리' + lv;
+
+    const node = document.createElement('button');
+    // 2026-08-21(9): "개미 있는 이미지는 위아래로 안 가는거 같은데" 제보 — 원 자리는 고정이라
+    // 실제로 안 움직이는 게 맞는데(요청하신 대로), 그러다보니 넘겼는데도 아무 변화가 없어
+    // 보이는 느낌이 들 수 있어서 자리 안 그림이 바뀔 때마다 살짝 페이드인 되게 해서 "바뀌었다"는
+    // 게 눈에 보이게 한다(위치는 그대로, 애니메이션은 이 opacity 페이드뿐).
+    node.className = 'lv-circle lv-swap-fade' + (unlocked ? '' : ' locked') + (isClear ? ' cleared' : '');
+    node.dataset.lv = String(lv); // 색상 CSS([data-lv="N"])가 이 값으로 레벨별 색을 고른다
+    node.setAttribute('role', 'listitem');
+    // 2026-08-21(10): "마우스 스크롤로는 잘 움직이는데, 터치로 안움직여" 제보 — 잠긴
+    // 레벨이 중앙에 있을 때, disabled 버튼은 터치/포인터 이벤트 자체가 아예 안 일어나서
+    // (휠은 원을 안 만지므로 멀쩡했지만) 중앙 원을 터치해서 드래그를 시작하는 게 원천적으로
+    // 불가능했다. 미리보기(peek) 원만 진짜로 비활성화하고, 잠긴 중앙 원은 disabled를 빼서
+    // 드래그는 되게 하되 클릭(openLevel)은 여전히 안 걸려있어서(unlocked && !isPeek 조건)
+    // 못 들어가는 건 그대로다.
+    node.disabled = isPeek; // 미리보기 원은 장식일 뿐, 눌러서 못 들어감
+
+    node.tabIndex = isPeek ? -1 : 0;
+    node.setAttribute('aria-label', categoryLabel + (isClear ? ' (cleared)' : unlocked ? '' : ' (locked)'));
+
+    // 2026-08-11: "레벨 박스안에 이모지 넣어도 좋아" 요청 — 그 레벨 첫 도안의 이모지를 코너에
+    // 살짝 얹어서 숫자만 있던 밋밋한 카드에 그 레벨에 뭐가 들었는지 살짝 예고해준다(잠긴
+    // 레벨도 동일하게 보여줘서 궁금증 유발 — 미리보기일 뿐 실제 색은 안 보여줌).
+    // 2026-08-21: 원형으로 바뀌면서 코너 배지가 아니라 원 전체를 채우는 큰 이미지로 승격.
+    // "원 안 이미지는 그 카테고리 첫 도안의 goal 이미지" 요청 — 유니코드 글리프 대신 다른
+    // 곳(renderQueueRow 등)과 같은 방식으로 실제 트위모지 SVG 파일을 <img>로 넣는다.
+    const previewTpl = list[0];
+    let inner = previewTpl
+      ? '<img class="lv-circle-emoji" src="assets/emoji/' + previewTpl.id + (previewTpl.isBoss ? '-icon' : '') + '.svg" alt="">'
+      : '';
+    if (!unlocked) {
+      inner += '<span class="lv-lock">🔒</span>';
+    } else if (isClear && !isPeek) {
+      inner += '<span class="lv-clear-badge">✓</span>';
+    }
+    node.innerHTML = inner;
+
+    if (unlocked && !isPeek) node.addEventListener('click', () => openLevel(lv));
+    return node;
+  }
+
+  // 2026-08-21(8): "원 3개는 고정" — 위/중앙/아래 3자리의 화면 위치는 절대 움직이지 않는다.
+  // 중앙을 드래그하면 mapCarouselIndex만 바뀌고, 그 자리들 안에 들어가는 그림(레벨)만
+  // renderCarouselSlots()가 다시 채운다. 레벨1↔레벨10은 원형으로 이어짐(무한 루프).
+  let mapCarouselIndex = 0;
+
+  function renderCarouselSlots() {
     const scores = getScores();
     const times = getLevelTimes();
-    mapGrid.innerHTML = '';
-    for (let lv = 1; lv <= TOTAL_LEVELS; lv++) {
-      const list = getTemplatesForLevel(lv);
-      const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
-      const isClear = isLevelCleared(lv, scores);
-      const unlocked = isLevelUnlocked(lv, scores);
+    const lv = mapCarouselIndex + 1;
+    const list = getTemplatesForLevel(lv);
+    const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
+    const isClear = isLevelCleared(lv, scores);
+    const unlocked = isLevelUnlocked(lv, scores);
+    const aboveLv = lv > 1 ? lv - 1 : TOTAL_LEVELS;
+    const belowLv = lv < TOTAL_LEVELS ? lv + 1 : 1;
 
-      const wrap = document.createElement('div');
-      wrap.className = 'level-node-wrap';
+    const aboveSlot = mapGrid.querySelector('.lv-peek-above');
+    aboveSlot.innerHTML = '';
+    aboveSlot.appendChild(buildLevelCircle(aboveLv, scores, true));
 
-      const node = document.createElement('button');
-      node.className = 'level-node' + (unlocked ? '' : ' locked') + (isClear ? ' cleared' : '');
-      node.setAttribute('role', 'listitem');
-      node.disabled = !unlocked;
-      node.setAttribute('aria-label', 'Level ' + lv + (isClear ? ' (cleared)' : unlocked ? '' : ' (locked)'));
+    const belowSlot = mapGrid.querySelector('.lv-peek-below');
+    belowSlot.innerHTML = '';
+    belowSlot.appendChild(buildLevelCircle(belowLv, scores, true));
 
-      // 2026-08-11: "레벨 박스안에 이모지 넣어도 좋아" 요청 — 그 레벨 첫 도안의 이모지를 코너에
-      // 살짝 얹어서 숫자만 있던 밋밋한 카드에 그 레벨에 뭐가 들었는지 살짝 예고해준다(잠긴
-      // 레벨도 동일하게 보여줘서 궁금증 유발 — 미리보기일 뿐 실제 색은 안 보여줌).
-      const previewEmoji = list.length ? list[0].emoji : '';
-      // 2026-08-16: "스크롤 없이 한 화면에" 요청으로 카드가 작아지면서, 10개 카드마다 매번
-      // 반복되던 "레벨" 글자 줄은 뺐다(숫자만으로도 어떤 카드인지 충분히 구분됨).
-      let inner = '<span class="lv-preview-emoji">' + previewEmoji + '</span>' +
-        '<span class="lv-num">' + lv + '</span>';
-      if (!unlocked) {
-        inner += '<span class="lv-lock">🔒</span>';
-      } else if (isClear) {
-        inner += '<span class="lv-clear-badge">✓ ' + escapeHtml(I18N.t('level.clearBadge')) + '</span><span class="lv-progress">' + doneCount + ' / ' + list.length + '</span>';
-      } else {
-        inner += '<span class="lv-progress">' + doneCount + ' / ' + list.length + '</span>';
-      }
-      node.innerHTML = inner;
+    // 2026-08-21: "박스는 아예 없애고, 좌상단 원을 중앙에 30% 크기로, 카테고리N 글자는
+    // 원 위쪽에 원처럼 곡선지게" 요청 — 곡선 글자는 SVG textPath로 원과 같은 반지름의
+    // 호를 그려서 그 위에 얹는다(순수 CSS로는 글자를 곡선으로 못 눕힘).
+    // 2026-08-21(3): "원 사이 간격이 안 맞다" 수정 — 곡선 글자/진행도 텍스트가 위/아래
+    // 여백 계산에 끼어들어서 위쪽 간격(라벨 포함)과 아래쪽 간격(진행도 유무에 따라 들쑥날쑥)이
+    // 서로 달랐음. stage 자체의 레이아웃 높이는 원 하나뿐이 되게 하고, 라벨/진행도는
+    // position:absolute로 원 위·아래에 "얹기만" 해서 위/아래 원 사이 간격(wrap의 gap)이
+    // 항상 똑같게 만든다.
+    const stage = mapGrid.querySelector('.lv-circle-stage');
+    const labelId = 'lv-arc-' + lv;
+    stage.innerHTML =
+      '<svg class="lv-curve-label" viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden="true">' +
+      '<path id="' + labelId + '" d="M 10,90 A 90,90 0 0 1 190,90" fill="none"/>' +
+      '<text><textPath href="#' + labelId + '" startOffset="50%" text-anchor="middle">' +
+      escapeHtml('카테고리' + lv) + '</textPath></text>' +
+      '</svg>';
+    stage.appendChild(buildLevelCircle(lv, scores, false));
 
-      if (unlocked) node.addEventListener('click', () => openLevel(lv));
-      wrap.appendChild(node);
-
-      // 완료(클리어)까지 걸린 시간 — 카드 바로 아래에 별도로 표시
-      const lvSeconds = getLevelTimeSeconds(times[lv]);
-      if (isClear && lvSeconds != null) {
-        const timeEl = document.createElement('div');
-        timeEl.className = 'lv-time';
-        timeEl.textContent = '⏱ ' + formatClearTime(lvSeconds);
-        wrap.appendChild(timeEl);
-      }
-
-      mapGrid.appendChild(wrap);
+    if (unlocked) {
+      const progress = document.createElement('div');
+      progress.className = 'lv-progress';
+      progress.textContent = doneCount + ' / ' + list.length;
+      stage.appendChild(progress);
     }
+
+    // 완료(클리어)까지 걸린 시간 — 진행도 바로 아래에 얹음(마찬가지로 절대 위치라 간격에 안 끼어듦)
+    const lvSeconds = getLevelTimeSeconds(times[lv]);
+    if (isClear && lvSeconds != null) {
+      const timeEl = document.createElement('div');
+      timeEl.className = 'lv-time';
+      timeEl.textContent = '⏱ ' + formatClearTime(lvSeconds);
+      stage.appendChild(timeEl);
+    }
+  }
+
+  function renderMap() {
+    mapCarouselIndex = 0;
+    mapGrid.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'level-node-wrap';
+    const above = document.createElement('div');
+    above.className = 'lv-peek lv-peek-above';
+    wrap.appendChild(above);
+    const stage = document.createElement('div');
+    stage.className = 'lv-circle-stage';
+    wrap.appendChild(stage);
+    const below = document.createElement('div');
+    below.className = 'lv-peek lv-peek-below';
+    wrap.appendChild(below);
+    mapGrid.appendChild(wrap);
+
+    renderCarouselSlots();
     updateStatLine();
     renderModeButtons();
     renderBossSection();
@@ -1076,6 +1153,86 @@
   }
 
   btnMapBack.addEventListener('click', goToMap);
+
+  // 2026-08-21(4): "캐러셀/슬라이드 애니메이션 방식같다" — 참고 영상을 다시 보니 브라우저
+  // 네이티브 스크롤(관성으로 여러 칸 훅 넘어갈 수 있음)이 아니라, 한 번의 드래그에 정확히
+  // 한 칸만 넘어가는 캐러셀이다. 스크롤 컨테이너를 안 쓰고, 터치/마우스 모두 같은 pointer
+  // 이벤트로 처리해서 mapCarouselIndex를 하나씩만 옮긴다(터치도 네이티브 스크롤에 맡기지
+  // 않음 — CSS의 touch-action:none과 짝).
+  // 2026-08-21(7): "오로지 중앙에 있는 원이 움직여야 바뀌게, 작은 원은 터치해도 안 움직이게"
+  // 요청 — 드래그 시작점이 중앙 원(.lv-circle-stage) 안이 아니면(위/아래 미리보기 원이나
+  // 빈 공간에서 시작했으면) 아예 드래그로 안 침, 즉 아무 반응 없음.
+  (function setupMapCarousel() {
+    let dragging = false, startY = 0, moved = false, downCircle = null;
+    mapGrid.addEventListener('pointerdown', (e) => {
+      if (!e.target.closest('.lv-circle-stage')) return;
+      // 터치에서 브라우저가 나중에 따로 합성해서 쏘는 호환용 click을 막는다 — 안 막으면
+      // (2026-08-21(11) 위 downCircle.click() 우회로 이미 화면이 갤러리로 바뀐 뒤에) 그 지연
+      // click이 원래 좌표에 새로 놓인 엉뚱한 항목(그림 도안 등)을 눌러버리는 2차 오작동이 생김.
+      e.preventDefault();
+      dragging = true;
+      moved = false;
+      startY = e.clientY;
+      // 실제 눌린 원 버튼을 미리 기억해둔다 — 바로 아래 setPointerCapture 때문에 이후
+      // 발생하는 click 이벤트의 target이 이 버튼이 아니라 mapGrid 자신으로 바뀌어버려서
+      // (2026-08-21(11) 버그: 자물쇠 없는=클릭 리스너가 달린 원만 실제로 안 열리던 원인.
+      // 잠긴 원은 애초에 클릭 리스너가 없어서 이 문제가 안 드러났을 뿐이었다), 탭(드래그 아님)
+      // 판정 시 이 참조로 직접 열어야 한다.
+      downCircle = e.target.closest('.lv-circle');
+      mapGrid.setPointerCapture(e.pointerId);
+    });
+    // pointerdown의 preventDefault만으로는 터치용 호환 click 합성이 안 막혀서(실측 확인),
+    // touchstart 자체에도 preventDefault를 걸어야 브라우저가 이 터치에 대해 지연 click을
+    // 아예 안 만든다. 기본이 passive라 preventDefault가 무시되므로 passive:false 필수.
+    mapGrid.addEventListener('touchstart', (e) => {
+      if (e.target.closest('.lv-circle-stage')) e.preventDefault();
+    }, { passive: false });
+    mapGrid.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      if (Math.abs(e.clientY - startY) > 4) moved = true;
+    });
+    function endDrag(e) {
+      if (!dragging) return;
+      dragging = false;
+      e.preventDefault();
+      if (moved) {
+        const dy = e.clientY - startY;
+        const STEP_THRESHOLD = 40; // 이만큼(px) 이상 끌어야 한 칸 이동으로 인정
+        // 레벨10 다음은 레벨1, 레벨1 이전은 레벨10 — 원형으로 이어짐(무한 루프).
+        const n = TOTAL_LEVELS;
+        if (dy <= -STEP_THRESHOLD) mapCarouselIndex = (mapCarouselIndex + 1) % n;
+        else if (dy >= STEP_THRESHOLD) mapCarouselIndex = (mapCarouselIndex - 1 + n) % n;
+        else return; // 살짝만 끌었으면 안 넘김
+        renderCarouselSlots();
+      } else if (downCircle) {
+        // pointer capture 부작용으로 네이티브 click은 mapGrid 자신에게만 가서 원 버튼의
+        // openLevel 리스너에 안 닿는다 — 눌렀던 원을 직접 클릭시켜 우회.
+        downCircle.click();
+      }
+    }
+    mapGrid.addEventListener('pointerup', endDrag);
+    mapGrid.addEventListener('pointercancel', endDrag);
+    // 드래그였으면(살짝 눌렀다 뗀 클릭이 아니라 진짜 끌었으면) 그 안의 원 클릭(레벨 진입)을
+    // 막는다 — 안 그러면 넘기려고 누른 게 실수로 레벨을 열어버림.
+    mapGrid.addEventListener('click', (e) => {
+      if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; }
+    }, true);
+
+    // PC 마우스 휠도 같은 원칙(한 번에 정확히 한 칸)으로 동작하게 함 — 휠은 중앙 원 위가
+    // 아니어도 허용(휠은 애초에 "작은 원을 건드려서 실수로 움직이는" 문제가 없음).
+    let wheelCooldown = false;
+    mapGrid.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (wheelCooldown) return;
+      const n = TOTAL_LEVELS;
+      if (e.deltaY > 0) mapCarouselIndex = (mapCarouselIndex + 1) % n;
+      else if (e.deltaY < 0) mapCarouselIndex = (mapCarouselIndex - 1 + n) % n;
+      else return;
+      renderCarouselSlots();
+      wheelCooldown = true;
+      setTimeout(() => { wheelCooldown = false; }, 350);
+    }, { passive: false });
+  })();
 
   modeButtons.forEach((btn) => {
     btn.addEventListener('click', () => setMode(btn.dataset.mode));

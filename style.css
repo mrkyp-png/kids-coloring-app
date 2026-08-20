@@ -474,149 +474,228 @@ button:active { transform: scale(0.94); }
 .icon-btn-spacer { width: 56px; height: 56px; flex: 0 0 auto; }
 
 /* ---------- 레벨 지도 ---------- */
-/* 2026-08-16: "레벨 1~10이 스크롤 없이 한 화면에" 요청 — 예전엔 auto-fill이라 화면 폭에 따라
-   열 수가 바뀌었는데(보통 폰에선 2열), 이제 2열x5행으로 고정하고 .map-grid 자체를 #map-screen의
-   남은 세로 공간(flex:1)에 정확히 맞춘다. minmax(0, 1fr)이 핵심 — 그냥 1fr만 쓰면 카드 내용이
-   원하는 만큼(min-content) 행 높이를 늘려버려서 작은 화면에서 스크롤이 다시 생기는데, 0을
-   최소값으로 두면 행이 무조건 5등분 몫만큼만 차지하고 카드 쪽이 거기 맞춰 눌려 들어간다. */
+/* 2026-08-16: "레벨 1~10이 스크롤 없이 한 화면에" 요청으로 2열×5행 고정 + overflow:hidden이었음.
+   2026-08-21: 컬러링 모드 개편(카테고리 10개) — 참고 영상처럼 레벨 하나가 화면을 거의 다
+   채우고 위/아래로 넘기면 다음 레벨이 나오는 방식으로 바꿈.
+   2026-08-21(8): "원 3개는 고정" 요청 — 위/중앙/아래 3자리의 화면 위치는 절대 움직이지
+   않는다. .level-node-wrap은 딱 하나만 있고, 스와이프/휠하면 app.js가 그 자리 안의 그림만
+   다시 채운다(위치 이동/애니메이션 없음). */
 .map-grid {
   flex: 1 1 auto;
   min-height: 0;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: repeat(5, minmax(0, 1fr));
-  gap: 8px;
   padding: 8px 16px 12px;
   max-width: 420px;
   margin: 0 auto;
   width: 100%;
-  overflow: hidden;
+  cursor: grab;
+  /* 터치로 드래그하는 동안 브라우저의 기본 세로 스크롤/패닝 제스처가 끼어들지 않게 함 —
+     레벨 전환은 전부 JS(pointer 이벤트)가 담당. */
+  touch-action: none;
+}
+.map-grid:active {
+  cursor: grabbing;
 }
 .level-node-wrap {
-  position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 0; /* 그리드 행이 5등분 몫보다 커지지 않도록 — 아래 .map-grid 주석 참고 */
+  align-items: center;
+  justify-content: center;
+  gap: 30px; /* 2026-08-21: "간격을 지금의 3배로" 요청 — 10px → 30px */
+  height: 100%;
   /* 2026-08-16: 배경 장식(z-index:0)이 레벨 박스의 둥근 모서리 바깥쪽(투명한 네 귀퉁이) 틈으로
      살짝 비쳐 보이는 문제 발견 — 그리드 전체를 막으면 장식이 여백에서도 거의 안 보이게
      되므로, 박스 모서리가 각진 이 래퍼(.level-node 자체보다 한 겹 바깥, 각진 사각형)에만
      배경색을 깔아서 딱 박스 크기만큼만 막는다. 격자 사이 여백/화면 여백엔 장식이 그대로 보임. */
   background: var(--bg);
+  padding: 12px 0;
 }
-.level-node-wrap .level-node {
+/* 2026-08-21: "위에는 이전 카테고리가 70% 크기로, 아래에는 다음 카테고리가 70% 크기로 살짝
+   보이게" 요청 — 슬라이드(레벨 하나 = 화면 하나) 안에 미리보기용 작은 원을 위/아래에 하나씩
+   더 넣는다. 터치로 스크롤하면 이 슬라이드 전체가 손가락을 따라 움직이다가 다음 슬라이드
+   경계에서 스냅되고, 새 슬라이드의 "아래 미리보기"였던 원이 중앙의 큰 원 자리로 온다.
+   2026-08-21(2): "PC에서 vw 기준이라 비율이 깨짐" + "원 사이 간격이 너무 멀다" 수정 —
+   뷰포트 기준(vw) 대신 .map-grid(PC에서도 420px로 고정된 폭) 기준 %로 바꾸고, wrap을
+   space-between(위/아래 끝까지 벌림) 대신 gap 10px로 가운데 모아 붙인다. */
+.lv-peek {
+  flex: 0 0 auto;
+  width: 31.5%; /* 큰 원(45%)의 70% */
+  opacity: 0.7;
+}
+.lv-peek .lv-circle {
   width: 100%;
-  flex: 1;
-  min-height: 0;
 }
+/* 2026-08-21(14): "원 위/아래"는 원 바깥이 아니라 원 안쪽(그림 위에 얹힘)이라는 뜻이었음 —
+   진행도(.lv-progress)는 원 안쪽 위, 타이머(.lv-time)는 원 안쪽 아래에 작은 알약칩으로 얹는다.
+   자물쇠(중앙)·체크뱃지(우측 상단)와는 안 겹치는 자리. */
 .lv-time {
-  margin-top: 2px;
-  text-align: center;
+  position: absolute;
+  bottom: 6%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.82);
+  padding: 2px 9px;
+  border-radius: 999px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
   font-size: 0.65rem;
   font-weight: 700;
   color: var(--brand);
 }
-/* 2026-08-11: "키보드 형태로 입체감있게" 요청 — 카드 아래쪽에 두꺼운 "테두리"처럼 진한 그림자를
-   깔아서 키보드 자판(키캡)처럼 도드라져 보이게 하고, 실제로 누르면(:active) 그만큼 눌리는
-   애니메이션을 준다(시작 화면 Start 버튼과 같은 방식). */
-.level-node {
-  /* 2026-08-11: "모드 아이콘처럼 테두리도" 요청 — 모드 버튼처럼 테두리를 추가해 윤곽을 한 번 더
-     또렷하게(색은 그림자와 같은 --lv-bezel 계열이라 톤이 어긋나지 않음). */
+/* 2026-08-21: "박스는 아예 없애고, 좌상단 원을 중앙에 30% 크기로, 카테고리N 글자는 원
+   위쪽에 원처럼 곡선지게" 요청 — 사각 박스(.level-node)를 통째로 원형 버튼(.lv-circle)으로
+   교체.
+   2026-08-21(3): "원 사이 간격이 안 맞다" 수정 — stage 자체 레이아웃 높이는 원 하나뿐이 되게
+   하고(position:relative), 곡선 글자/진행도는 position:absolute로 원 위·아래에 겹쳐서
+   "얹기만" 한다 — 그래야 위/아래 이웃 원과의 간격(.level-node-wrap의 gap)이 라벨/글자 유무와
+   무관하게 항상 똑같다. */
+.lv-circle-stage {
   position: relative;
+  width: 45%; /* .map-grid(PC에서도 420px 고정) 기준 — vw였다가 PC에서 비율 깨지던 버그 수정 */
+  container-type: inline-size; /* 아래 .lv-curve-label의 cqw가 이 30% 폭을 기준으로 계산되게 */
+}
+.lv-curve-label {
+  display: none; /* 2026-08-21(15): "카테고리 글자는 일단 없애고" 요청 — 임시로 숨김 */
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: 100%;
+  /* 2026-08-21(3): 간격을 10px로 좁히면서 라벨이 위 미리보기 원과 겹치지 않도록 높이도
+     같이 줄임(50cqw→18cqw). 곡선 자체(SVG path)는 그대로 두고 뷰포트만 낮춰서 글자가
+     살짝 잘려도 위쪽 절반만 보이면 되므로 무방함. */
+  height: 18cqw;
+  overflow: visible;
+}
+.lv-curve-label text {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  fill: var(--brand);
+}
+/* 2026-08-11(원래 사각 박스에 쓰던) "키보드 형태로 입체감있게" 요청을 그대로 원형에 적용 —
+   아래쪽 두꺼운 "테두리" 그림자로 키캡처럼 도드라져 보이게 하고 누르면(:active) 눌리는
+   애니메이션. */
+.lv-circle {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
   background: var(--lv-bg, var(--card-bg));
-  border: 2px solid var(--lv-bezel, #E6E0FF);
-  border-radius: var(--radius-md);
+  border: 3px solid var(--lv-bezel, #E6E0FF);
   box-shadow: 0 6px 0 var(--lv-bezel, rgba(0, 0, 0, 0.16)), 0 10px 16px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  /* 2026-08-16: "레벨 1~10 스크롤 없이 한 화면에" 요청으로 카드 높이가 크게 줄어서, 여백/줄
-     간격/글자 크기를 그만큼 압축했다(패딩 16/12→6/6, 줄 간격 6px→2px, 숫자 2.5rem→1.6rem).
-     "레벨" 글자 줄(.lv-label)은 카드 10개마다 매번 똑같이 반복되던 정보라 이 김에 뺐다. */
-  padding: 6px 6px 6px;
+  padding: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  overflow: hidden;
+  /* 2026-08-21(11): "터치로 움직이면 안 움직이거나 이상한 방향으로 감" 제보 — html,body의
+     touch-action:manipulation과, 이 버튼(.lv-circle)이 실제 터치 대상일 때 조상(.map-grid)의
+     touch-action:none이 안 먹히는 경우가 있어(다른 드래그 요소 .reward-puzzle-piece도 같은
+     이유로 자기 자신에 touch-action:none을 직접 걸어둠) 여기도 대상 요소 자신에 명시한다. */
+  touch-action: none;
   transition: transform 0.08s ease, box-shadow 0.08s ease;
 }
-.level-node:not(:disabled):active {
+/* 2026-08-21(14): "볼록거울처럼 입체감" 요청 — 왼쪽위 밝은 하이라이트 + 오른쪽아래 옅은
+   그림자를 얹은 유리구슬 느낌의 오버레이. pointer-events:none이라 클릭/드래그엔 안 끼어들고,
+   overflow:hidden 덕분에 원 밖으로는 안 삐져나간다. */
+.lv-circle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0.22) 24%, rgba(255, 255, 255, 0) 48%),
+    radial-gradient(circle at 70% 78%, rgba(0, 0, 0, 0.16) 0%, rgba(0, 0, 0, 0) 55%);
+  pointer-events: none;
+}
+/* 2026-08-21(9): 원 위치는 고정이라 안 움직이지만, 넘길 때 그 자리 그림이 바뀌었다는 걸
+   눈에 보이게 살짝 페이드인만 준다(위치 이동은 없음). */
+.lv-swap-fade {
+  animation: lv-swap-fade-in 0.2s ease;
+}
+@keyframes lv-swap-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.lv-circle:not(:disabled):active {
   transform: translateY(5px);
   box-shadow: 0 1px 0 var(--lv-bezel, rgba(0, 0, 0, 0.16)), 0 3px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
-.level-node .lv-num {
-  font-size: 1.6rem;
-  font-weight: 800;
-  color: var(--brand);
-  line-height: 1;
-}
-.level-node .lv-progress {
-  font-size: 0.7rem;
+.lv-progress {
+  position: absolute;
+  top: 6%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.82);
+  padding: 2px 9px;
+  border-radius: 999px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  font-size: 0.78rem;
   color: var(--muted);
-  font-weight: 600;
+  font-weight: 700;
 }
-.level-node.locked {
+.lv-circle.locked {
   opacity: 0.55;
 }
-.level-node.locked .lv-num { color: var(--muted); }
 
 /* 레벨 1~10 순서대로 색을 순환. box-shadow/background를 여기서 직접 못 박지 않고 --lv-bg/--lv-bezel
-   변수만 세팅해서, 실제 칠하는 곳(.level-node 기본 규칙과 :active 규칙)이 그 값을 var()로 읽게
+   변수만 세팅해서, 실제 칠하는 곳(.lv-circle 기본 규칙과 :active 규칙)이 그 값을 var()로 읽게
    한다 — 이렇게 안 하면 :active 눌림 그림자 규칙이랑 이 규칙이 서로 우선순위(specificity) 싸움을
    해서 누르면 색이 도로 회색으로 튀는 버그가 생긴다. 클리어 상태는 .cleared가 리터럴 값으로 또
    덮어써서(이 변수를 안 씀) 그대로 분홍 유지. */
-.level-node-wrap:nth-child(1) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-1), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-1), var(--lv-sat), var(--lv-bezel-light)); }
-.level-node-wrap:nth-child(2) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-2), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-2), var(--lv-sat), var(--lv-bezel-light)); }
-.level-node-wrap:nth-child(3) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-3), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-3), var(--lv-sat), var(--lv-bezel-light)); }
-.level-node-wrap:nth-child(4) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-4), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-4), var(--lv-sat), var(--lv-bezel-light)); }
-.level-node-wrap:nth-child(5) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-5), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-5), var(--lv-sat), var(--lv-bezel-light)); }
-.level-node-wrap:nth-child(6) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-6), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-6), var(--lv-sat), var(--lv-bezel-light)); }
-.level-node-wrap:nth-child(7) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-7), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-7), var(--lv-sat), var(--lv-bezel-light)); }
-.level-node-wrap:nth-child(8) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-8), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-8), var(--lv-sat), var(--lv-bezel-light)); }
-.level-node-wrap:nth-child(9) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-9), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-9), var(--lv-sat), var(--lv-bezel-light)); }
-.level-node-wrap:nth-child(10) .level-node:not(.cleared) { --lv-bg: hsl(var(--lv-hue-10), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-10), var(--lv-sat), var(--lv-bezel-light)); }
+/* 2026-08-21: 위/아래 70% 미리보기 원 추가로 슬라이드(.level-node-wrap) 하나 안에 서로 다른
+   레벨의 원이 여러 개(이전/현재/다음) 같이 들어오게 되면서, "몇 번째 슬라이드인가"(nth-child)로
+   색을 정하던 방식이 더는 안 맞음(같은 슬라이드 안에 색이 달라야 할 원이 여러 개) — 원 자체에
+   data-lv 속성을 찍어서 그 원이 "실제로 몇 번 레벨을 나타내는지" 기준으로 색을 고른다. */
+.lv-circle[data-lv="1"]:not(.cleared) { --lv-bg: hsl(var(--lv-hue-1), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-1), var(--lv-sat), var(--lv-bezel-light)); }
+.lv-circle[data-lv="2"]:not(.cleared) { --lv-bg: hsl(var(--lv-hue-2), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-2), var(--lv-sat), var(--lv-bezel-light)); }
+.lv-circle[data-lv="3"]:not(.cleared) { --lv-bg: hsl(var(--lv-hue-3), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-3), var(--lv-sat), var(--lv-bezel-light)); }
+.lv-circle[data-lv="4"]:not(.cleared) { --lv-bg: hsl(var(--lv-hue-4), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-4), var(--lv-sat), var(--lv-bezel-light)); }
+.lv-circle[data-lv="5"]:not(.cleared) { --lv-bg: hsl(var(--lv-hue-5), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-5), var(--lv-sat), var(--lv-bezel-light)); }
+.lv-circle[data-lv="6"]:not(.cleared) { --lv-bg: hsl(var(--lv-hue-6), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-6), var(--lv-sat), var(--lv-bezel-light)); }
+.lv-circle[data-lv="7"]:not(.cleared) { --lv-bg: hsl(var(--lv-hue-7), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-7), var(--lv-sat), var(--lv-bezel-light)); }
+.lv-circle[data-lv="8"]:not(.cleared) { --lv-bg: hsl(var(--lv-hue-8), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-8), var(--lv-sat), var(--lv-bezel-light)); }
+.lv-circle[data-lv="9"]:not(.cleared) { --lv-bg: hsl(var(--lv-hue-9), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-9), var(--lv-sat), var(--lv-bezel-light)); }
+.lv-circle[data-lv="10"]:not(.cleared) { --lv-bg: hsl(var(--lv-hue-10), var(--lv-sat), var(--lv-light)); --lv-bezel: hsl(var(--lv-hue-10), var(--lv-sat), var(--lv-bezel-light)); }
 
-.level-node.cleared {
+.lv-circle.cleared {
   /* 2026-08-11: "클리어시 연한 분홍색 처리" 요청 — 기존 브랜드색(연보라) 대신 연한 분홍으로 변경 */
   background: var(--cleared-bg);
   box-shadow: 0 6px 0 var(--cleared-bezel), 0 10px 16px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
-.level-node.cleared:not(:disabled):active {
+.lv-circle.cleared:not(:disabled):active {
   box-shadow: 0 1px 0 var(--cleared-bezel), 0 3px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
-.level-node .lv-preview-emoji {
-  /* 카드 밖으로 삐져나오면 옆 카드(간격이 좁음)의 배지와 겹쳐서 안쪽 코너에 배치 */
-  /* 2026-08-11: "아이콘에 입체감을(3D 느낌)" 요청 — 다른 곳(cover-start-btn 등)에서 쓰는
-     키캡 스타일(위는 밝고 아래는 어두운 그라디언트 + 아래쪽 그림자 턱 + 안쪽 하이라이트)을
-     이 작은 원형 배지에도 적용해 볼록한 유리구슬처럼 보이게 함. */
+/* 2026-08-21: "원 안 이미지는 그 카테고리 첫 도안의 goal 이미지" 요청 — 원 전체를 채우는
+   실제 트위모지 SVG(renderMap()에서 <img>로 삽입). */
+.lv-circle-emoji {
+  width: 78%;
+  height: 78%;
+  object-fit: contain;
+}
+.lv-circle .lv-clear-badge {
   position: absolute;
-  top: 6px;
-  left: 6px;
-  width: 28px;
-  height: 28px;
+  /* 2026-08-21(12): "우측 상단에 색깔이 좀 남아있다" 제보 — top/right를 정사각형 박스 기준
+     %로 주면 원(border-radius:50%)의 실제 둥근 테두리 밖으로 배지 대부분이 나가서
+     overflow:hidden에 잘려 초록색 조각만 남아 보였음. 원 중심에서 45도 방향, 반지름
+     안쪽으로 배지 반지름(13px)만큼 뺀 자리에 배지 중심을 두면 박스 크기와 무관하게 항상
+     원 안쪽에 완전히 들어간다. */
+  left: calc(50% + (50% - 13px) * 0.7071);
+  top: calc(50% - (50% - 13px) * 0.7071);
+  transform: translate(-50%, -50%);
+  background: var(--good);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 800;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: linear-gradient(155deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.8) 55%, rgba(255, 255, 255, 0.55) 100%);
-  box-shadow:
-    0 2px 0 rgba(0, 0, 0, 0.16),
-    0 3px 6px rgba(0, 0, 0, 0.22),
-    inset 0 1.5px 1.5px rgba(255, 255, 255, 0.95),
-    inset 0 -2px 3px rgba(0, 0, 0, 0.14);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
-}
-.level-node .lv-clear-badge {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  background: var(--good);
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: 800;
-  padding: 4px 8px;
-  border-radius: 999px;
   box-shadow: var(--shadow);
 }
-.level-node .lv-lock {
-  font-size: 1.4rem;
+.lv-circle .lv-lock {
+  position: absolute;
+  font-size: 2rem;
 }
 .level-next-banner {
   margin: 4px 16px 10px;
