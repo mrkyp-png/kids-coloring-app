@@ -24,9 +24,20 @@
   // 2026-08-20: "위/아래/좌/우 사각 링 배치 — 유아 12개(색10+뒤로가기+완료), 챌린지 16개(색12+
   // 스킬1·2+뒤로가기+완료)" 요청 — 링 한 면당 개수가 딱 맞아떨어지려면 기본 스와치가 정확히 10개
   // 여야 한다. COLORS(11 = 10색+흰)는 targetPaletteForLevel 등 절차생성 로직이 그대로 쓰므로 안
-  // 건드리고, 팔레트 UI 기본 표시용으로만 초록 계열 하나(teal, #1baf7a)를 뺀 10색 세트를 따로 둔다
-  // (해당 색이 실제로 필요한 도안은 required 병합으로 여전히 자동 노출됨).
-  const SWATCH_BASE_PALETTE = COLORS.filter((c) => c !== '#1baf7a');
+  // 건드리고, 팔레트 UI 기본 표시용으로만 10색 세트를 따로 둔다.
+  // 2026-08-21: "비슷한 색깔이 있다" 제보로 원인 확인 — 단순히 teal만 빼고 COLORS 순서 그대로
+  // 쓰면, 주황(#eb6834)이 우상단 코너에, 호박색(#eda100)이 그 바로 아래 오른쪽 줄 첫 칸에 와서
+  // 물리적으로 맞닿는데 실제로는 RGB 거리 77(앱이 실사색 배정에 쓰는 최소 이웃거리 기준 100
+  // 미달, MIN_NEIGHBOR_COLOR_DIST 참고)이라 구분이 잘 안 됐음 — COLORS의 순서는 "일렬로 나열"
+  // 기준으로 검증된 것이라, 코너에서 줄이 꺾이는 사각 링에 그대로 얹으면 원래 안 붙어있던 색끼리
+  // 코너를 사이에 두고 붙어버릴 수 있다는 게 원인. 아래 순서는 teal을 뺀 10색을 링의 실제 이웃
+  // 관계(윗줄 → 우상단 코너 → 오른쪽 줄 → [완료 버튼] → 아랫줄(오른→왼) → 좌하단 코너 →
+  // 왼쪽 줄(아래→위) → [뒤로가기 버튼])에 맞춰 재배열해서 모든 이웃 쌍이 거리 ≥100(최소
+  // 109.8)이 되도록 다시 짠 것 — COLORS 원본 순서와는 다름.
+  const SWATCH_BASE_PALETTE = [
+    '#2a78d6', '#7F5539', '#eb6834', '#e87ba4', '#008300',
+    '#e34948', '#4a3aa7', '#eda100', '#F2C879', '#2E2E2E'
+  ];
 
   // label은 i18n 도입(2026-08-11) 전 기본값(영어) — 실제 표시는 ratingLabel()이 I18N.t('rating.N')로 가져온다.
   const RATING_LEVELS = [
@@ -3138,26 +3149,19 @@
   // 색은 각 변에 3개씩=12색)와 유아(둘레 4칸, 모서리 중 뒤로가기·완료만 있고 나머지 두 모서리
   // 우상단·좌하단은 색으로 채워야 4개씩 맞음=변 2개+모서리색 2개=10색)가 갯수가 달라 표를 나눔.
   function renderPalette() {
-    const usedColors = currentLabelToColor ? Array.from(new Set(currentLabelToColor.values())) : [];
-    const required = usedColors.length ? usedColors : ((currentTemplate && currentTemplate.partColors) || []);
     let cols;
     if (currentTemplate && currentTemplate.paletteOverride) {
       cols = currentTemplate.paletteOverride.slice();
     } else {
       cols = currentIsChallenge ? SWATCH_BASE_PALETTE.concat(CHALLENGE_EXTRA_COLORS) : SWATCH_BASE_PALETTE.slice();
     }
-    required.forEach((c) => { if (!cols.includes(c)) cols.push(c); });
-    // 2026-08-20: "유아모드는 버튼이 반드시 12개(색10+뒤로가기+완료)로 구성돼야" 요청 — required
-    // 병합으로 기본 팔레트 밖 색이 추가돼 12개를 넘기면, required가 아닌 기본색을 뒤에서부터
-    // 잘라내 항상 정확히 10색(챌린지는 12색)으로 맞춘다. 도안 자체의 색 배정(어떤 그림이 어떤
-    // 색을 쓰는지)은 안 건드리고 팔레트 UI 표시 개수만 강제로 캡한다.
+    // 2026-08-21: "지정한 색 개수(유아10/챌린지12)를 트위모지 실제 도안 색과 안 맞아도 그대로
+    // 유지" 요청 — 예전엔 도안이 실제로 쓰는 색(required)을 팔레트에 강제 병합해서 지정 개수를
+    // 넘기는 경우가 있었다(그 결과 유아 10개/챌린지 12개가 안 지켜짐). 지금은 병합 없이 항상
+    // 정확히 지정된 색만 표시한다 — 도안 색이 팔레트 밖이면 당장은 그 영역을 못 맞추더라도,
+    // 트위모지 쪽 색을 팔레트에 맞게 바꾸는 건 나중에 별도로 진행하기로 함.
     const swatchTarget = currentIsChallenge ? 12 : 10;
-    if (cols.length > swatchTarget) {
-      const requiredSet = new Set(required);
-      for (let idx = cols.length - 1; idx >= 0 && cols.length > swatchTarget; idx--) {
-        if (!requiredSet.has(cols[idx])) cols.splice(idx, 1);
-      }
-    }
+    if (cols.length > swatchTarget) cols = cols.slice(0, swatchTarget);
     selectedColor = cols[0];
     [paletteTop, paletteBottom, paletteLeft, paletteRight, cornerTR, cornerBL].forEach((el) => {
       el.querySelectorAll('.color-swatch').forEach((sw) => sw.remove());
