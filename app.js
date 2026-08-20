@@ -3079,7 +3079,9 @@
   // 넘치는 스와치는 기존 overflow-y:auto로 스크롤된다. 색칠 화면을 열 때(화면이 보이기 직전)와
   // 리사이즈/회전 시 다시 계산한다.
   function syncRingSquareSize() {
-    const middleColumnWidth = coloringScreen.clientWidth - 176; // 176 = 좌우 팔레트 열(88px×2)
+    // 2026-08-21: "버튼 최소화, goal/캔버스 박스 최대화" 요청으로 팔레트 열 폭을 88px→60px로
+    // 줄임(style.css .palette-col 참고) — 뺄 값도 같이 120(=60×2)으로 맞춘다.
+    const middleColumnWidth = coloringScreen.clientWidth - 120; // 120 = 좌우 팔레트 열(60px×2)
     const size = Math.max(0, Math.min(middleColumnWidth, 420));
     document.documentElement.style.setProperty('--ring-square', size + 'px');
   }

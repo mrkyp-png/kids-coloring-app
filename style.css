@@ -1199,8 +1199,10 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   max-width: 596px;
   margin: 0 auto;
   /* 2026-08-20: "색상 스와치가 캔버스를 액자처럼 좌우로 둘러싸게" 요청 — 팔레트 열을 오른쪽 하나에서
-     좌/우 두 열로 분리. 폭 88px 산출 근거는 아래 .palette-col 주석 참고(양쪽 다 동일해야 함). */
-  grid-template-columns: 88px 1fr 88px;
+     좌/우 두 열로 분리. 폭 60px 산출 근거는 아래 .palette-col 주석 참고(양쪽 다 동일해야 함).
+     2026-08-21: "버튼은 최소한으로 줄이고 goal/캔버스 박스를 최대한 키워달라" 요청 — 열 폭을
+     줄인 만큼 그대로 가운데 열(goal/캔버스)이 커진다(app.js syncRingSquareSize 참고). */
+  grid-template-columns: 60px 1fr 60px;
   /* 2026-08-14(I3, 최종 리뷰): 챌린지 HUD를 위해 맨 위에 1행 추가.
      2026-08-20: 기존 툴바 1행을 캔버스 위/아래 기능버튼 2행(frame-top/frame-bottom)으로 분리.
      2026-08-20(2): "버튼 링도 캔버스처럼 정사각형이어야" 요청 — 세 차례 시도 끝에 정리됨.
@@ -1217,7 +1219,7 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
      화면을 열 때마다 동기 실행 + resize 리스너, 화면에 그려지기 전에 세팅되므로 깜빡임 없음).
      팔레트 열은 이 고정 행 높이에 맞춰 stretch되고, 넘치는 스와치는 기존 overflow-y:auto로
      스크롤된다. */
-  grid-template-rows: auto auto var(--ring-square, 280px) 88px var(--ring-square, 280px) 88px;
+  grid-template-rows: auto auto var(--ring-square, 280px) 60px var(--ring-square, 280px) 60px;
   /* 2026-08-20: "바탕화면을 게임 느낌 나게, 은은한 우주 패턴" 요청 — 크림 배경(--bg) 위에 아주
      연한 별 점(radial-gradient 반복)과 구석의 흐릿한 성운색 뭉치를 얹는다. 채도/투명도를 낮게
      잡아서 색칠버튼·캔버스 등 핵심 요소 가독성에는 영향 없게 함. */
@@ -1507,44 +1509,48 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 
 .palette-col {
   /* 2026-08-20: 캔버스를 액자처럼 좌우로 둘러싸는 색상 열(예전 우측 단일 .palette를 좌/우로 분리).
-     너비 88px = 스와치 지름(52+테두리4*2=60px) + 선택 표시 링(::after, inset:-6px 이므로 양쪽
-     6px씩 더 필요=72px) + 좌우 패딩 8px씩 — 링이 overflow-x:hidden에 안 잘리게. grid-template-columns의
-     88px 트랙과 맞춰져 있어야 함(양쪽 다 88이어야 함, 하드코딩된 곳들). 색 개수가 많은 챌린지모드에서
+     2026-08-21: "버튼은 최소한으로, goal/캔버스 박스는 최대한 크게" 요청으로 스와치를 60px→44px로
+     축소하면서 이 열의 폭도 같이 줄임 — 너비 60px = 스와치 지름(44px, 테두리 3px 포함) + 선택
+     표시 링(::after, inset:-4px 이므로 양쪽 4px씩=8px) + 좌우 패딩 4px씩=8px. grid-template-columns의
+     60px 트랙과 맞춰져 있어야 함(양쪽 다 60이어야 함, 하드코딩된 곳들). 색 개수가 많은 챌린지모드에서
      세로로 다 안 들어가면 세로 스크롤.
      2026-08-20(2): "상하좌우 버튼 간 거리가 다 똑같아야"(뒤로가기→첫 색, 색↔색, 마지막 색→완료
      전부 포함) 요청 — 위/아래 줄(.color-frame-row)은 space-between이라 실제 렌더링된 간격이
      고정값이 아니라 도안/화면 크기마다 달라진다(예: 55.3px). 그 값을 app.js의 syncRingGap()이
      매번 측정해 --ring-gap으로 반영하면, 여기서도 같은 값을 gap으로 쓰고, 위아래 패딩을
-     "간격 - 18px"로 계산해 뒤로가기/완료(88px 행에서 52px 원이 위아래로 18px씩 남는 것)와의
-     거리까지 정확히 같은 값으로 맞춘다. */
-  width: 88px;
+     "간격 - (행높이-스와치지름)"으로 계산해 뒤로가기/완료와의 거리까지 정확히 같은 값으로 맞춘다. */
+  width: 60px;
   display: flex;
   flex-direction: column;
   flex-wrap: nowrap;
   align-items: center;
   gap: 0;
-  /* 2026-08-20(3): 위/아래 줄의 모서리 버튼(뒤로가기·완료 등)은 88px 행 안에서 위아래로 18px씩
-     여백을 두고 가운데 있다((88-52)/2). 좌/우 열의 박스 자체는 캔버스 행(row5) 높이만큼이라
-     그 18px 여백 구간이 빠져 있는데, margin으로 18px씩 밀어 넣어 "뒤로가기 바로 밑 ~ 완료 바로
+  /* 2026-08-20(3): 위/아래 줄의 모서리 버튼(뒤로가기·완료 등)은 60px 행 안에서 위아래로 8px씩
+     여백을 두고 가운데 있다((60-44)/2). 좌/우 열의 박스 자체는 캔버스 행(row5) 높이만큼이라
+     그 8px 여백 구간이 빠져 있는데, margin으로 8px씩 밀어 넣어 "뒤로가기 바로 밑 ~ 완료 바로
      위"까지를 이 열의 실제 범위로 만든다(위/아래 원의 여백 구간은 애초에 비어 있어서 겹쳐도
      클릭에 영향 없음). 그 범위 안에서 justify-content:space-evenly로 색상 앞뒤·사이 간격을
      전부 동일하게 나눈다(색이 N개면 N+1개 간격이 다 같아짐). */
-  margin: -14px 0; /* (88-60)/2 — .ring-circle이 60px로 커지면 이 여백도 같이 줄여야 함 */
+  margin: -8px 0; /* (60-44)/2 — .ring-circle 지름이 바뀌면 이 여백도 같이 줄여야 함 */
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0 8px;
+  padding: 0 4px;
   justify-content: space-evenly;
 }
 /* 2026-08-20: "뒤로가기/완료/스킬도 색칠버튼과 동일한 원형이어야 하고, 사각 링 배치 개수에
    포함된다" 요청 — 색상 스와치와 완전히 같은 크기/입체감을 공유하는 기반 클래스로 뺀다.
    배경색만 각자 다르게 주면 되므로(스와치는 인라인 style, 기능버튼은 아래 .ring-btn-* 클래스),
    임의의 색에도 공통으로 먹히는 인셋 하이라이트/그림자 레이어만으로 볼록한 캔디버튼 느낌을 낸다. */
+/* 2026-08-21: "버튼은 최소한으로 줄이고 goal/캔버스 박스는 최대한 키워달라" 요청 — 60px→44px로
+   축소(터치 타겟 최소 권장치 44px 유지). 테두리도 비율 맞춰 4px→3px. 이 크기를 바꾸면
+   .palette-col/.color-swatch.active::after/.ring-corner-slot 마진, app.js syncRingSquareSize()의
+   176(=88×2) 상수도 같이 맞춰야 함(위 #coloring-screen 주석 참고). */
 .ring-circle {
   flex: 0 0 auto;
-  width: 60px;
-  height: 60px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  border: 4px solid #fff;
+  border: 3px solid #fff;
   box-shadow:
     0 3px 0 rgba(0, 0, 0, 0.22),
     0 5px 8px rgba(0, 0, 0, 0.16),
@@ -1554,7 +1560,7 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.3rem;
+  font-size: 1rem;
   transition: transform 0.08s ease, box-shadow 0.08s ease;
 }
 .ring-circle:active {
@@ -1568,9 +1574,9 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 .color-swatch.active::after {
   content: "";
   position: absolute;
-  inset: -6px;
+  inset: -4px; /* 2026-08-21: 버튼 축소(60→44px)에 맞춰 6px→4px, .palette-col 폭 계산과 맞물림 */
   border-radius: 50%;
-  border: 3px solid var(--brand);
+  border: 2px solid var(--brand);
 }
 .ring-btn-back { background: #CFE3FF; }
 .ring-btn-done { background: #C9F2D6; }
@@ -1613,8 +1619,8 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   align-items: center;
   justify-content: center;
 }
-.color-frame-row > .ring-corner-slot:first-child { margin-left: 14px; } /* (88-60)/2 */
-.color-frame-row > .ring-corner-slot:last-child { margin-right: 14px; }
+.color-frame-row > .ring-corner-slot:first-child { margin-left: 8px; } /* (60-44)/2, 2026-08-21 축소 반영 */
+.color-frame-row > .ring-corner-slot:last-child { margin-right: 8px; }
 /* 2026-08-11: 다른 버튼들(Start, 레벨박스)과 같은 키캡 입체감을 툴바/모달 버튼에도 통일 적용. */
 .tool-btn {
   flex: 1;
