@@ -854,16 +854,34 @@
     return m + ':' + (s < 10 ? '0' : '') + s;
   }
 
+  let levelTimerActive = false; // 화면이 안 보이는 동안 setInterval은 꺼도, "원래 돌고 있어야 하는지"는 기억해둔다
+
   function stopLevelTimer() {
+    levelTimerActive = false;
     if (levelTimerInterval) { clearInterval(levelTimerInterval); levelTimerInterval = null; }
     coloringTimerText.hidden = true;
   }
 
   function startLevelTimer() {
     stopLevelTimer();
+    levelTimerActive = true;
     levelTimerInterval = setInterval(updateLevelTimerDisplay, 1000);
     updateLevelTimerDisplay();
   }
+
+  // 2026-08-21(22): "게임 중 대기하면 시간이 계속 흘러 배터리를 먹는다" 요청 — 탭/앱이
+  // 백그라운드로 가면 1초마다 돌던 setInterval을 아예 멈추고, 다시 보일 때만 재개한다.
+  // updateLevelTimerDisplay는 매번 Date.now() 기준으로 새로 계산하지 누적이 아니므로,
+  // 멈췄다 재개해도 기록되는 경과시간 자체는 그대로 정확하다 — 안 보이는 동안 매초
+  // 화면을 갱신하던 낭비만 아낀다.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (levelTimerInterval) { clearInterval(levelTimerInterval); levelTimerInterval = null; }
+    } else if (levelTimerActive && !levelTimerInterval) {
+      levelTimerInterval = setInterval(updateLevelTimerDisplay, 1000);
+      updateLevelTimerDisplay();
+    }
+  });
 
   // 시간 초과 처리(보스): 그 보스 점수 초기화 + 안내 + 맵으로 (완주 기록 자체는 안 지워지므로 다시 도전 가능)
   function handleBossTimeUp(mode) {
