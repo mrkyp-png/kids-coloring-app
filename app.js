@@ -1179,6 +1179,11 @@
       // 잠긴 원은 애초에 클릭 리스너가 없어서 이 문제가 안 드러났을 뿐이었다), 탭(드래그 아님)
       // 판정 시 이 참조로 직접 열어야 한다.
       downCircle = e.target.closest('.lv-circle');
+      // 2026-08-21(16): "PC는 눌림 효과 나오는데 폰은 안 나온다" 제보 — 브라우저 네이티브
+      // :active는 터치에서 원래도 불안정한데, 위 pointerdown의 preventDefault()가 그 활성화
+      // 자체를 막아버려서 폰에서는 아예 안 뜨게 된 것. :active에 기대는 대신 직접 클래스를
+      // 붙였다 떼서 CSS 눌림 효과를 확실하게 재현한다.
+      if (downCircle) downCircle.classList.add('lv-pressed');
       mapGrid.setPointerCapture(e.pointerId);
     });
     // pointerdown의 preventDefault만으로는 터치용 호환 click 합성이 안 막혀서(실측 확인),
@@ -1195,6 +1200,7 @@
       if (!dragging) return;
       dragging = false;
       e.preventDefault();
+      if (downCircle) downCircle.classList.remove('lv-pressed');
       if (moved) {
         const dy = e.clientY - startY;
         const STEP_THRESHOLD = 40; // 이만큼(px) 이상 끌어야 한 칸 이동으로 인정

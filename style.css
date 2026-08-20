@@ -615,7 +615,7 @@ button:active { transform: scale(0.94); }
   from { opacity: 0; }
   to { opacity: 1; }
 }
-.lv-circle:not(:disabled):active {
+.lv-circle:not(:disabled):active, .lv-circle:not(:disabled).lv-pressed {
   transform: translateY(5px);
   box-shadow: 0 1px 0 var(--lv-bezel, rgba(0, 0, 0, 0.16)), 0 3px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
@@ -661,7 +661,7 @@ button:active { transform: scale(0.94); }
   background: var(--cleared-bg);
   box-shadow: 0 6px 0 var(--cleared-bezel), 0 10px 16px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
-.lv-circle.cleared:not(:disabled):active {
+.lv-circle.cleared:not(:disabled):active, .lv-circle.cleared:not(:disabled).lv-pressed {
   box-shadow: 0 1px 0 var(--cleared-bezel), 0 3px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 /* 2026-08-21: "원 안 이미지는 그 카테고리 첫 도안의 goal 이미지" 요청 — 원 전체를 채우는
