@@ -453,11 +453,10 @@
     } catch (e) { /* 무시 */ }
 
     // 2026-08-16: "리셋하고 레벨1 들어가니 아래 박스가 안나와" 버그 — renderQueue()가 세션 중
-    // "지금 화면에 보이는 2개"를 queueByLevel에 캐싱해두는데, 리셋 전에 그 레벨을 이미 100%
-    // 클리어한 적이 있으면 캐시가 빈 배열([])로 남아있다. 빈 배열도 truthy라 renderQueue의
-    // "최초 진입" 분기를 안 타고 그 빈 캐시를 그대로 다시 그려서 대기열이 계속 비어 보였다.
-    // 리셋 시 이 캐시를 통째로 지워서 다음 진입 때 새로 계산하게 한다.
-    Object.keys(queueByLevel).forEach((k) => delete queueByLevel[k]);
+    // "마지막으로 그렸을 때 마스터돼있던 id 집합"을 masteredByLevel에 캐싱해두는데, 리셋 전
+    // 기록이 남아있으면 "방금 클리어됨"으로 잘못 해석될 수 있다. 리셋 시 이 캐시를 통째로
+    // 지워서 다음 진입 때 새로 계산하게 한다.
+    Object.keys(masteredByLevel).forEach((k) => delete masteredByLevel[k]);
   }
 
   // 레벨 10개를 다 완료하는 데 걸린 시간(초) 기록 — 메인 화면 레벨 블록 아래에 표시한다.
@@ -993,7 +992,7 @@
     // 레벨도 동일하게 보여줘서 궁금증 유발 — 미리보기일 뿐 실제 색은 안 보여줌).
     // 2026-08-21: 원형으로 바뀌면서 코너 배지가 아니라 원 전체를 채우는 큰 이미지로 승격.
     // "원 안 이미지는 그 카테고리 첫 도안의 goal 이미지" 요청 — 유니코드 글리프 대신 다른
-    // 곳(renderQueueRow 등)과 같은 방식으로 실제 트위모지 SVG 파일을 <img>로 넣는다.
+    // 곳(renderClearedBadge 등)과 같은 방식으로 실제 트위모지 SVG 파일을 <img>로 넣는다.
     const previewTpl = list[0];
     let inner = previewTpl
       ? '<img class="lv-circle-emoji" src="assets/emoji/' + previewTpl.id + (previewTpl.isBoss ? '-icon' : '') + '.svg" alt="">'
@@ -1609,7 +1608,12 @@
     levelReward.hidden = !art;
     if (!art) return;
     if (levelRewardArt.dataset.level !== String(level)) {
-      const { cols, rows } = gridDims(total);
+      // 2026-08-21(19): "goal 이미지도 16조각" 요청 — 완성 판정(clearedCount>=total, 바로 아래)은
+      // 실제 그림 개수 그대로 쓰고, 칸을 자르는 격자 크기만 최소 16(4x4)으로 키운다. 그림이
+      // 아직 16개보다 적은 레벨은 남는 칸이 평생 안 열린 채로(연한 색으로 덮인 채) 남는다 —
+      // 원형 아이콘 목록의 빈 자리표시자와 같은 성격의, 콘텐츠 16개 채우기 전까지의 임시 모습.
+      const gridTotal = Math.max(total, GALLERY_GRID_TARGET);
+      const { cols, rows } = gridDims(gridTotal);
       levelRewardArt.innerHTML = buildRewardSvg(art, cols, rows);
       levelRewardArt.setAttribute('viewBox', '0 0 100 100');
       levelRewardArt.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -1840,7 +1844,8 @@
   function finishRewardPuzzle(level) {
     const art = LEVEL_REWARD_ART[level];
     const total = getTemplatesForLevel(level).length;
-    const { cols, rows } = gridDims(total);
+    // updateLevelReward와 같은 격자 크기를 써야 이 완성 연출 직전/직후 칸 크기가 안 튄다.
+    const { cols, rows } = gridDims(Math.max(total, GALLERY_GRID_TARGET));
 
     // "다음" 버튼을 여는 재렌더링은 맨 먼저 해둔다 — updateLevelReward가 이 시점부터는
     // isRewardPuzzleBlocking이 false라 판단해 levelRewardArt에 .launched를 미리 붙여버리는데,
@@ -2073,41 +2078,14 @@
     renderQueue(currentLevel, list, scores);
   }
 
-  // 2026-08-16: "카드 그리드 대신 2개씩 대기열" 요청 — 한 번에 딱 2개(QUEUE_SIZE)만 보여주고,
-  // 그림을 완료하면 그 줄이 보상 이미지로 흡수되며 사라진 뒤, 대기 중이던 다음 그림이 그 자리로
-  // 올라온다. 레벨별로 "지금 화면에 보이는 두 그림의 id"를 기억해뒀다가(queueByLevel), 매
-  // 렌더마다 그중 새로 클리어된 게 있는지 비교해서 흡수 애니메이션을 트리거한다.
-  const QUEUE_SIZE = 2;
-  const queueByLevel = {};
+  // 2026-08-21(19): "첫화면부터 16개 원형 아이콘" 요청 — 예전엔 대기열(2개씩)로 보여주다가
+  // 다 깨야만 원형 그리드로 바뀌었는데, 이제 처음 진입할 때부터 항상 (실제 그림 + 빈 자리표시자
+  // 로 16개 채운) 원형 그리드 하나만 쓴다. 레벨별로 "마지막으로 그렸을 때 이미 마스터돼있던
+  // id 집합"을 기억해뒀다가(masteredByLevel), 매 렌더마다 새로 마스터된 게 있으면 그 아이콘에서
+  // 보상 이미지 쪽으로 복제본이 날아가는 연출(flyToReward)만 트리거한다 — 아이콘 자체는 계속
+  // 그 자리에 남아있어서(대기열처럼 사라지지 않음) 16칸이 항상 그대로 유지된다.
+  const masteredByLevel = {};
 
-  function renderQueueRow(tpl) {
-    // 2026-08-16: 배경 장식이 .tpl-row의 둥근 모서리 틈으로 비치는 걸 막으려고, 각진(둥글지
-    // 않은) 래퍼로 한 겹 감싼다 — 래퍼 크기만큼만 장식을 가리고, 래퍼 바깥 여백엔 장식이 보임.
-    const wrap = document.createElement('div');
-    wrap.className = 'tpl-row-wrap';
-    const row = document.createElement('button');
-    row.className = 'tpl-row';
-    row.dataset.tplId = tpl.id;
-    const displayName = I18N.templateName(tpl);
-    row.setAttribute('aria-label', 'Color the ' + displayName);
-    row.innerHTML =
-      '<img class="tpl-emoji" src="assets/emoji/' + tpl.id + (tpl.isBoss ? '-icon' : '') + '.svg" alt="">' +
-      '<span class="tpl-label">' + escapeHtml(displayName) + '</span>';
-    row.addEventListener('click', () => openTemplate(tpl));
-    wrap.appendChild(row);
-    return wrap;
-  }
-
-  function paintQueue(ids, byId, level) {
-    galleryGrid.classList.remove('gallery-grid-cleared');
-    galleryGrid.dataset.paintedLevel = String(level);
-    galleryGrid.innerHTML = '';
-    ids.forEach((id) => { if (byId[id]) galleryGrid.appendChild(renderQueueRow(byId[id])); });
-  }
-
-  // 2026-08-17: "다 깬 12개가 세로 카드로 늘어서 스크롤해야 보인다" 피드백 — 진행 중 대기열
-  // 카드(.tpl-row)와 달리, 이미 다 깬 그림들은 이름표 없이 원형 아이콘(.tpl-row .tpl-emoji와
-  // 같은 스타일)만 줄바꿈되는 그리드로 한 화면에 다 보이게 한다.
   function renderClearedBadge(tpl) {
     const badge = document.createElement('button');
     badge.className = 'tpl-badge';
@@ -2143,80 +2121,32 @@
   function renderQueue(level, list, scores) {
     const byId = {};
     list.forEach((t) => { byId[t.id] = t; });
-    const pending = list.filter((t) => !isMastered(t.id, scores));
-    const pendingIds = new Set(pending.map((t) => t.id));
-    const prevIds = queueByLevel[level];
     const allIds = list.map((t) => t.id);
-    // 2026-08-17(3차): "레벨3(안 깬 레벨)로 가도 레벨2 뱃지가 그대로 남는다" 버그 수정 —
-    // #gallery-grid는 모든 레벨이 공유하는 하나의 DOM이라, "지금 화면에 뭔가 그려져 있다"는
-    // 것만으로는 그게 이 레벨 것인지 알 수 없었다(children.length만 보던 아래 최적화들이 이걸
-    // 놓쳤다). paintQueue/paintClearedGrid가 그릴 때마다 어느 레벨 것인지 dataset에 남겨두고,
-    // 지금 레벨과 다르면 "새로 그려야 함"으로 확정한다.
+    const masteredNow = new Set(list.filter((t) => isMastered(t.id, scores)).map((t) => t.id));
+    // #gallery-grid는 모든 레벨이 공유하는 하나의 DOM이라, 지금 화면에 그려진 게 이 레벨 것이
+    // 맞는지 dataset으로 확인한다(2026-08-17(3차) 버그 수정 때 생긴 원칙, 그대로 유지).
     const domStale = galleryGrid.dataset.paintedLevel !== String(level);
+    const prevMastered = masteredByLevel[level];
 
-    // "이미 다 깬 레벨에 다시 들어옴"(Back/Next로 재진입 등) — 새로 완료된 그림이 없으므로
-    // 아래 "방금 클리어됨" 흡수 연출/1.1초 지연 없이 곧장 뱃지 그리드로 그린다.
-    if (pending.length === 0 && prevIds && prevIds.length === allIds.length) {
-      paintClearedGrid(allIds, byId, level);
-      return;
-    }
+    paintClearedGrid(allIds, byId, level);
 
-    if (!prevIds || domStale) {
-      // 이 레벨을 이번 세션에서 처음 그리는 거면(또는 화면에 다른 레벨 것이 남아있으면)
-      // 애니메이션 없이 바로 채운다. 이미 예전에 다 깬 레벨이면 대기열 대신 뱃지 그리드로.
-      if (pending.length === 0) {
-        queueByLevel[level] = allIds;
-        paintClearedGrid(allIds, byId, level);
-      } else {
-        const initial = prevIds || pending.slice(0, QUEUE_SIZE).map((t) => t.id);
-        queueByLevel[level] = initial;
-        paintQueue(initial, byId, level);
-      }
-      return;
-    }
+    // 이번이 이 레벨 첫 렌더(또는 다른 레벨 것이 화면에 남아있던 경우)면 "새로 클리어됨" 연출 없이
+    // 그냥 현재 상태만 기억해둔다 — 방금 막 클리어한 게 아니라 원래 그런 상태였을 뿐이므로.
+    const justCleared = (!prevMastered || domStale) ? [] : allIds.filter((id) => masteredNow.has(id) && !prevMastered.has(id));
+    masteredByLevel[level] = masteredNow;
+    if (justCleared.length === 0) return;
 
-    const justCleared = prevIds.filter((id) => !pendingIds.has(id));
-    if (justCleared.length === 0) {
-      return;
-    }
-
-    // 방금 클리어된 줄들을 보상 이미지 쪽으로 흡수시키고, 끝나면 다음 상태로 교체한다.
-    const doneCountAfter = list.length - pending.length;
-    const doneCountBefore = doneCountAfter - justCleared.length;
+    // 방금 클리어된 아이콘에서 보상 이미지 쪽으로 복제본이 날아가는 연출만 재생 — 아이콘 자체는
+    // (대기열 방식과 달리) 계속 그 자리에 남아있어서 16칸 그리드가 항상 그대로 유지된다.
+    const doneCountBefore = masteredNow.size - justCleared.length;
     const art = LEVEL_REWARD_ART[level];
     playAbsorbSfx();
     justCleared.forEach((id, k) => {
-      const row = galleryGrid.querySelector('[data-tpl-id="' + id + '"]');
-      if (!row) return;
-      row.classList.add('tpl-row-absorbing');
+      const badge = galleryGrid.querySelector('[data-tpl-id="' + id + '"]');
+      if (!badge) return;
       const pieceEl = art && levelRewardArt.querySelector('[data-piece="cell-' + (doneCountBefore + k) + '"]');
-      flyToReward(row, pieceEl);
+      flyToReward(badge, pieceEl);
     });
-
-    if (pending.length === 0) {
-      // 방금 이 레벨의 마지막 그림까지 다 깼다 — 흡수 연출이 끝나면 전체를 뱃지 그리드로 바꾼다.
-      queueByLevel[level] = allIds;
-      setTimeout(() => {
-        if (currentLevel !== level) return; // 2026-08-17: 그 사이 다른 레벨로 넘어갔으면 건너뜀
-        paintClearedGrid(allIds, byId, level);
-      }, 1100);
-      return;
-    }
-
-    const remaining = prevIds.filter((id) => pendingIds.has(id));
-    const used = new Set(remaining);
-    for (const t of pending) {
-      if (used.size >= QUEUE_SIZE) break;
-      if (!used.has(t.id)) { remaining.push(t.id); used.add(t.id); }
-    }
-    queueByLevel[level] = remaining;
-
-    setTimeout(() => {
-      if (currentLevel !== level) return; // 2026-08-17: "Next를 빨리 누르면 다음 레벨 화면이
-      // 이전 레벨 그림으로 덮어써진다" 버그 수정 — 이 타이머엔 레벨 전환 확인이 없어서, 예약된
-      // 뒤 다른 레벨로 넘어가도 그대로 발동해 그 레벨의 #gallery-grid를 덮어쓰고 있었다.
-      paintQueue(queueByLevel[level], byId, level);
-    }, 1100);
   }
 
   // "다시 도전!"/레벨클리어/구역단계/그림완성 축하 중 어느 하나라도 아직 안 끝났는데 다른
