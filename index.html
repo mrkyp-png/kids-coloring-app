@@ -127,18 +127,17 @@
 <!-- ===================== Level gallery screen ===================== -->
 <section id="gallery-screen" class="screen" hidden>
   <header class="coloring-header">
-    <button id="btn-map-back" class="icon-btn" aria-label="Back to map">🗺️</button>
+    <button id="btn-map-back" class="icon-btn" aria-label="Back to map">⬅️</button>
     <div class="level-header-mid">
       <h1 id="level-title" class="coloring-title"></h1>
       <p id="level-progress" class="subtitle"></p>
+      <span id="level-next-text" class="level-timer-text" hidden></span>
     </div>
-    <span class="icon-btn-spacer" aria-hidden="true"></span>
+    <div class="level-header-nav-group">
+      <button id="btn-level-back" class="icon-btn icon-btn-sm" hidden aria-label="Previous level">◀</button>
+      <button id="btn-level-next" class="icon-btn icon-btn-sm" hidden aria-label="Next level">▶</button>
+    </div>
   </header>
-  <div id="level-next-banner" class="level-next-banner" hidden>
-    <button id="btn-level-back" class="back-btn" hidden data-i18n="level.back">◀ Back</button>
-    <span id="level-next-text"></span>
-    <button id="btn-level-next" class="next-btn" hidden data-i18n="level.next">Next ▶</button>
-  </div>
   <!-- 2026-08-16: 실험 기능(레벨1만 테스트) — 날아가서 사라진 보상 그림을 드래그 조각
        맞추기로 다시 완성하는 미니게임. 보상 이미지를 가운데 두고 위/아래에 조각을 4개씩
        나눠 배치. app.js의 rewardPuzzle 관련 함수들이 담당. -->

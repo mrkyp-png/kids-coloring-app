@@ -161,7 +161,6 @@
   const btnMapBack = document.getElementById('btn-map-back');
   const levelTitle = document.getElementById('level-title');
   const levelProgress = document.getElementById('level-progress');
-  const levelNextBanner = document.getElementById('level-next-banner');
   const levelNextText = document.getElementById('level-next-text');
   const btnLevelNext = document.getElementById('btn-level-next');
   const btnLevelBack = document.getElementById('btn-level-back');
@@ -912,7 +911,7 @@
     // 경과시간 카운트업만 보여준다. 시간초과 리셋 없음.
     const text = '⏱ ' + formatMMSS((Date.now() - start) / 1000);
     if (!galleryScreen.hidden) {
-      levelNextBanner.hidden = false;
+      levelNextText.hidden = false;
       levelNextText.textContent = text;
     } else {
       coloringTimerText.hidden = false;
@@ -1291,7 +1290,9 @@
   // 개수만큼(1/10레벨=12칸, 2~9레벨=10칸) 격자로 나눠서 씌워놓고, 그림을 완료할 때마다 칸이
   // 하나씩 열리며 안의 실제 이모지가 드러난다. 정원이 다 채워지면 완성 연출이 재생된다.
   function gridDims(n) {
-    return n === 12 ? { cols: 4, rows: 3 } : { cols: 5, rows: 2 };
+    if (n === 12) return { cols: 4, rows: 3 };
+    if (n === 16) return { cols: 4, rows: 4 };
+    return { cols: 5, rows: 2 };
   }
 
   // 2026-08-16: "날아가서 사라지는 로켓/풍선/기차는 효과가 큰데 나머지는 밋밋하다" 피드백으로
@@ -2054,16 +2055,19 @@
       clearLevelAttempt(currentLevel); // 클리어했으니 이 레벨의 타임어택은 끝 — 더 이상 시간 잴 필요 없음
       // 2026-08-14: "유아용 모드는 랭킹 삭제" 요청 — 완주해도 랭킹 등록 모달을 띄우지 않는다.
       const hasNext = currentLevel < TOTAL_LEVELS;
-      levelNextText.textContent = hasNext ? I18N.t('level.clear') : I18N.t('level.allClear');
-      btnLevelNext.textContent = hasNext ? I18N.t('level.next') : I18N.t('level.map');
+      // 2026-08-21(17): "클리어! 다음▶ 배너 없애고 우측 상단에 이전/다음 아이콘만" 요청 —
+      // 배너 텍스트 없이 아이콘만(레벨10 클리어시엔 지도로 돌아가는 의미라 🗺️로 구분).
+      btnLevelNext.textContent = hasNext ? '▶' : '🗺️';
+      btnLevelNext.setAttribute('aria-label', hasNext ? 'Next level' : 'Back to map');
       // 2026-08-16: 실험 기능 — 조각 맞추기 미니게임이 아직 안 끝났으면 "다음"을 계속 숨겨둔다.
       btnLevelNext.hidden = isRewardPuzzleBlocking(currentLevel);
     } else {
-      levelNextText.textContent = '';
       btnLevelNext.hidden = true;
     }
+    // 배너를 없애서 levelNextText(경과시간 표시)는 이제 타이머가 실제로 도는 동안만 보인다 —
+    // updateLevelTimerDisplay()가 타이머 있을 때만 켜주므로, 여기서는 그 외 경우 확실히 꺼둔다.
     const hasTimer = !isClear && currentLevel in getLevelAttempts();
-    levelNextBanner.hidden = !(isClear || hasBack || hasTimer);
+    levelNextText.hidden = !hasTimer;
     updateLevelTimerDisplay();
 
     renderQueue(currentLevel, list, scores);
@@ -2115,13 +2119,25 @@
     return badge;
   }
 
+  // 2026-08-21(17): "동그란 아이콘은 무조건 16개" 요청 — 실제 그림 콘텐츠는 아직 레벨당
+  // 10~12개뿐이라(향후 16개로 늘릴 예정, 별도 작업), 지금은 레이아웃만 4x4로 미리 보이게
+  // 빈 자리를 자리표시자로 채운다. 클릭 안 되고 실제 그림도 없는 순수 시각적 미리보기용.
+  const GALLERY_GRID_TARGET = 16;
+  function renderPlaceholderBadge() {
+    const badge = document.createElement('div');
+    badge.className = 'tpl-badge tpl-badge-placeholder';
+    badge.setAttribute('aria-hidden', 'true');
+    return badge;
+  }
+
   function paintClearedGrid(ids, byId, level) {
     galleryGrid.classList.add('gallery-grid-cleared');
     galleryGrid.dataset.paintedLevel = String(level);
-    // 위 보상 이미지 칸 배치와 같은 규칙(10개=5x2, 12개=4x3)을 그대로 써서 열 수를 정한다.
-    galleryGrid.style.gridTemplateColumns = 'repeat(' + gridDims(ids.length).cols + ', 1fr)';
+    const total = Math.max(ids.length, GALLERY_GRID_TARGET);
+    galleryGrid.style.gridTemplateColumns = 'repeat(' + gridDims(total).cols + ', 1fr)';
     galleryGrid.innerHTML = '';
     ids.forEach((id) => { if (byId[id]) galleryGrid.appendChild(renderClearedBadge(byId[id])); });
+    for (let i = ids.length; i < GALLERY_GRID_TARGET; i++) galleryGrid.appendChild(renderPlaceholderBadge());
   }
 
   function renderQueue(level, list, scores) {
@@ -3093,9 +3109,14 @@
         if (custom[i]) currentLabelToColor.set(r.label, custom[i]);
       });
     } else if (getMode() === 'easy' || (currentTemplate && currentTemplate.isBoss)) {
+      // 2026-08-21(18): 실제 이모지 색은 화면에 실제로 보이는 스와치(SWATCH_BASE_PALETTE) 기준으로
+      // 스냅해야 한다 — cyclePalette(TARGET_PALETTE 기반)는 teal(#1baf7a)을 포함하는데, 어제
+      // SWATCH_BASE_PALETTE에서 teal이 크림색으로 교체돼서 더는 안 눌리는 버튼이라 안 맞았음.
       currentGradableRegions.forEach((r, i) => {
-        const hex = (sampled && sampled.has(r.label)) ? sampled.get(r.label) : cyclePalette[i % cyclePalette.length];
-        currentLabelToColor.set(r.label, hex);
+        // 샘플 색이 없어 순환 팔레트(cyclePalette, TARGET_PALETTE 기반)로 대체하는 경우도
+        // 마찬가지로 teal이 뽑힐 수 있어(예: tophat) 같은 스와치 기준으로 스냅한다.
+        const raw = (sampled && sampled.has(r.label)) ? sampled.get(r.label) : cyclePalette[i % cyclePalette.length];
+        currentLabelToColor.set(r.label, nearestPaletteColor(raw, SWATCH_BASE_PALETTE));
       });
     } else {
       const seed = (currentTemplate ? currentTemplate.id : 'x') + ':' + getMode();
@@ -3466,6 +3487,21 @@
     const g = parseInt(h.substring(2, 4), 16);
     const b = parseInt(h.substring(4, 6), 16);
     return [r, g, b, 255];
+  }
+
+  // 2026-08-21(18): "트위모지색을 팔레트에 맞게 조정" 요청 — 이모지 원본에서 뽑은 실제 색이
+  // 팔레트(10색) 밖이면 그 영역을 영원히 못 맞추던 문제(renderGoalPreview 주석 참고) 수정.
+  // 실제 이모지 원본 색을 그대로 쓰는 대신, 그 팔레트 안에서 RGB 거리가 가장 가까운 색으로
+  // 스냅해서 항상 팔레트 버튼 중 하나로 맞춰지게 한다.
+  function nearestPaletteColor(hex, palette) {
+    const [r, g, b] = hexToRgba(hex);
+    let best = palette[0], bestDist = Infinity;
+    palette.forEach((c) => {
+      const [pr, pg, pb] = hexToRgba(c);
+      const d = (r - pr) * (r - pr) + (g - pg) * (g - pg) + (b - pb) * (b - pb);
+      if (d < bestDist) { bestDist = d; best = c; }
+    });
+    return best;
   }
 
   // 실제로 픽셀을 채우는 부분만 뺀 것 — 소리/단계 칭찬 같은 "사용자가 지금 막 칠했다"는
