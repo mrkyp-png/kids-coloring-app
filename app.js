@@ -2062,7 +2062,9 @@
       const hasNext = currentLevel < TOTAL_LEVELS;
       // 2026-08-21(17): "클리어! 다음▶ 배너 없애고 우측 상단에 이전/다음 아이콘만" 요청 —
       // 배너 텍스트 없이 아이콘만(레벨10 클리어시엔 지도로 돌아가는 의미라 🗺️로 구분).
-      btnLevelNext.textContent = hasNext ? '▶' : '🗺️';
+      // 2026-08-21(21): "화살표로 통일" 요청 — 마지막 레벨(지도로 돌아가는 경우)도 🗺️ 대신
+      // 이전(◀)이랑 같은 화살표 계열로 통일.
+      btnLevelNext.textContent = '▶';
       btnLevelNext.setAttribute('aria-label', hasNext ? 'Next level' : 'Back to map');
       // 2026-08-16: 실험 기능 — 조각 맞추기 미니게임이 아직 안 끝났으면 "다음"을 계속 숨겨둔다.
       btnLevelNext.hidden = isRewardPuzzleBlocking(currentLevel);
@@ -2086,13 +2088,17 @@
   // 그 자리에 남아있어서(대기열처럼 사라지지 않음) 16칸이 항상 그대로 유지된다.
   const masteredByLevel = {};
 
-  function renderClearedBadge(tpl) {
+  function renderClearedBadge(tpl, isDone) {
     const badge = document.createElement('button');
     badge.className = 'tpl-badge';
     badge.dataset.tplId = tpl.id;
     const displayName = I18N.templateName(tpl);
-    badge.setAttribute('aria-label', displayName);
-    badge.innerHTML = '<img class="tpl-emoji" src="assets/emoji/' + tpl.id + (tpl.isBoss ? '-icon' : '') + '.svg" alt="">';
+    badge.setAttribute('aria-label', displayName + (isDone ? ' (cleared)' : ''));
+    // 2026-08-21(20): "완료된 원(양 등)은 어떻게 처리?" — 지도 화면 레벨 원의 클리어 뱃지
+    // (.lv-clear-badge)와 같은 스타일/자리(우측 상단, 45도 대각선 스냅)를 그대로 재사용.
+    let inner = '<img class="tpl-emoji" src="assets/emoji/' + tpl.id + (tpl.isBoss ? '-icon' : '') + '.svg" alt="">';
+    if (isDone) inner += '<span class="lv-clear-badge">✓</span>';
+    badge.innerHTML = inner;
     badge.addEventListener('click', () => openTemplate(tpl));
     return badge;
   }
@@ -2108,13 +2114,13 @@
     return badge;
   }
 
-  function paintClearedGrid(ids, byId, level) {
+  function paintClearedGrid(ids, byId, level, masteredSet) {
     galleryGrid.classList.add('gallery-grid-cleared');
     galleryGrid.dataset.paintedLevel = String(level);
     const total = Math.max(ids.length, GALLERY_GRID_TARGET);
     galleryGrid.style.gridTemplateColumns = 'repeat(' + gridDims(total).cols + ', 1fr)';
     galleryGrid.innerHTML = '';
-    ids.forEach((id) => { if (byId[id]) galleryGrid.appendChild(renderClearedBadge(byId[id])); });
+    ids.forEach((id) => { if (byId[id]) galleryGrid.appendChild(renderClearedBadge(byId[id], !!(masteredSet && masteredSet.has(id)))); });
     for (let i = ids.length; i < GALLERY_GRID_TARGET; i++) galleryGrid.appendChild(renderPlaceholderBadge());
   }
 
@@ -2128,7 +2134,7 @@
     const domStale = galleryGrid.dataset.paintedLevel !== String(level);
     const prevMastered = masteredByLevel[level];
 
-    paintClearedGrid(allIds, byId, level);
+    paintClearedGrid(allIds, byId, level, masteredNow);
 
     // 이번이 이 레벨 첫 렌더(또는 다른 레벨 것이 화면에 남아있던 경우)면 "새로 클리어됨" 연출 없이
     // 그냥 현재 상태만 기억해둔다 — 방금 막 클리어한 게 아니라 원래 그런 상태였을 뿐이므로.
