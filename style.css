@@ -1303,7 +1303,13 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   min-height: 0;
   overflow: hidden;
   display: flex;
-  align-items: center;
+  /* 2026-08-21: "색칠 이미지 박스를 상하좌우 2~3mm 더 키워달라" 요청 — 아래 .goal-canvas-wrap의
+     -34px 여유 중 실제로 필요한 건 지렁이 도로 쪽 아래 17px뿐이고, 위쪽 17px은 그냥 가운데
+     정렬 때문에 낭비되던 여백이었다. align-items를 center에서 flex-start로 바꿔 그 위쪽 여백을
+     없애고 박스 쪽으로 돌려주면(아래 -34px→-17px과 세트), 지렁이 여유는 그대로 유지하면서
+     박스만 커진다. justify-content(가로 중앙정렬)는 그대로 둬서 canvas-wrap과 가로 위치는 계속
+     똑같이 맞는다(세로 정렬만 다름 — 가로만 어긋났던 예전 버그와는 다른 축이라 안전). */
+  align-items: flex-start;
   justify-content: center;
   padding: 2px; /* canvas-wrap과 반드시 동일해야 함(안 그러면 둘이 다시 어긋남) */
   position: relative; /* 아래 지렁이(::after)가 이 안에서 기어가도록 기준점 */
@@ -1360,10 +1366,14 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
      크기가 되도록 고침(애초에 "goal 이미지와 캔버스는 항상 같은 크기" 불변식과도 맞음).
      2026-08-20(3): "경계선과 2mm 여유" 요청 — 처음에 8px만 뺐더니 실측 결과 -5px(즉 5px 겹침)
      이었다: 가운데 정렬이라 절반(4px)만 아래쪽 여유가 되는데, 도로선 자체가 9px 높이라 4px로는
-     어림도 없었음. 필요한 아래쪽 여유 = 도로선 높이(9px) + 원하는 간격(8px) = 17px, 가운데
-     정렬로 절반만 배분되므로 전체는 그 두 배(34px)를 빼야 한다(.canvas-square도 동일 공식 —
-     "같은 크기" 불변식 유지). */
-  width: min(calc(var(--ring-square, 280px) - 34px), 420px);
+     어림도 없었음. 필요한 아래쪽 여유 = 도로선 높이(9px) + 원하는 간격(8px) = 17px.
+     2026-08-21: "박스를 상하좌우 2~3mm 더 키워달라" 요청 — 위 17px는 원래 아래쪽에만 필요한데,
+     가운데 정렬 때문에 위/아래 반반(17+17=34)씩 빼고 있었다. 위 .goal-panel의 align-items를
+     flex-start로 바꾸고, 남는 공간이 전부 아래쪽에만 생기게 했다 — 이때 goal-panel 자체의
+     padding(2px×위아래)이 flex-start 기준점을 아래로 2px 밀어 넣는 만큼 그대로 여유가 줄어드니,
+     17px가 아니라 19px를 빼야 실측 아래쪽 여유가 정확히 17px(도로선9+간격8)로 나온다(헤드리스
+     브라우저로 실측 확인, .canvas-square도 동일 공식 — "같은 크기" 불변식 유지). */
+  width: min(calc(var(--ring-square, 280px) - 19px), 420px);
   aspect-ratio: 1;
   display: flex;
   align-items: center;
@@ -1412,11 +1422,12 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   /* 2026-08-20: goal-canvas-wrap과 같은 공식(--ring-square 기반, 위 .goal-canvas-wrap 주석
      참고)을 그대로 써서 "goal 이미지와 캔버스는 항상 같은 크기" 불변식을 보장한다 — 전엔
      cqw로 따로 계산했는데 goal-canvas-wrap이 --ring-square 직접 참조로 바뀌면서, 반올림 등에
-     의해 미묘하게 어긋날 여지를 없애려고 여기도 통일함(같은 -34px도 그대로 맞춤, 위
-     .goal-canvas-wrap 주석 참고). 캔버스 행(row 5) 높이는 --ring-square 그대로 유지되므로
-     (박스만 작아짐) 좌우 팔레트 열은 여전히 그 행 높이에 맞춰 늘어나 링 전체는 정사각형 그대로. */
+     의해 미묘하게 어긋날 여지를 없애려고 여기도 통일함(같은 -19px도 그대로 맞춤, 위
+     .goal-canvas-wrap 주석 참고 — 2026-08-21에 34px→19px로 축소). 캔버스 행(row 5) 높이는
+     --ring-square 그대로 유지되므로(박스만 작아짐) 좌우 팔레트 열은 여전히 그 행 높이에 맞춰
+     늘어나 링 전체는 정사각형 그대로. */
   position: relative;
-  width: min(calc(var(--ring-square, 280px) - 34px), 420px);
+  width: min(calc(var(--ring-square, 280px) - 19px), 420px);
   aspect-ratio: 1;
   border-radius: var(--radius-lg);
   /* 2026-08-20: "대각선에 흰색·파란(보라)색 링이 보이는데 파란색만 없애줘" 요청 — 브랜드색
