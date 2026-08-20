@@ -169,13 +169,14 @@
     <span id="challenge-hud-accuracy">Acc 100%</span>
   </div>
   <header class="coloring-header">
+    <!-- 2026-08-20: "홈버튼은 goal 이미지 좌상단 원래 자리로" 요청 — 원래 위치/동작(지도 화면까지
+         한번에 이동)으로 복귀. 링 안에는 대신 #btn-back(뒤로가기, 한 단계만)이 들어감. -->
     <button id="btn-home" class="icon-btn" aria-label="Go home">🏠</button>
     <div class="level-header-mid">
       <h2 id="coloring-title" class="coloring-title"></h2>
       <p id="coloring-timer-text" class="subtitle timer-subtitle" hidden></p>
     </div>
-    <!-- 2026-08-11: 음악/소리 버튼이 메인(맵) 화면으로 옮겨져서, 제목이 계속 가운데 오도록
-         왼쪽 홈 버튼과 폭이 같은 빈 스페이서만 남겨둔다. -->
+    <!-- 2026-08-20: 마스코트 삭제 요청 — 제목이 계속 가운데 오도록 빈 스페이서만 유지. -->
     <div class="icon-btn-spacer" aria-hidden="true"></div>
   </header>
 
@@ -191,26 +192,58 @@
       <!-- 2026-08-15: 챌린지 LEVEL 2(1~6번) — goal 이미지는 항상 보이고, 원이 회전하는 자리만
            이 엘리먼트로 가림(배경색과 같은 원). challenge.js가 위치/크기를 매 프레임 갱신. -->
       <span id="challenge-goal-occluder" class="challenge-goal-occluder" aria-hidden="true" hidden></span>
-      <span class="goal-zoom-badge" aria-hidden="true">🔍</span>
     </div>
   </div>
 
-  <div id="canvas-wrap" class="canvas-wrap">
-    <canvas id="fill-canvas" class="stack-canvas"></canvas>
-    <canvas id="line-canvas" class="stack-canvas"></canvas>
-    <canvas id="mask-canvas" class="stack-canvas" hidden></canvas>
-    <div id="tap-layer" class="tap-layer" aria-label="Tap a part to color it"></div>
-    <!-- 2026-08-17: 구역을 하나씩 채울 때마다 뜨는 단계별 칭찬(GOOD~PERFECT). app.js의
-         showRegionStagePraise()가 텍스트를 채우고 .show를 토글한다. -->
-    <div id="region-stage-praise" class="region-stage-praise" hidden aria-live="polite"></div>
+  <!-- ===================== 색상 프레임: 캔버스(정사각형)를 위/아래/좌/우 네 면으로 둘러싸 사각
+       배치를 이룬다(2026-08-20 재구성). 색상 스와치·뒤로가기·완료·스킬 전부 동일한 원형(.ring-circle)
+       지우개/되돌리기는 삭제. btn-back은 보기전용 모드에서도 절대 안 숨김(유일한 탈출구).
+       2026-08-20(3): "상하좌우 정확히 4개씩(모서리는 위/아래와 좌/우가 공유)" 요청 — 네 모서리
+       (btn-back·#corner-tr·#corner-bl·btn-save)를 위/아래 줄에 두되, 위/아래·좌/우 그리드 셀이
+       바로 인접해 있어 시각적으로는 그 열의 시작/끝처럼 보인다(진짜 DOM 공유는 불가능하므로
+       위치로 공유 효과를 냄). 챌린지(둘레 5칸, 16개=색12+모서리4)는 네 모서리가 전부 스킬/뒤로가기
+       /완료라 색은 각 변에 3개씩. 유아(둘레 4칸, 12개=색10+뒤로가기+완료)는 스킬 자리가 없는
+       두 모서리(우상단 #corner-tr·좌하단 #corner-bl)를 색상 스와치로 채워서 4개씩 맞춘다
+       (app.js renderPalette 참고). -->
+  <div id="frame-top" class="color-frame-row">
+    <div class="ring-corner-slot">
+      <button id="btn-back" class="ring-circle ring-btn-back" aria-label="Back">⬅️</button>
+    </div>
+    <div id="palette-top" class="palette-row" role="list" aria-label="Pick a color"></div>
+    <div id="corner-tr" class="ring-corner-slot">
+      <button id="btn-skill1" class="ring-circle ring-btn-skill" type="button" aria-label="Skill 1" hidden>⭐</button>
+    </div>
   </div>
 
-  <div id="palette" class="palette" role="list" aria-label="Pick a color"></div>
+  <div id="palette-left" class="palette-col" role="list" aria-label="Pick a color"></div>
 
-  <div id="coloring-toolbar" class="toolbar">
-    <button id="btn-undo" class="tool-btn" aria-label="Undo">↩️<span data-i18n="tool.undo">Undo</span></button>
-    <button id="btn-clear" class="tool-btn" aria-label="Clear">🧽<span data-i18n="tool.clear">Clear</span></button>
-    <button id="btn-save" class="tool-btn tool-btn-primary" aria-label="Done, save it">✅<span data-i18n="tool.done">Done!</span></button>
+  <div id="canvas-wrap" class="canvas-wrap">
+    <!-- 2026-08-20: "캔버스 박스가 정사각형이어야" 요청 확인 결과, canvas-wrap은 그리드 셀이라
+         직사각형(244×308 측정됨)이고 안쪽 정사각형 캔버스가 그 안에 여백을 두고 떠 있었음(베젤
+         테두리를 canvas-wrap에 그려서 사각형처럼 안 보인 원인). 정사각형 전용 래퍼를 따로 둬서
+         베젤을 여기로 옮김 — 크기 공식은 옆의 .stack-canvas/.tap-layer와 동일(같은 컨테이너
+         기준 cqw/cqh라 항상 같은 크기로 맞아떨어짐). -->
+    <div class="canvas-square">
+      <canvas id="fill-canvas" class="stack-canvas"></canvas>
+      <canvas id="line-canvas" class="stack-canvas"></canvas>
+      <canvas id="mask-canvas" class="stack-canvas" hidden></canvas>
+      <div id="tap-layer" class="tap-layer" aria-label="Tap a part to color it"></div>
+      <!-- 2026-08-17: 구역을 하나씩 채울 때마다 뜨는 단계별 칭찬(GOOD~PERFECT). app.js의
+           showRegionStagePraise()가 텍스트를 채우고 .show를 토글한다. -->
+      <div id="region-stage-praise" class="region-stage-praise" hidden aria-live="polite"></div>
+    </div>
+  </div>
+
+  <div id="palette-right" class="palette-col" role="list" aria-label="Pick a color"></div>
+
+  <div id="frame-bottom" class="color-frame-row">
+    <div id="corner-bl" class="ring-corner-slot">
+      <button id="btn-skill2" class="ring-circle ring-btn-skill" type="button" aria-label="Skill 2" hidden>⭐</button>
+    </div>
+    <div id="palette-bottom" class="palette-row" role="list" aria-label="Pick a color"></div>
+    <div class="ring-corner-slot">
+      <button id="btn-save" class="ring-circle ring-btn-done" aria-label="Done, save it">✅</button>
+    </div>
   </div>
 </section>
 

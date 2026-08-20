@@ -1192,20 +1192,49 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 #coloring-screen {
   display: grid;
   height: 100dvh;
-  grid-template-columns: 1fr 88px;
-  /* 2026-08-10: 한 차례 1:2(캔버스 우선)로 줬다가, "목표 이미지도 최대한 키워달라"는 후속
-     피드백으로 다시 1:1로 — 팔레트가 이미 별도 열로 빠지고 툴바도 반으로 줄어든 상태라
-     1:1이어도 원래보다 둘 다 훨씬 큼. */
-  /* 2026-08-14(I3, 최종 리뷰): 챌린지 HUD를 위해 맨 위에 1행 추가, 기존 4행은 전부 한 칸씩 밀림.
-     HUD는 평소 hidden(display:none)이라 Child 모드에서는 auto 행이 0 높이라 레이아웃 영향 없음. */
-  grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 1fr) auto;
+  /* 2026-08-20: PC/넓은 화면 캡처에서 캔버스(최대 420px 정사각형)만 가운데 뜨고 좌우 팔레트 열은
+     화면 맨 끝에 붙어서 큰 빈 간격이 생기는 문제 — 가운데 열이 1fr라 화면 폭만큼 무한정 늘어나던
+     게 원인. 그리드 자체 폭을 팔레트 두 열(88×2)+캔버스 최대치(420)=596px로 캡하고 가운데 정렬해서
+     폰 화면 그대로 보이게 함(이 앱은 원래 폰 전용 UI라 PC에서도 폰 폭으로 보이는 게 맞음). */
+  max-width: 596px;
+  margin: 0 auto;
+  /* 2026-08-20: "색상 스와치가 캔버스를 액자처럼 좌우로 둘러싸게" 요청 — 팔레트 열을 오른쪽 하나에서
+     좌/우 두 열로 분리. 폭 88px 산출 근거는 아래 .palette-col 주석 참고(양쪽 다 동일해야 함). */
+  grid-template-columns: 88px 1fr 88px;
+  /* 2026-08-14(I3, 최종 리뷰): 챌린지 HUD를 위해 맨 위에 1행 추가.
+     2026-08-20: 기존 툴바 1행을 캔버스 위/아래 기능버튼 2행(frame-top/frame-bottom)으로 분리.
+     2026-08-20(2): "버튼 링도 캔버스처럼 정사각형이어야" 요청 — 세 차례 시도 끝에 정리됨.
+     1차: frame-top/bottom만 88px로 고정 — 부족. goal-panel/canvas-row가 minmax(0,1fr)로 남은
+     세로공간을 나눠 가지면 그 높이(cqh)가 정사각형의 폭(cqw)보다 항상 커서(실측 cqh 280 vs
+     캔버스 240) 좌우 팔레트 열이 그 큰 높이까지 늘어나버림.
+     2차: 행을 auto로, 정사각형은 aspect-ratio:1로(cqh 대신 폭에서 높이 유도) — 그래도 부족.
+     팔레트 열 자체의 내용물(스와치 여러 개, 최대 7개=52px×7+간격≈400px)이 정사각형보다 커서
+     grid의 auto 트랙이 팔레트 내용물 높이에 맞춰 오히려 더 늘어나버림 — CSS만으로는 "이 트랙은
+     팔레트 내용물 크기 말고 저 정사각형 하나만 보고 정해라"를 표현할 방법이 없음(다른 열의
+     content-based auto 크기를 무시시키는 순수 CSS 수단이 없다).
+     3차(최종): 행 높이를 --ring-square 커스텀 프로퍼티로 고정 — app.js의 syncRingSquareSize()가
+     "가운데 열 폭(=이 뷰포트에서 정사각형이 실제로 될 크기)"을 계산해 이 값을 채워 넣는다(색칠
+     화면을 열 때마다 동기 실행 + resize 리스너, 화면에 그려지기 전에 세팅되므로 깜빡임 없음).
+     팔레트 열은 이 고정 행 높이에 맞춰 stretch되고, 넘치는 스와치는 기존 overflow-y:auto로
+     스크롤된다. */
+  grid-template-rows: auto auto var(--ring-square, 280px) 88px var(--ring-square, 280px) 88px;
+  /* 2026-08-20: "바탕화면을 게임 느낌 나게, 은은한 우주 패턴" 요청 — 크림 배경(--bg) 위에 아주
+     연한 별 점(radial-gradient 반복)과 구석의 흐릿한 성운색 뭉치를 얹는다. 채도/투명도를 낮게
+     잡아서 색칠버튼·캔버스 등 핵심 요소 가독성에는 영향 없게 함. */
+  background:
+    radial-gradient(circle at 90% 8%, rgba(108, 92, 231, 0.10), transparent 40%),
+    radial-gradient(circle at 6% 85%, rgba(255, 159, 67, 0.08), transparent 35%),
+    radial-gradient(rgba(108, 92, 231, 0.16) 1px, transparent 1.5px) 0 0 / 46px 46px,
+    var(--bg);
 }
 .challenge-hud { grid-column: 1 / -1; grid-row: 1; }
 .coloring-header { grid-column: 1 / -1; grid-row: 2; }
-.goal-panel { grid-column: 1; grid-row: 3; }
-.canvas-wrap { grid-column: 1; grid-row: 4; }
-.palette { grid-column: 2; grid-row: 3 / 5; }
-.toolbar { grid-column: 1 / -1; grid-row: 5; }
+.goal-panel { grid-column: 1 / -1; grid-row: 3; }
+#frame-top { grid-column: 1 / -1; grid-row: 4; }
+#palette-left { grid-column: 1; grid-row: 5; }
+.canvas-wrap { grid-column: 2; grid-row: 5; }
+#palette-right { grid-column: 3; grid-row: 5; }
+#frame-bottom { grid-column: 1 / -1; grid-row: 6; }
 .coloring-header {
   /* 2026-08-10: "이미지를 최대한 키워달라, 아이콘과 안 겹치는 조건" — 아이콘 크기(56px, 탭 타겟)는
      그대로 두고 순수 여백만 줄여서 goal/canvas 행에 세로 공간을 더 돌려줌. */
@@ -1275,7 +1304,6 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   align-items: center;
   justify-content: center;
   padding: 2px; /* canvas-wrap과 반드시 동일해야 함(안 그러면 둘이 다시 어긋남) */
-  container-type: size;
   position: relative; /* 아래 지렁이(::after)가 이 안에서 기어가도록 기준점 */
   /* 2026-08-11: "직선 말고 갈색으로, 길처럼 울퉁불퉁하게" 요청 — 보라 그라디언트 대신 흙길
      느낌의 갈색 톤을 불규칙한 폭으로 반복해서 울퉁불퉁한 비포장길처럼 보이게 함. */
@@ -1323,31 +1351,31 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   50% { transform: scaleX(0.65) scaleY(1.3); }
 }
 .goal-canvas-wrap {
-  width: min(100cqw, 100cqh, 420px);
-  height: min(100cqw, 100cqh, 420px);
+  /* 2026-08-20: 실측 버그 — goal-panel은 그리드 전체 폭(3열)에 걸쳐 있어서 100cqw가 "가운데 열
+     폭"이 아니라 "화면 전체 폭"을 기준으로 계산됐다(예: 390 vs 실제 필요한 214). 그 결과 이
+     박스가 자기 행(--ring-square=214)보다 훨씬 커져서(386) 아래로 넘쳐 흘러 도로/애벌레
+     장식선과 겹쳤다. .canvas-square와 똑같이 --ring-square를 직접 써서 캔버스와 정확히 같은
+     크기가 되도록 고침(애초에 "goal 이미지와 캔버스는 항상 같은 크기" 불변식과도 맞음).
+     2026-08-20(3): "경계선과 2mm 여유" 요청 — 처음에 8px만 뺐더니 실측 결과 -5px(즉 5px 겹침)
+     이었다: 가운데 정렬이라 절반(4px)만 아래쪽 여유가 되는데, 도로선 자체가 9px 높이라 4px로는
+     어림도 없었음. 필요한 아래쪽 여유 = 도로선 높이(9px) + 원하는 간격(8px) = 17px, 가운데
+     정렬로 절반만 배분되므로 전체는 그 두 배(34px)를 빼야 한다(.canvas-square도 동일 공식 —
+     "같은 크기" 불변식 유지). */
+  width: min(calc(var(--ring-square, 280px) - 34px), 420px);
+  aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   cursor: zoom-in;
-}
-/* 2026-08-11: "goal 이미지를 확대해서 색깔을 자세히 보고 싶다" 요청 — 탭하면 커진다는 걸
-   알려주는 작은 돋보기 배지(항상 표시, 코너에 살짝). */
-.goal-zoom-badge {
-  /* 2026-08-11: "보스 그림이랑 겹칠 수 있으니 위로" 요청 — 하단 우측 대신 상단 우측으로 이동 */
-  position: absolute;
-  right: 2px;
-  top: 2px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--card-bg);
-  box-shadow: var(--shadow);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.95rem;
-  pointer-events: none;
+  /* 2026-08-20: "색칠 박스는 오목한데, goal 박스는 볼록 튀어나온 느낌으로" 요청 — 인셋 방향만
+     뒤집어서(위쪽 밝은 하이라이트=빛이 볼록한 윗면에 닿는 느낌, 아래쪽 어두운 그림자=볼록한
+     아랫면) 입체감만 주고, 바깥 링(흰색+브랜드색 테두리)은 뺐다 — goal-panel 바닥의 도로/애벌레
+     장식선과 겹쳐 보이는 문제가 있었음(2026-08-20(2), "외곽선이 안 보이게" 요청). */
+  border-radius: var(--radius-lg);
+  box-shadow:
+    inset 0 3px 5px rgba(255, 255, 255, 0.7),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.15);
 }
 .goal-emoji {
   font-size: min(64vw, 340px);
@@ -1372,19 +1400,47 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  container-type: size; /* .goal-canvas-wrap과 같은 이유 — 이하 정사각형들이 cqw/cqh로 줄어듦 */
+}
+/* 2026-08-20: "색칠 박스가 정사각형으로 안 보인다"(실측 244×308) — canvas-wrap은 그리드 셀이라
+   직사각형인데 베젤을 거기 그려서 그랬음. 정사각형 전용 래퍼(.stack-canvas/.tap-layer와 똑같은
+   cqw/cqh 공식이라 항상 같은 크기)를 따로 두고 베젤은 이쪽으로 옮김 — "오목한 화면" 느낌은 그대로,
+   border 대신 box-shadow만 쓰는 이유는 아래 .canvas-wrap padding이 .goal-panel과 반드시 같아야
+   하는 것과 무관하게(래퍼가 별도 레이어라) 안전하기 때문. */
+.canvas-square {
+  /* 2026-08-20: goal-canvas-wrap과 같은 공식(--ring-square 기반, 위 .goal-canvas-wrap 주석
+     참고)을 그대로 써서 "goal 이미지와 캔버스는 항상 같은 크기" 불변식을 보장한다 — 전엔
+     cqw로 따로 계산했는데 goal-canvas-wrap이 --ring-square 직접 참조로 바뀌면서, 반올림 등에
+     의해 미묘하게 어긋날 여지를 없애려고 여기도 통일함(같은 -34px도 그대로 맞춤, 위
+     .goal-canvas-wrap 주석 참고). 캔버스 행(row 5) 높이는 --ring-square 그대로 유지되므로
+     (박스만 작아짐) 좌우 팔레트 열은 여전히 그 행 높이에 맞춰 늘어나 링 전체는 정사각형 그대로. */
+  position: relative;
+  width: min(calc(var(--ring-square, 280px) - 34px), 420px);
+  aspect-ratio: 1;
+  border-radius: var(--radius-lg);
+  /* 2026-08-20: "대각선에 흰색·파란(보라)색 링이 보이는데 파란색만 없애줘" 요청 — 브랜드색
+     바깥 링만 제거, 흰 링은 유지. */
+  box-shadow:
+    inset 0 4px 10px rgba(0, 0, 0, 0.28),
+    inset 0 -2px 4px rgba(255, 255, 255, 0.35),
+    0 0 0 4px #fff,
+    0 3px 8px rgba(0, 0, 0, 0.15);
 }
 .stack-canvas {
   position: absolute;
-  width: min(100cqw, 100cqh, 420px);
-  height: min(100cqw, 100cqh, 420px);
+  inset: 0;
+  /* 2026-08-20: 실측 버그 — <canvas>는 inset:0만으론 부모 크기에 안 맞춰지고 원본 해상도(예:
+     640×640) 그대로 CSS 크기로 렌더링된다(대체 요소라 자체 고유 크기를 우선함). width/height:
+     100%를 명시해야 .canvas-square 크기에 맞게 실제로 줄어든다. */
+  width: 100%;
+  height: 100%;
   border-radius: var(--radius-lg);
 }
 #line-canvas { pointer-events: none; }
 .tap-layer {
   position: absolute;
-  width: min(100cqw, 100cqh, 420px);
-  height: min(100cqw, 100cqh, 420px);
+  inset: 0;
+  width: 100%;
+  height: 100%;
   border-radius: var(--radius-lg);
   /* PC(마우스)에서는 색칠 중이라는 게 바로 보이게 연필 커서로 — 터치 기기는 어차피 커서가
      안 보이니 그대로 둬도 무관하다(2026-08-11 요청). 팁(끝) 좌표가 클릭 지점이 되도록 hotspot을
@@ -1449,33 +1505,65 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   .picture-complete-praise.show { animation: none; }
 }
 
-.palette {
-  /* 2026-08-10: 캔버스 밑 가로줄 → 캔버스 오른쪽 세로줄로 변경(색칠 캔버스 공간을 최대한 확보하려는
-     요청) — 색이 늘어나면(레벨 오를수록 최대 11개) 세로로 다 안 들어갈 수 있어서 세로 스크롤.
+.palette-col {
+  /* 2026-08-20: 캔버스를 액자처럼 좌우로 둘러싸는 색상 열(예전 우측 단일 .palette를 좌/우로 분리).
      너비 88px = 스와치 지름(52+테두리4*2=60px) + 선택 표시 링(::after, inset:-6px 이므로 양쪽
-     6px씩 더 필요=72px) + 좌우 패딩 8px씩 — 링이 overflow-x:hidden에 안 잘리게.
-     grid-row:2/4로 goal-panel+canvas-wrap 두 행에 걸쳐서 헤더 바로 밑부터 툴바 바로 위까지
-     이어짐(#coloring-screen 규칙 참고) — 그래서 width도 grid-template-columns의 88px 트랙과
-     맞춰져 있어야 함(둘 다 88이어야 함, 하드코딩 두 곳). */
+     6px씩 더 필요=72px) + 좌우 패딩 8px씩 — 링이 overflow-x:hidden에 안 잘리게. grid-template-columns의
+     88px 트랙과 맞춰져 있어야 함(양쪽 다 88이어야 함, 하드코딩된 곳들). 색 개수가 많은 챌린지모드에서
+     세로로 다 안 들어가면 세로 스크롤.
+     2026-08-20(2): "상하좌우 버튼 간 거리가 다 똑같아야"(뒤로가기→첫 색, 색↔색, 마지막 색→완료
+     전부 포함) 요청 — 위/아래 줄(.color-frame-row)은 space-between이라 실제 렌더링된 간격이
+     고정값이 아니라 도안/화면 크기마다 달라진다(예: 55.3px). 그 값을 app.js의 syncRingGap()이
+     매번 측정해 --ring-gap으로 반영하면, 여기서도 같은 값을 gap으로 쓰고, 위아래 패딩을
+     "간격 - 18px"로 계산해 뒤로가기/완료(88px 행에서 52px 원이 위아래로 18px씩 남는 것)와의
+     거리까지 정확히 같은 값으로 맞춘다. */
   width: 88px;
   display: flex;
   flex-direction: column;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 10px;
+  gap: 0;
+  /* 2026-08-20(3): 위/아래 줄의 모서리 버튼(뒤로가기·완료 등)은 88px 행 안에서 위아래로 18px씩
+     여백을 두고 가운데 있다((88-52)/2). 좌/우 열의 박스 자체는 캔버스 행(row5) 높이만큼이라
+     그 18px 여백 구간이 빠져 있는데, margin으로 18px씩 밀어 넣어 "뒤로가기 바로 밑 ~ 완료 바로
+     위"까지를 이 열의 실제 범위로 만든다(위/아래 원의 여백 구간은 애초에 비어 있어서 겹쳐도
+     클릭에 영향 없음). 그 범위 안에서 justify-content:space-evenly로 색상 앞뒤·사이 간격을
+     전부 동일하게 나눈다(색이 N개면 N+1개 간격이 다 같아짐). */
+  margin: -14px 0; /* (88-60)/2 — .ring-circle이 60px로 커지면 이 여백도 같이 줄여야 함 */
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 10px 8px;
-  justify-content: flex-start;
+  padding: 0 8px;
+  justify-content: space-evenly;
 }
-.color-swatch {
+/* 2026-08-20: "뒤로가기/완료/스킬도 색칠버튼과 동일한 원형이어야 하고, 사각 링 배치 개수에
+   포함된다" 요청 — 색상 스와치와 완전히 같은 크기/입체감을 공유하는 기반 클래스로 뺀다.
+   배경색만 각자 다르게 주면 되므로(스와치는 인라인 style, 기능버튼은 아래 .ring-btn-* 클래스),
+   임의의 색에도 공통으로 먹히는 인셋 하이라이트/그림자 레이어만으로 볼록한 캔디버튼 느낌을 낸다. */
+.ring-circle {
   flex: 0 0 auto;
-  width: 52px;
-  height: 52px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   border: 4px solid #fff;
-  box-shadow: var(--shadow);
+  box-shadow:
+    0 3px 0 rgba(0, 0, 0, 0.22),
+    0 5px 8px rgba(0, 0, 0, 0.16),
+    inset 0 2px 3px rgba(255, 255, 255, 0.55),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.22);
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.ring-circle:active {
+  transform: translateY(2px);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.22),
+    0 2px 4px rgba(0, 0, 0, 0.12),
+    inset 0 2px 3px rgba(255, 255, 255, 0.55),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.22);
 }
 .color-swatch.active::after {
   content: "";
@@ -1484,13 +1572,49 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   border-radius: 50%;
   border: 3px solid var(--brand);
 }
+.ring-btn-back { background: #CFE3FF; }
+.ring-btn-done { background: #C9F2D6; }
+.ring-btn-skill { background: #E4DBFF; }
 
-.toolbar {
-  /* 2026-08-10: "그림영역을 최대한 키워줘"로 절반 크기로 축소해서 캔버스 쪽에 세로 공간을 더 줌. */
+/* 2026-08-20: 캔버스 위/아래 면 — 스킬 자리(챌린지 전용) + 색상 스와치 일부 + 뒤로가기/완료.
+   좌/우 열(.palette-col)과 합쳐 색상 스와치가 캔버스 네 면을 다 두르는 사각 링을 이룬다
+   (유아 12개=색10+뒤로가기+완료, 챌린지 16개=색12+뒤로가기+완료+스킬1+스킬2, 한 면당 개수 동일). */
+/* 2026-08-20: "간격이 동일해야" + "모서리에 버튼이 있어야"(뒤로가기/완료가 팔레트 좌/우 열과
+   진짜 같은 자리에 와야 함) 요청 — 두 가지를 동시에 만족시켜야 한다.
+   1) .palette-row를 display:contents로 빼서, 모서리 버튼(back/corner-tr 등)과 색상 스와치가
+      .color-frame-row의 flex 아이템으로 다 같이 참여 → gap 하나만 공유(색↔색, 모서리↔색 동일).
+   2) justify-content를 center 대신 space-between으로 — 첫 아이템(모서리)이 줄 왼쪽 끝에,
+      마지막 아이템(모서리)이 오른쪽 끝에 딱 붙고, 남는 공간은 gap들 사이에 "균등하게" 더
+      배분된다(space-between + gap 조합은 나머지 여백을 모든 내부 간격에 똑같이 나눠줌 —
+      결과적으로 간격은 여전히 서로 다 같음).
+   3) 좌우 패딩은 0으로(2026-08-20(4)) — 모서리 버튼을 감싸는 .ring-corner-slot이 이제 88px로
+      .palette-col과 폭이 같으므로, 이 줄 자체는 패딩 없이 딱 붙어야 두 88px 박스의 좌표가
+      정확히 일치한다(패딩을 주면 모서리 박스가 그만큼 안쪽으로 밀려 팔레트 열과 어긋남). */
+.color-frame-row {
   display: flex;
-  gap: 6px;
-  padding: 3px 14px 6px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
 }
+.palette-row {
+  display: contents;
+}
+/* 2026-08-20: 모서리 칸 — 챌린지 모드에선 스킬 버튼, 유아모드에선 renderPalette()가 색상
+   스와치를 대신 넣는다. 뒤로가기·완료도 이 클래스로 감싼다.
+   2026-08-20(4): 뒤로가기가 줄 가장자리에 바싹 붙어(중심 34px) 팔레트 열 스와치(88px 안에서
+   중앙정렬, 중심 44px)와 10px 어긋났었다. 슬롯 폭을 88px로 키워 고쳐봤더니 이번엔 줄 안의
+   간격 계산이 슬롯 폭 때문에 밀려서 간격이 안 맞았다(모서리↔색 54.7 vs 색↔색 36.7 — 슬롯이
+   넓어진 만큼 안쪽 여백이 생겨서). 그래서 폭은 원래대로 두고(auto), 중심 방향으로 10px만
+   margin으로 밀어서(줄 안쪽으로) 정렬만 고치고 간격 계산엔 티끌만큼만 영향 주게 함. */
+.ring-corner-slot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.color-frame-row > .ring-corner-slot:first-child { margin-left: 14px; } /* (88-60)/2 */
+.color-frame-row > .ring-corner-slot:last-child { margin-right: 14px; }
 /* 2026-08-11: 다른 버튼들(Start, 레벨박스)과 같은 키캡 입체감을 툴바/모달 버튼에도 통일 적용. */
 .tool-btn {
   flex: 1;
@@ -1520,9 +1644,6 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   --lv-bezel: #22A857;
   color: #fff;
 }
-/* 색칠 화면 툴바의 Undo/Clear는 밋밋한 흰색이라 파스텔 포인트만 살짝(Done!과 안 헷갈리게 초록은 피함). */
-.toolbar .tool-btn:nth-child(1) { --lv-bg: #CFE3FF; --lv-bezel: #9FC1EE; }
-.toolbar .tool-btn:nth-child(2) { --lv-bg: #FFE7BF; --lv-bezel: #EFC48A; }
 
 /* ---------- 부모 평가 모달 ---------- */
 .modal-overlay {

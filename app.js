@@ -5,7 +5,6 @@
   const STROKE_COLOR = '#2b2b2b';
   const ALPHA_WALL_THRESHOLD = 20; // 이 값 이상 알파면 "선"으로 취급 (번짐 방지)
   const MIN_REGION_SIZE = 10;      // 이보다 작은 조각은 탭 불가능한 슬리버로 보고 채점 대상에서 제외
-  const MAX_UNDO = 15;
 
   // 2026-08-10 색맹 시뮬레이션(OKLab ΔE) 기준으로 검증해서 교체 — 기존 팔레트는 보라↔파랑이
   // 정상 시력 기준으로도 구분 어려웠고(ΔE 9.5, 기준 15 미달), 핑크↔보라는 적록색맹 기준
@@ -19,6 +18,15 @@
     '#e34948', '#2E2E2E', '#F2C879'
   ];
   const WHITE_SUBSTITUTE = '#F2C879'; // 흰색은 배경(캔버스)과 구분이 안 돼서 크림색으로 대체
+  // 2026-08-20: "챌린지 모드는 팔레트에 하늘색·회색도" 요청 — 팔레트 프레임 UI 전용 추가 색상
+  // (기존 파랑 #2a78d6·검정 #2E2E2E과 헷갈리지 않게 톤 차이를 둠). 챌린지 모드 스와치 렌더링에서만 씀.
+  const CHALLENGE_EXTRA_COLORS = ['#5BC8F2', '#9B9B9B'];
+  // 2026-08-20: "위/아래/좌/우 사각 링 배치 — 유아 12개(색10+뒤로가기+완료), 챌린지 16개(색12+
+  // 스킬1·2+뒤로가기+완료)" 요청 — 링 한 면당 개수가 딱 맞아떨어지려면 기본 스와치가 정확히 10개
+  // 여야 한다. COLORS(11 = 10색+흰)는 targetPaletteForLevel 등 절차생성 로직이 그대로 쓰므로 안
+  // 건드리고, 팔레트 UI 기본 표시용으로만 초록 계열 하나(teal, #1baf7a)를 뺀 10색 세트를 따로 둔다
+  // (해당 색이 실제로 필요한 도안은 required 병합으로 여전히 자동 노출됨).
+  const SWATCH_BASE_PALETTE = COLORS.filter((c) => c !== '#1baf7a');
 
   // label은 i18n 도입(2026-08-11) 전 기본값(영어) — 실제 표시는 ratingLabel()이 I18N.t('rating.N')로 가져온다.
   const RATING_LEVELS = [
@@ -102,10 +110,9 @@
   // 색을 보여줘야 해서 색을 임의로 바꾸면 안 됨(openTemplate opts.challenge로 판단).
   let currentIsChallenge = false;
   // 2026-08-17: "이미 클리어한 그림을 다시 열면 완성본만 보여달라" 요청 — true면 openTemplate이
-  // 정답색으로 채워서 열고, 탭 채색/undo/clear/done 등 편집은 전부 막는다(보기 전용).
+  // 정답색으로 채워서 열고, 탭 채색/팔레트/완료 등 편집은 전부 막는다(보기 전용).
   let currentIsViewOnly = false;
   let selectedColor = COLORS[0];
-  let undoStack = [];
   let soundOn = true;
   let levelTimerInterval = null;
   let audioCtx = null;
@@ -185,13 +192,19 @@
   const tapLayer = document.getElementById('tap-layer');
   const regionStagePraise = document.getElementById('region-stage-praise');
   const pictureCompletePraise = document.getElementById('picture-complete-praise');
-  const palette = document.getElementById('palette');
-  const coloringToolbar = document.getElementById('coloring-toolbar');
+  const paletteTop = document.getElementById('palette-top');
+  const paletteBottom = document.getElementById('palette-bottom');
+  const paletteLeft = document.getElementById('palette-left');
+  const paletteRight = document.getElementById('palette-right');
+  const cornerTR = document.getElementById('corner-tr');
+  const cornerBL = document.getElementById('corner-bl');
+  const frameTop = document.getElementById('frame-top');
+  const btnSkill1 = document.getElementById('btn-skill1');
+  const btnSkill2 = document.getElementById('btn-skill2');
   const btnHome = document.getElementById('btn-home');
+  const btnBack = document.getElementById('btn-back');
   const btnSound = document.getElementById('btn-sound');
   const btnMusic = document.getElementById('btn-music');
-  const btnUndo = document.getElementById('btn-undo');
-  const btnClear = document.getElementById('btn-clear');
   const btnSave = document.getElementById('btn-save');
   const praiseOverlay = document.getElementById('praise-overlay');
   const praiseEmoji = document.getElementById('praise-emoji');
@@ -2037,8 +2050,24 @@
     currentIsChallenge = !!opts.challenge;
     // 2026-08-17: 이미 클리어한 그림을 다시 열면 채색은 막고 정답 완성본만 보여준다(보기 전용).
     currentIsViewOnly = !opts.challenge && !tpl.isBoss && isMastered(tpl.id, getScores());
-    palette.hidden = currentIsViewOnly;
-    coloringToolbar.hidden = currentIsViewOnly;
+    // 2026-08-20: #frame-top 안에 #btn-back(뒤로가기)이 있다 — frame-top/bottom 전체를 hidden
+    // 처리하면 보기전용 모드에서 탈출구인 뒤로가기까지 같이 사라지므로, 각 자식을 개별적으로
+    // 숨긴다(btn-back·헤더의 btn-home은 절대 안 숨김).
+    paletteTop.hidden = currentIsViewOnly;
+    paletteBottom.hidden = currentIsViewOnly;
+    paletteLeft.hidden = currentIsViewOnly;
+    paletteRight.hidden = currentIsViewOnly;
+    cornerTR.hidden = currentIsViewOnly;
+    cornerBL.hidden = currentIsViewOnly;
+    btnSave.hidden = currentIsViewOnly;
+    // 2026-08-20: "챌린지 모드는 시간 내 클리어하면 자동으로 다음 문제로 넘어가서 완료 버튼이
+    // 의미 없다 — LUCK 버튼으로 바꿔줘(기능은 추후 안내)" 요청 — 클릭 동작(challenge.js의 강제
+    // 제출 가로채기)은 그대로 두고 아이콘/라벨만 모드별로 바꾼다.
+    btnSave.textContent = opts.challenge ? '🍀' : '✅';
+    btnSave.setAttribute('aria-label', opts.challenge ? 'Luck' : 'Done, save it');
+    // 스킬1/2는 자리만 있는 챌린지 전용 장식 버튼 — 유아모드/보기전용에서는 항상 숨김.
+    btnSkill1.hidden = !opts.challenge || currentIsViewOnly;
+    btnSkill2.hidden = !opts.challenge || currentIsViewOnly;
     // 실제로 그림을 열어서 색칠을 시작하는 이 순간에 그 레벨(또는 보스)의 타임어택을 시작(또는 이어감).
     if (opts.challenge) {
       // 챌린지 모드는 자체 타이머/시도추적을 쓰므로 Child의 타임어택 시작 로직을 건너뛴다.
@@ -2072,6 +2101,7 @@
     goalEmoji.innerHTML = '<img class="title-emoji-icon" src="' + titleIconSrc + '" alt="">';
     galleryScreen.hidden = true;
     coloringScreen.hidden = false;
+    syncRingSquareSize();
     // 2026-08-11: "한 캐릭터 색칠 후 다음 물체 색칠 전에 이전 그림이 보인다" 제보 — loadTemplateSource가
     // 이미지 로딩 때문에 비동기라서, 콜백이 오기 전까지는 아래 캔버스들이 방금 전 그림 내용을 그대로
     // 들고 있어서 화면 전환 직후 잠깐 이전 캐릭터가 그대로 보였음. 화면 전환하는 이 시점에 바로
@@ -2099,14 +2129,12 @@
 
       // 정답색이 정해진 뒤에 팔레트 구성(그 도안에 실제 필요한 색이 반드시 포함되게)
       renderPalette();
+      syncRingGap();
 
       // 채우기 레이어 초기화 — 보기 전용이면 방금 그린 정답 이미지(goalCanvas)를 그대로 옮겨서
       // 처음부터 완성된 상태로 보여준다.
       fillCtx.clearRect(0, 0, WORK_SIZE, WORK_SIZE);
       if (currentIsViewOnly) fillCtx.drawImage(goalCanvas, 0, 0);
-      undoStack = [];
-      pushUndo();
-      updateUndoButton();
 
       if (onReady) onReady();
     });
@@ -3032,6 +3060,39 @@
   }
 
 
+  // 2026-08-20: "버튼 링이 캔버스처럼 정사각형이어야" 요청 — CSS만으로는 안 풀림(위 style.css
+  // #coloring-screen 주석의 1~2차 시도 참고: 팔레트 열의 스와치 내용물이 정사각형보다 커서
+  // grid auto 트랙이 오히려 내용물 쪽에 맞춰 늘어나 버림). 가운데 열의 실제 폭(=이 화면에서
+  // 정사각형이 되는 크기, min(그 폭, 420)과 동일한 값)을 계산해 --ring-square로 박아 넣어
+  // goal-panel/canvas 행 높이를 강제로 고정한다 — 팔레트 열은 그 고정 높이에 맞춰 늘어나고,
+  // 넘치는 스와치는 기존 overflow-y:auto로 스크롤된다. 색칠 화면을 열 때(화면이 보이기 직전)와
+  // 리사이즈/회전 시 다시 계산한다.
+  function syncRingSquareSize() {
+    const middleColumnWidth = coloringScreen.clientWidth - 176; // 176 = 좌우 팔레트 열(88px×2)
+    const size = Math.max(0, Math.min(middleColumnWidth, 420));
+    document.documentElement.style.setProperty('--ring-square', size + 'px');
+  }
+
+  // 2026-08-20: "상하좌우 버튼 간 거리가 다 똑같아야"(뒤로가기→첫 색, 색↔색, 마지막 색→완료 전부
+  // 포함) 요청 — 위/아래 줄(#frame-top)은 justify-content:space-between이라 렌더링된 실제 간격이
+  // CSS 고정값이 아니라 도안·화면 크기마다 다르다. 그 값을 직접 측정해 --ring-gap으로 반영하면
+  // 좌/우 열(.palette-col, style.css 참고)이 같은 값을 gap/padding에 그대로 써서 맞춘다.
+  function syncRingGap() {
+    const items = [...frameTop.querySelectorAll('.ring-circle, .color-swatch')]
+      .filter((el) => el.offsetParent !== null)
+      .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+    if (items.length < 2) return;
+    const r0 = items[0].getBoundingClientRect();
+    const r1 = items[1].getBoundingClientRect();
+    const gap = Math.max(0, Math.round((r1.left - r0.right) * 10) / 10);
+    document.documentElement.style.setProperty('--ring-gap', gap + 'px');
+  }
+  window.addEventListener('resize', () => {
+    if (!coloringScreen.hidden) { syncRingSquareSize(); syncRingGap(); }
+  });
+
+  // 2026-08-20: "링 안 뒤로가기는 한 단계만" 요청 — 이 함수는 원래도 그 동작이었다(일반 레벨은
+  // 갤러리로, 보스전은 지도로 한 단계만 물러남). #btn-back(링)에 그대로 연결.
   function goHome() {
     coloringScreen.hidden = true;
     if (currentBossMode) {
@@ -3047,6 +3108,18 @@
     }
   }
 
+  // 2026-08-20: "헤더 홈버튼은 goal 이미지 좌상단, 끝까지(지도까지) 한번에" 요청 — goHome()과
+  // 달리 갤러리를 안 거치고 항상 지도 화면으로 바로 나간다. #btn-home(헤더)에 연결.
+  function goHomeToMap() {
+    coloringScreen.hidden = true;
+    stopLevelTimer();
+    currentBossMode = null;
+    setBgmTrack(MUSIC_SRC);
+    galleryScreen.hidden = true;
+    mapScreen.hidden = false;
+    renderMap();
+  }
+
   // ================= 팔레트 =================
   // 난이도(1~10단계)가 오를수록 고를 수 있는 색상 수가 늘어남(4색 → 10색), 10단계에서 흰색 보너스 추가
   const PALETTE_SIZE_BY_LEVEL = [4, 4, 5, 6, 7, 8, 9, 10, 10, 10];
@@ -3057,44 +3130,79 @@
     return TARGET_PALETTE.slice(0, PALETTE_SIZE_BY_LEVEL[idx]);
   }
 
-  function paletteColorsForLevel(level, requiredColors) {
-    const idx = Math.min(Math.max(level || 10, 1), 10) - 1;
-    const n = PALETTE_SIZE_BY_LEVEL[idx];
-    const cols = TARGET_PALETTE.slice(0, n);
-    if ((level || 10) >= 10 && !cols.includes(WHITE_SUBSTITUTE)) cols.push(WHITE_SUBSTITUTE);
-    // 도안이 실사 색을 위해 이 단계 기본 팔레트 밖의 색을 쓰면(예: 흰색 달걀, 파란 물방울)
-    // 그 색이 반드시 선택 가능하도록 팔레트에 추가한다.
-    (requiredColors || []).forEach((c) => { if (!cols.includes(c)) cols.push(c); });
-    return cols;
-  }
-
+  // 2026-08-20: "팔레트는 항상 다 보여줘(레벨별 4→10색 증가 폐지)" 요청 — 실제 그림의 난이도(절차생성
+  // 도안이 몇 색을 쓰는지, targetPaletteForLevel/PALETTE_SIZE_BY_LEVEL)는 그대로 두고, 고를 수 있는
+  // 스와치 UI만 유아모드=COLORS 전체, 챌린지모드=+하늘색·회색까지 항상 다 보여준다.
+  // 2026-08-20: "상/하/좌/우 정확히 4개씩(모서리는 인접한 두 변이 공유)" 요청 — 링 전체를 사각형
+  // 둘레 하나로 보고 순서대로 배분한다. 챌린지(둘레 5칸, 네 모서리가 전부 뒤로가기/스킬/완료라
+  // 색은 각 변에 3개씩=12색)와 유아(둘레 4칸, 모서리 중 뒤로가기·완료만 있고 나머지 두 모서리
+  // 우상단·좌하단은 색으로 채워야 4개씩 맞음=변 2개+모서리색 2개=10색)가 갯수가 달라 표를 나눔.
   function renderPalette() {
-    const level = currentTemplate ? currentTemplate.difficulty : 10;
     const usedColors = currentLabelToColor ? Array.from(new Set(currentLabelToColor.values())) : [];
     const required = usedColors.length ? usedColors : ((currentTemplate && currentTemplate.partColors) || []);
     let cols;
     if (currentTemplate && currentTemplate.paletteOverride) {
       cols = currentTemplate.paletteOverride.slice();
-      required.forEach((c) => { if (!cols.includes(c)) cols.push(c); });
     } else {
-      cols = paletteColorsForLevel(level, required);
+      cols = currentIsChallenge ? SWATCH_BASE_PALETTE.concat(CHALLENGE_EXTRA_COLORS) : SWATCH_BASE_PALETTE.slice();
+    }
+    required.forEach((c) => { if (!cols.includes(c)) cols.push(c); });
+    // 2026-08-20: "유아모드는 버튼이 반드시 12개(색10+뒤로가기+완료)로 구성돼야" 요청 — required
+    // 병합으로 기본 팔레트 밖 색이 추가돼 12개를 넘기면, required가 아닌 기본색을 뒤에서부터
+    // 잘라내 항상 정확히 10색(챌린지는 12색)으로 맞춘다. 도안 자체의 색 배정(어떤 그림이 어떤
+    // 색을 쓰는지)은 안 건드리고 팔레트 UI 표시 개수만 강제로 캡한다.
+    const swatchTarget = currentIsChallenge ? 12 : 10;
+    if (cols.length > swatchTarget) {
+      const requiredSet = new Set(required);
+      for (let idx = cols.length - 1; idx >= 0 && cols.length > swatchTarget; idx--) {
+        if (!requiredSet.has(cols[idx])) cols.splice(idx, 1);
+      }
     }
     selectedColor = cols[0];
-    palette.innerHTML = '';
-    cols.forEach((color, idx) => {
-      const btn = document.createElement('button');
-      btn.className = 'color-swatch' + (idx === 0 ? ' active' : '');
-      btn.style.background = color;
-      btn.setAttribute('role', 'listitem');
-      btn.setAttribute('aria-label', 'Pick a color');
-      btn.dataset.color = color;
-      btn.addEventListener('click', () => {
-        selectedColor = color;
-        palette.querySelectorAll('.color-swatch').forEach((el) => el.classList.remove('active'));
-        btn.classList.add('active');
-      });
-      palette.appendChild(btn);
+    [paletteTop, paletteBottom, paletteLeft, paletteRight, cornerTR, cornerBL].forEach((el) => {
+      el.querySelectorAll('.color-swatch').forEach((sw) => sw.remove());
     });
+
+    // 둘레를 위(왼쪽→오른쪽) → 우상단 모서리 → 오른쪽(위→아래) → 아래(왼쪽→오른쪽) → 좌하단
+    // 모서리 → 왼쪽(위→아래) 순서로 한 바퀴 돌며 자른다. 챌린지는 모서리 칸이 0이라 그냥 건너뜀.
+    const perSide = currentIsChallenge ? 3 : 2;
+    const cornerColors = currentIsChallenge ? 0 : 1;
+    let i = 0;
+    const take = (n) => cols.slice(i, i += n);
+    const plan = [
+      [paletteTop, take(perSide)],
+      [cornerTR, take(cornerColors)],
+      [paletteRight, take(perSide)],
+      [paletteBottom, take(perSide)],
+      [cornerBL, take(cornerColors)],
+      [paletteLeft, take(perSide)],
+    ];
+    const overflow = cols.slice(i); // required 병합으로 기본치보다 색이 많은 도안의 나머지(좌우에 번갈아)
+    overflow.forEach((color, k) => plan.push([k % 2 === 0 ? paletteRight : paletteLeft, [color]]));
+
+    let globalIdx = 0;
+    plan.forEach(([container, colors]) => {
+      colors.forEach((color) => {
+        const btn = document.createElement('button');
+        btn.className = 'ring-circle color-swatch' + (globalIdx === 0 ? ' active' : '');
+        btn.style.background = color;
+        btn.setAttribute('role', 'listitem');
+        btn.setAttribute('aria-label', 'Pick a color');
+        btn.dataset.color = color;
+        btn.addEventListener('click', () => {
+          selectedColor = color;
+          getPaletteSwatches().forEach((el) => el.classList.remove('active'));
+          btn.classList.add('active');
+        });
+        container.appendChild(btn);
+        globalIdx++;
+      });
+    });
+  }
+
+  function getPaletteSwatches() {
+    return [paletteTop, paletteBottom, paletteLeft, paletteRight, cornerTR, cornerBL]
+      .flatMap((el) => [...el.querySelectorAll('.color-swatch')]);
   }
 
   function rgbToHex(r, g, b) {
@@ -3191,8 +3299,8 @@
     return [r, g, b, 255];
   }
 
-  // 실제로 픽셀을 채우는 부분만 뺀 것 — 소리/되돌리기 기록/단계 칭찬 같은 "사용자가 지금 막
-  // 칠했다"는 부수효과 없이, 캔버스에만 색을 채워야 할 때(2026-08-17: 이미 클리어된 그림을
+  // 실제로 픽셀을 채우는 부분만 뺀 것 — 소리/단계 칭찬 같은 "사용자가 지금 막 칠했다"는
+  // 부수효과 없이, 캔버스에만 색을 채워야 할 때(2026-08-17: 이미 클리어된 그림을
   // 다시 열 때 자동으로 미리 다 칠해두는 용도, autoFillIfMastered 참고) 재사용한다.
   function fillRegionPixels(startIdx, hexColor) {
     if (!wallMask || wallMask[startIdx] === 1) return false; // 선을 눌렀으면 무시
@@ -3239,23 +3347,14 @@
     if (startX < 0 || startY < 0 || startX >= WORK_SIZE || startY >= WORK_SIZE) return;
     const startIdx = startY * WORK_SIZE + startX;
     if (!fillRegionPixels(startIdx, hexColor)) return;
-    pushUndo();
-    updateUndoButton();
     playPop();
     const label = currentLabelMap ? currentLabelMap[startIdx] : null;
     if (isCorrectColorForLabel(label, hexColor)) maybeShowRegionStagePraise(label);
   }
 
   // Task2(챌린지 Phase2): floodFill과 같은 벽(wallMask) 경계 연결 채우기지만, 시스템이 자동으로
-  // 색을 바꾸는 용도(LEVEL 9/10)라 pushUndo/playPop을 호출하지 않는다 — 이 변화 자체를 하나의
-  // 실행취소 단위로 남기지 않겠다는 뜻일 뿐, "플레이어의 Undo가 이 변화를 되돌리지 못하게 막는다"는
-  // 뜻이 아니다. 오히려 반대로, pushUndo를 안 하기 때문에 #btn-undo가 가리키는 스냅샷은 게임이
-  // 몰래 바꾸기 전 상태 그대로라서, 플레이어가 Undo를 누르면 LEVEL 9/10이 방금 만든 변화를 그냥
-  // 되돌려 버릴 수 있다(=난이도를 무력화하는 known limitation). 2026-08-14 최종 리뷰 fix wave:
-  // challenge.js에서 챌린지 진행 중 #btn-undo/#btn-clear를 가로채 이 구멍을 실제로 막았다
-  // (#btn-save/#btn-home과 동일한 capture-listener 패턴, "챌린지 진행 중일 때만 #btn-save를
-  // 가로챈다" 주석 참고). hexColor가 null이면 그 영역을 다시 미색칠(alpha 0) 상태로 되돌린다
-  // (LEVEL 9의 "랜덤 소멸").
+  // 색을 바꾸는 용도(LEVEL 9/10)라 playPop()을 호출하지 않는다(플레이어가 직접 칠한 게 아니므로).
+  // hexColor가 null이면 그 영역을 다시 미색칠(alpha 0) 상태로 되돌린다(LEVEL 9의 "랜덤 소멸").
   function paintRegionPixels(seed, hexColor) {
     if (!wallMask || wallMask[seed] === 1) return;
     const imgData = fillCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE);
@@ -3293,32 +3392,6 @@
       return { seed: r.seed, label: r.label, targetColor: currentLabelToColor.get(r.label), painted: data[p + 3] !== 0 };
     });
   }
-
-  // ================= 실행 취소 =================
-  function pushUndo() {
-    undoStack.push(fillCtx.getImageData(0, 0, WORK_SIZE, WORK_SIZE));
-    if (undoStack.length > MAX_UNDO) undoStack.shift();
-  }
-
-  function updateUndoButton() {
-    btnUndo.disabled = undoStack.length <= 1;
-    btnUndo.style.opacity = undoStack.length <= 1 ? 0.4 : 1;
-  }
-
-  btnUndo.addEventListener('click', () => {
-    if (undoStack.length <= 1) return;
-    undoStack.pop();
-    const prev = undoStack[undoStack.length - 1];
-    fillCtx.putImageData(prev, 0, 0);
-    updateUndoButton();
-  });
-
-  btnClear.addEventListener('click', () => {
-    fillCtx.clearRect(0, 0, WORK_SIZE, WORK_SIZE);
-    undoStack = [];
-    pushUndo();
-    updateUndoButton();
-  });
 
   // ================= 탭 → 채우기 =================
   // 수염/입/이마주름처럼 폭이 몇 픽셀 안 되는 아주 얇은 색칠 영역은 손가락으로 정확히
@@ -3825,7 +3898,8 @@
   updateMusicButton();
 
   // ================= 네비게이션 =================
-  btnHome.addEventListener('click', goHome);
+  btnHome.addEventListener('click', goHomeToMap);
+  btnBack.addEventListener('click', goHome);
 
   // ================= 표지 화면 =================
   // 2026-08-10: 보스가 손그림(svgArt, 이미 완성된 정답색이 마크업에 그대로 박혀있던 방식)에서
@@ -4069,7 +4143,7 @@
     if (!tpl) return resolve(null);
     openTemplate(tpl, () => {
       // 실제 화면에 그려진 팔레트 스와치를 그대로 읽는다(렌더팔레트가 currentLabelToColor 기반으로 동적 구성하므로)
-      const paletteColors = Array.from(palette.querySelectorAll('.color-swatch')).map((el) => el.dataset.color);
+      const paletteColors = getPaletteSwatches().map((el) => el.dataset.color);
       // 각 영역에서 "벽으로부터 가장 먼(가장 안전하게 탭할 수 있는) 지점"을 계산한다.
       // seed(첫 발견 픽셀)나 centroid(평균 좌표)는 곡선/오목한 모양에서 벽 위나 바깥에 걸릴 수 있어 부적합.
       const W = WORK_SIZE, H = WORK_SIZE;
