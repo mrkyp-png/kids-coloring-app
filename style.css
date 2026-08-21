@@ -803,6 +803,16 @@ button:active { transform: scale(0.94); }
   transform-box: border-box;
   transform-origin: center;
 }
+/* 2026-08-21: 변신 영상 — goal 이미지와 정확히 같은 박스 안에서만 재생(화면 전체 아님). */
+.level-reward-video {
+  grid-area: 1 / 1;
+  width: min(78vw, 320px);
+  height: 100%;
+  max-height: 340px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: var(--bg);
+}
 /* 2026-08-16: 조각 맞추기 미니게임(레벨1만 테스트하다 2026-08-17부터 전체 레벨로 확장).
    2026-08-16(2차): "목표박스와 선택박스 크기가 달라요, 정사각형으로" 피드백 — 정답 칸(가운데)과
    트레이 조각을 서로 다른 좌표계(SVG 전체 vs 개별 박스)로 따로 만들다 보니 크기가 어긋났었음.
@@ -832,6 +842,10 @@ button:active { transform: scale(0.94); }
 /* 아래쪽은 .level-reward 자체에 이미 margin-bottom:28px가 있어서(보상 이미지 아래 콘텐츠와의
    기본 여백), 위쪽과 같은 정도로 당기려면 그만큼(28px)을 더 빼야 한다(-24-28=-52). */
 #reward-puzzle-tray-bottom { margin-top: -52px; }
+/* 2026-08-21: 레벨1(sheep→robot, 16조각)은 조각이 4배 많아서 타일을 64px로 줄이고 4열로 배치 —
+   goal 박스(min(78vw,320px)) 안에 96px×4=384px가 아니라 64px×4=256px로 들어가게 한다. */
+.reward-puzzle-4x4.reward-puzzle-target-grid { grid-template-columns: repeat(4, 64px); }
+.reward-puzzle-4x4 .reward-puzzle-tile { width: 64px; height: 64px; }
 .reward-puzzle-target-grid {
   grid-area: 1 / 1; /* .level-reward-art와 같은 칸에 둬서 크로스페이드 때 겹치게 함 */
   display: grid;

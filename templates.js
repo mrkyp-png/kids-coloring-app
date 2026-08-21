@@ -20,6 +20,13 @@ const COLORING_TEMPLATES = [
   { id: "bird", name: "Bird", emoji: "🐦", renderMode: "emoji", difficulty: 1 },
   { id: "dolphin", name: "Dolphin", emoji: "🐬", difficulty: 1, renderMode: "emoji" },
   { id: "whale", name: "Whale", emoji: "🐳", difficulty: 1, renderMode: "emoji" },
+  // 2026-08-21: "챌린지모드 동물 4개를 가지고 와서 레벨1을 16개로" 요청 — 이미 챌린지모드에
+  // 있는 4종을 유아 모드 레벨1에도 그대로 추가(같은 id를 챌린지 배열에도 그대로 둠, 두 모드
+  // 다 독립적으로 동작). 영역 개수는 안 따짐(사용자 확인: "부족하면 바탕화면에서 직접 추가").
+  { id: "penguin", name: "Penguin", emoji: "🐧", difficulty: 1, renderMode: "emoji" },
+  { id: "lion", name: "Lion", emoji: "🦁", difficulty: 1, renderMode: "emoji" },
+  { id: "panda", name: "Panda", emoji: "🐼", difficulty: 1, renderMode: "emoji" },
+  { id: "tiger", name: "Tiger", emoji: "🐯", difficulty: 1, renderMode: "emoji" },
   // ===== Level 2: 음식 =====
   { id: "ant", name: "Ant", emoji: "🐜", difficulty: 3, renderMode: "emoji" },
   { id: "spider", name: "Spider", emoji: "🕷️", difficulty: 3, renderMode: "emoji" },

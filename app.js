@@ -158,6 +158,8 @@
   const rewardPuzzleTrayTop = document.getElementById('reward-puzzle-tray-top');
   const rewardPuzzleTrayBottom = document.getElementById('reward-puzzle-tray-bottom');
   const rewardPuzzleTargetGrid = document.getElementById('reward-puzzle-target-grid');
+  // 2026-08-21: 레벨1(동물)이 16개 다 완료됐을 때 goal 이미지 박스 안에서 재생되는 변신 영상.
+  const levelRewardVideo = document.getElementById('level-reward-video');
   const btnMapBack = document.getElementById('btn-map-back');
   const levelTitle = document.getElementById('level-title');
   const levelProgress = document.getElementById('level-progress');
@@ -1542,7 +1544,9 @@
       helicopter: HELICOPTER_INLINE,
     };
     const base = INLINE_BY_EMOJI[art.emoji] ||
-      '<image class="reward-emoji-img" href="assets/emoji/' + art.emoji + '.svg" x="0" y="0" width="100" height="100"/>';
+      (art.emoji === 'sheep-robot'
+        ? '<image class="reward-emoji-img" href="assets/transform/sheep-final.png" x="0" y="0" width="100" height="100"/>'
+        : '<image class="reward-emoji-img" href="assets/emoji/' + art.emoji + '.svg" x="0" y="0" width="100" height="100"/>');
     // 2026-08-17: "스피드선은 이미지 뒤에 나와야" 요청 — 스피드선류(바퀴 달린 탈것)는 차체보다
     // 먼저(=아래) 그려서 차체가 그 위에 겹쳐 보이게 한다. 나머지 장식은 원래대로 위에.
     const decorBehind = ['motorcycle', 'bicycle', 'racingcar', 'scooter'].includes(art.emoji);
@@ -1558,7 +1562,9 @@
   // (프로펠러)는 emoji 이름이 INLINE_BY_EMOJI(buildRewardSvg 참고)에 있으면 자동으로 해당
   // 부위만 따로 움직이는 인라인 SVG를 쓴다.
   const LEVEL_REWARD_ART = {
-    1: { emoji: 'rocket', flyDirection: 'diagonal', sparkles: true }, // 동물
+    // 16개 다 색칠하기 전(진행 중 모자이크)엔 원본 트위모지 양, 다 풀고 나면(변신 영상+퍼즐
+    // 이후) 로봇 모습으로 — puzzleEmoji가 있으면 "이미 다 푼 뒤" 표시에만 그걸 쓴다.
+    1: { emoji: 'sheep', puzzleEmoji: 'sheep-robot', flyDirection: 'diagonal' }, // 동물
     2: { emoji: 'motorcycle', flyDirection: 'left' },   // 음식
     3: { emoji: 'canoe', flyDirection: 'left' },        // 자연
     4: { emoji: 'balloon', flyDirection: 'up' },        // 하늘
@@ -1632,7 +1638,12 @@
       // 원형 아이콘 목록의 빈 자리표시자와 같은 성격의, 콘텐츠 16개 채우기 전까지의 임시 모습.
       const gridTotal = Math.max(total, GALLERY_GRID_TARGET);
       const { cols, rows } = gridDims(gridTotal);
-      levelRewardArt.innerHTML = buildRewardSvg(art, cols, rows);
+      // 2026-08-21: puzzleEmoji가 있는 레벨(레벨1=sheep→sheep-robot)은 "다 풀기 전"엔 원본,
+      // "이미 다 푼 뒤" 재진입한 것이면 변신된 모습으로 보여준다(퍼즐 진행 중엔 이 분기를 안
+      // 타므로 art.emoji 그대로 — explodeIntoPuzzle이 puzzleEmoji로 직접 바꿔침).
+      const alreadySolvedOnEntry = rewardPuzzleSolvedLevels.has(level) || isRewardPuzzleSolvedPersisted(level);
+      const displayArt = (alreadySolvedOnEntry && art.puzzleEmoji) ? Object.assign({}, art, { emoji: art.puzzleEmoji }) : art;
+      levelRewardArt.innerHTML = buildRewardSvg(displayArt, cols, rows);
       levelRewardArt.setAttribute('viewBox', '0 0 100 100');
       levelRewardArt.setAttribute('preserveAspectRatio', 'xMidYMid meet');
       levelRewardArt.dataset.level = String(level);
@@ -1669,14 +1680,23 @@
   // 보상 이미지를 감싼다.
   const PUZZLE_COLS = 2;
   const PUZZLE_ROWS = 2;
-  const PUZZLE_TOTAL = PUZZLE_COLS * PUZZLE_ROWS;
-  let rewardPuzzle = null; // { level, solved: Set<number> }
+  // 2026-08-21: 레벨1(동물, sheep→robot 변신)은 "16조각은 있어야 어린이~어른까지 재밌다"는
+  // 판단으로 다른 레벨(4조각, 유아 난이도로 이미 튜닝됨)보다 훨씬 크다. 레벨별로 조각 수/이미지
+  // 소스가 달라질 수 있어 이후 puzzleCellRect 등에서 이 값을 참고한다.
+  function puzzleDimsForLevel(level) {
+    return level === 1 ? { cols: 4, rows: 4 } : { cols: PUZZLE_COLS, rows: PUZZLE_ROWS };
+  }
+  // 레벨1처럼 완료 시 goal 박스 안에서 변신 영상이 먼저 재생된 뒤 그 마지막 프레임이 퍼즐이 되는 레벨.
+  const LEVEL_TRANSFORM_VIDEO = { 1: 'assets/transform/sheep.mp4' };
+  let rewardPuzzle = null; // { level, solved: Set<number>, dims: {cols,rows}, edges }
   // 이번 세션에 이미 다 맞춘 레벨(다시 들어가도 매번 또 안 뜨게) — 세션 한정 캐시일 뿐, 진짜
   // 영구 기록은 REWARD_PUZZLE_SOLVED_KEY(localStorage)에 있다(아래 maybeShowRewardPuzzle 참고).
   const rewardPuzzleSolvedLevels = new Set();
 
   function isRewardPuzzleBlocking(level) {
-    return !!(rewardPuzzle && rewardPuzzle.level === level && rewardPuzzle.solved.size < PUZZLE_TOTAL);
+    if (!rewardPuzzle || rewardPuzzle.level !== level) return false;
+    const total = rewardPuzzle.dims.cols * rewardPuzzle.dims.rows;
+    return rewardPuzzle.solved.size < total;
   }
 
   // 2026-08-16: "안 나온다" 제보로 원인 파악 — 예전엔 "방금 막 클리어한 순간"(justBecameLevelCleared)
@@ -1690,28 +1710,83 @@
     if (rewardPuzzle && rewardPuzzle.level === level) return; // 이미 진행 중
     if (rewardPuzzleSolvedLevels.has(level) || isRewardPuzzleSolvedPersisted(level)) return; // 이미 다 품(이번 세션 또는 예전에)
     const list = getTemplatesForLevel(level);
+    if (list.length === 0) return; // 아직 레벨이 선택 안 됐거나(level=undefined) 존재하지 않는 레벨
     const scores = getScores();
     const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
     if (doneCount < list.length) return; // 아직 다 안 깼음
-    rewardPuzzle = { level: level, solved: new Set() };
+    const dims = puzzleDimsForLevel(level);
+    rewardPuzzle = {
+      level: level,
+      solved: new Set(),
+      dims: dims,
+      edges: (dims.cols === PUZZLE_COLS && dims.rows === PUZZLE_ROWS) ? PUZZLE_EDGES : buildPuzzleJigEdges(dims.cols, dims.rows),
+    };
     // 완성된 그림이 위에서 살짝 내려오며 가운데 자리잡는 연출(0.4s) → 칸 구분선이 지워져
     // 깔끔한 한 장의 그림이 됨 → 퍼즐 트레이 크기로 줄어들며 살짝 아래로 자리잡음(0.5s) →
-    // 그 자리에서 조각 4개로 터뜨린다.
+    // 그 자리에서 조각들로 터뜨린다(레벨1은 그 전에 goal 박스 안에서 변신 영상이 먼저 재생됨).
     levelRewardArt.classList.add('reward-drop-in');
     setTimeout(() => {
       levelRewardArt.classList.remove('reward-drop-in');
       levelRewardArt.classList.add('reward-puzzle-clean');
     }, 450);
     setTimeout(() => levelRewardArt.classList.add('reward-puzzle-shrink'), 700);
-    setTimeout(() => explodeIntoPuzzle(level), 1300);
+    const videoSrc = LEVEL_TRANSFORM_VIDEO[level];
+    if (videoSrc) {
+      setTimeout(() => playLevelTransformVideo(level, videoSrc), 1300);
+    } else {
+      setTimeout(() => explodeIntoPuzzle(level), 1300);
+    }
+  }
+
+  // 레벨1: goal 이미지 박스(levelRewardArt와 정확히 같은 자리, CSS grid-area 공유) 안에서만
+  // 변신 영상을 재생하고, 끝나면(또는 자동재생이 막히면) 그대로 조각 맞추기로 넘어간다.
+  function playLevelTransformVideo(level, src) {
+    if (currentLevel !== level) return;
+    levelRewardArt.hidden = true;
+    levelRewardVideo.src = src;
+    levelRewardVideo.currentTime = 0;
+    levelRewardVideo.hidden = false;
+    const proceed = () => {
+      levelRewardVideo.hidden = true;
+      levelRewardArt.hidden = false;
+      explodeIntoPuzzle(level);
+    };
+    levelRewardVideo.onended = proceed;
+    levelRewardVideo.play().catch(proceed);
   }
 
   function puzzleCellRect(i) {
-    const c = i % PUZZLE_COLS, r = Math.floor(i / PUZZLE_COLS);
+    const cols = rewardPuzzle ? rewardPuzzle.dims.cols : PUZZLE_COLS;
+    const rows = rewardPuzzle ? rewardPuzzle.dims.rows : PUZZLE_ROWS;
+    const c = i % cols, r = Math.floor(i / cols);
     return {
-      x: (c * 100 / PUZZLE_COLS).toFixed(2), y: (r * 100 / PUZZLE_ROWS).toFixed(2),
-      w: (100 / PUZZLE_COLS).toFixed(2), h: (100 / PUZZLE_ROWS).toFixed(2),
+      x: (c * 100 / cols).toFixed(2), y: (r * 100 / rows).toFixed(2),
+      w: (100 / cols).toFixed(2), h: (100 / rows).toFixed(2),
     };
+  }
+
+  // 손으로 짠 PUZZLE_EDGES(2x2 전용)와 달리, NxN(레벨1=4x4) 조각의 돌출부/홈은 내부 경계마다
+  // 방향을 한 번씩 무작위로 정하고 양쪽 칸이 반대 부호로 읽게 해서 항상 맞물리게 만든다.
+  function buildPuzzleJigEdges(cols, rows) {
+    const vSign = [];
+    for (let r = 0; r < rows; r++) {
+      vSign.push(Array.from({ length: cols - 1 }, () => (Math.random() < 0.5 ? 'out' : 'in')));
+    }
+    const hSign = [];
+    for (let r = 0; r < rows - 1; r++) {
+      hSign.push(Array.from({ length: cols }, () => (Math.random() < 0.5 ? 'out' : 'in')));
+    }
+    const edges = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const left = c === 0 ? 'straight' : (vSign[r][c - 1] === 'out' ? 'in' : 'out');
+        const right = c === cols - 1 ? 'straight' : vSign[r][c];
+        const top = r === 0 ? 'straight' : (hSign[r - 1][c] === 'out' ? 'in' : 'out');
+        const bottom = r === rows - 1 ? 'straight' : hSign[r][c];
+        edges.push({ top, right, bottom, left });
+      }
+    }
+    return edges;
   }
 
   // 2026-08-17: "정사각형 타일 유지 + 진짜 직소퍼즐 모양(가장자리 돌출부/홈)" 요청 — 2x2라
@@ -1769,11 +1844,14 @@
     const imgX = (-Number(c.x) * scale).toFixed(2);
     const imgY = (-Number(c.y) * scale).toFixed(2);
     const imgSize = (100 * scale).toFixed(2);
-    const outline = jigsawPathD(PUZZLE_EDGES[cellIndex]);
+    const edges = (rewardPuzzle && rewardPuzzle.edges) || PUZZLE_EDGES;
+    const outline = jigsawPathD(edges[cellIndex]);
+    // sheep-robot(레벨1 변신 영상 마지막 프레임)은 assets/emoji/*.svg 규칙 밖의 PNG라 별도 처리.
+    const href = emoji === 'sheep-robot' ? 'assets/transform/sheep-final.png' : 'assets/emoji/' + emoji + '.svg';
     return '<svg viewBox="' + (-JIG_PAD) + ' ' + (-JIG_PAD) + ' ' + (JIG + JIG_PAD * 2) + ' ' + (JIG + JIG_PAD * 2) + '">' +
       '<defs><clipPath id="' + clipId + '"><path d="' + outline + '"/></clipPath></defs>' +
       '<g clip-path="url(#' + clipId + ')">' +
-      '<image href="assets/emoji/' + emoji + '.svg" x="' + imgX + '" y="' + imgY + '" width="' + imgSize + '" height="' + imgSize + '"/>' +
+      '<image href="' + href + '" x="' + imgX + '" y="' + imgY + '" width="' + imgSize + '" height="' + imgSize + '"/>' +
       '</g>' +
       '<path class="reward-puzzle-outline" d="' + outline + '" fill="none" stroke="#000" stroke-width="3"/>' +
       '</svg>';
@@ -1782,7 +1860,8 @@
   // 정답 칸(가운데)이 아직 안 채워졌을 때 — 조각과 똑같은 직소 윤곽을 옅은 보라색으로 채워서
   // "이 모양 조각이 여기 들어가야 함"을 보여준다.
   function puzzleEmptySlotSvg(cellIndex) {
-    const outline = jigsawPathD(PUZZLE_EDGES[cellIndex]);
+    const edges = (rewardPuzzle && rewardPuzzle.edges) || PUZZLE_EDGES;
+    const outline = jigsawPathD(edges[cellIndex]);
     return '<svg viewBox="' + (-JIG_PAD) + ' ' + (-JIG_PAD) + ' ' + (JIG + JIG_PAD * 2) + ' ' + (JIG + JIG_PAD * 2) + '">' +
       '<path d="' + outline + '" fill="#EDEBF9" stroke="#FFF8ED" stroke-width="2"/>' +
       '</svg>';
@@ -1791,6 +1870,7 @@
   function explodeIntoPuzzle(level) {
     if (currentLevel !== level) return; // 그 사이 다른 레벨로 이동했으면 건너뜀
     const art = LEVEL_REWARD_ART[level];
+    const puzzleTotal = rewardPuzzle.dims.cols * rewardPuzzle.dims.rows;
     const centerRect = levelRewardArt.getBoundingClientRect();
     const centerX = centerRect.left + centerRect.width / 2;
     const centerY = centerRect.top + centerRect.height / 2;
@@ -1807,8 +1887,14 @@
 
       // 정답 칸(가운데) — 트레이 조각과 완전히 같은 타일 클래스를 씀(크기 통일), 해당
       // 조각과 정확히 같은 직소 윤곽을 옅은 색으로 미리 보여줌.
+      // 레벨1(4x4=16조각)은 다른 레벨(2x2)보다 조각이 훨씬 많아서 타일을 작게(64px) 줄여야
+      // goal 박스 폭 안에 들어간다 — reward-puzzle-4x4 클래스로 CSS에서 크기/열 개수를 바꾼다.
+      const isBig = rewardPuzzle.dims.cols > PUZZLE_COLS;
+      rewardPuzzleTargetGrid.classList.toggle('reward-puzzle-4x4', isBig);
+      rewardPuzzleTrayTop.classList.toggle('reward-puzzle-4x4', isBig);
+      rewardPuzzleTrayBottom.classList.toggle('reward-puzzle-4x4', isBig);
       rewardPuzzleTargetGrid.innerHTML = '';
-      for (let i = 0; i < PUZZLE_TOTAL; i++) {
+      for (let i = 0; i < puzzleTotal; i++) {
         const slot = document.createElement('div');
         slot.className = 'reward-puzzle-tile reward-puzzle-target';
         slot.dataset.piece = 'cell-' + i;
@@ -1818,7 +1904,7 @@
       rewardPuzzleTargetGrid.hidden = false;
       levelReward.hidden = false;
 
-      const order = Array.from({ length: PUZZLE_TOTAL }, (_, i) => i);
+      const order = Array.from({ length: puzzleTotal }, (_, i) => i);
       for (let i = order.length - 1; i > 0; i--) { // 셔플
         const j = Math.floor(Math.random() * (i + 1));
         [order[i], order[j]] = [order[j], order[i]];
@@ -1828,12 +1914,12 @@
       rewardPuzzleTrayBottom.innerHTML = '';
       rewardPuzzleTrayTop.hidden = false;
       rewardPuzzleTrayBottom.hidden = false;
-      const half = PUZZLE_TOTAL / 2;
+      const half = puzzleTotal / 2;
       order.forEach((cellIndex, i) => {
         const piece = document.createElement('div');
         piece.className = 'reward-puzzle-tile reward-puzzle-piece';
         piece.dataset.cell = String(cellIndex);
-        piece.innerHTML = puzzleTileInnerSvg(art.emoji, cellIndex);
+        piece.innerHTML = puzzleTileInnerSvg(art.puzzleEmoji || art.emoji, cellIndex);
         wirePuzzlePieceDrag(piece, cellIndex);
         (i < half ? rewardPuzzleTrayTop : rewardPuzzleTrayBottom).appendChild(piece);
 
@@ -1882,7 +1968,9 @@
       // ② 완성 이미지를 정답 칸과 같은 자리(둘 다 CSS grid-area:1/1 — .level-reward의 grid가
       // 자동으로 겹쳐줌)에 투명하게 깔아둔 뒤, 정답 칸은 페이드아웃시키고 완성 이미지는
       // 페이드인시킨다. ①에서 이미 거의 같은 그림이 됐으니 이 크로스페이드는 짧게.
-      levelRewardArt.innerHTML = buildRewardSvg(art, cols, rows);
+      // 퍼즐을 다 푼 시점이므로(레벨1) 여기서부터는 변신된 모습(puzzleEmoji)으로 고정 표시.
+      const finishedArt = art.puzzleEmoji ? Object.assign({}, art, { emoji: art.puzzleEmoji }) : art;
+      levelRewardArt.innerHTML = buildRewardSvg(finishedArt, cols, rows);
       levelRewardArt.querySelectorAll('.reward-cell').forEach((el) => el.classList.add('is-active'));
       // reward-puzzle-clean: 칸 구분선 없이 깔끔한 한 장의 그림으로 보이게(밑에서 커지는
       // 동안에도 계속 유지해야 해서 이후 class를 바꿀 때도 계속 같이 붙여줌).
@@ -1994,7 +2082,7 @@
   function placePuzzlePiece(piece, cellIndex, targetSlotEl) {
     const art = LEVEL_REWARD_ART[currentLevel];
     if (targetSlotEl) {
-      targetSlotEl.innerHTML = puzzleTileInnerSvg(art.emoji, cellIndex);
+      targetSlotEl.innerHTML = puzzleTileInnerSvg(art.puzzleEmoji || art.emoji, cellIndex);
       targetSlotEl.classList.add('filled');
     }
     // 2026-08-17: "맞춰도 안 사라진다" 버그 원인 — 튀어나오는 연출(explodeIntoPuzzle)이
@@ -2007,7 +2095,7 @@
     if (rewardPuzzle) rewardPuzzle.solved.add(cellIndex);
     playPuzzleCorrectSfx();
     if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) { /* 무시 */ } }
-    if (rewardPuzzle && rewardPuzzle.solved.size >= PUZZLE_TOTAL) {
+    if (rewardPuzzle && rewardPuzzle.solved.size >= rewardPuzzle.dims.cols * rewardPuzzle.dims.rows) {
       const solvedLevel = rewardPuzzle.level;
       rewardPuzzleSolvedLevels.add(solvedLevel);
       markRewardPuzzleSolvedPersisted(solvedLevel);
@@ -3640,6 +3728,9 @@
         // 애니메이션 후 흡수" 요청 — playPictureCompletePraise() 참고.
         // 레벨 전체를 다 클리어한 순간엔 그대로 조각 맞추기 미니게임 → finishRewardPuzzle()이
         // 별도로 축하한다(여기서 미리 축하하지 않음, renderLevelGallery()의 maybeShowRewardPuzzle() 참고).
+        // 2026-08-21: 변신 영상은 그림 1장이 아니라 "레벨 전체 완료" 시점(레벨1=16개 다 완료)에
+        // goal 이미지 박스 안에서만 재생하는 것으로 확정 — maybeStartTemplateTransform은 더 이상
+        // 여기서 안 쓴다(finishRewardPuzzle 쪽에서 사용, 아래 참고). 함수 자체는 남겨둔다(재사용 가능).
         playPictureCompletePraise();
       }
     } else {
