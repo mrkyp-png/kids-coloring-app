@@ -1377,9 +1377,11 @@
     levelReward.classList.remove('reward-centered'); // 레벨1 중앙 이동 연출을 다른 레벨/재진입 시 원복.
     levelReward.style.transform = '';
     levelReward.style.transition = '';
-    // reserveTrayHeight가 미리 잡아둔 트레이 높이 예약을 다른 레벨/재진입 시 원복.
+    // reserveTrayHeight가 미리 잡아둔 트레이 높이 예약/중앙정렬 앵커를 다른 레벨/재진입 시 원복.
     rewardPuzzleTrayTop.style.minHeight = '';
     rewardPuzzleTrayBottom.style.minHeight = '';
+    rewardPuzzleTrayTop.classList.remove('reward-tray-anchor-top');
+    rewardPuzzleTrayBottom.classList.remove('reward-tray-anchor-bottom');
     levelRewardStage.style.transform = ''; // 레벨1 정면 확대 연출을 다른 레벨/재진입 시 원복.
     levelRewardStage.style.transition = '';
     if (isLevelCleared(level)) clearLevelAttempt(level); // 이미 클리어된 레벨은 타이머 불필요
@@ -1885,7 +1887,12 @@
       galleryGrid.hidden = true;
       galleryGrid.classList.remove('gallery-grid-hiding');
       reserveTrayHeight(rewardPuzzle.dims); // 트레이가 나중에 채워져도 더는 안 흔들리게 지금 미리 자리를 예약
-      levelReward.classList.add('reward-centered'); // margin-top/bottom:auto로 남는 공간에서 중앙 정렬
+      levelReward.classList.add('reward-centered');
+      // 2026-08-22(3차): 박스가 아니라 트레이 위/아래 끝에 margin:auto를 줘서, 남는 공간이
+      // 트레이-박스 사이가 아니라 (헤더~트레이) 바깥/(트레이~화면끝) 바깥으로 가게 한다 —
+      // 그래야 화면이 커도 트레이-박스-트레이가 항상 붙은 한 덩어리로 중앙에 온다.
+      rewardPuzzleTrayTop.classList.add('reward-tray-anchor-top');
+      rewardPuzzleTrayBottom.classList.add('reward-tray-anchor-bottom');
       const after = levelReward.getBoundingClientRect();
       levelReward.style.transform = 'translateY(' + (before.top - after.top) + 'px)';
       requestAnimationFrame(() => {

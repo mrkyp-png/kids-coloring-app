@@ -838,13 +838,16 @@ button:active { transform: scale(0.94); }
   display: flex;
   justify-content: center;
 }
-/* 2026-08-22: 레벨1 — 아이콘 목록이 사라진 뒤 남는 세로 공간에서 보상 박스를 가운데로
-   정렬한다. margin:auto는 트랜지션이 안 먹으므로(모션은 app.js moveRewardBoxToCenter가
-   FLIP 기법으로 별도 처리), 여기선 최종 위치만 정의한다. */
-.level-reward.reward-centered { margin-top: auto; margin-bottom: auto; }
-/* app.js moveRewardBoxToCenter가 이 자리를 찾은 뒤 곧바로 position:fixed로 고정하는데(인라인
-   top/left/width), 그때도 트레이 조각들 위에 확실히 그려지도록. */
-.level-reward.reward-centered { z-index: 40; }
+/* 2026-08-22(3차): "박스 위아래로 거대한 빈 공간" — 원인은 트레이 크기 계산이 아니라, 박스
+   하나에만 margin:auto를 줬던 것 자체였다. 화면(창)이 트레이+박스를 합친 실제 필요 높이보다
+   훨씬 크면, 남는 공간이 전부 박스 위/아래(=트레이와 박스 사이)로만 몰려서 이런 틈이 생김.
+   고정: margin:auto를 박스가 아니라 "트레이 위쪽 끝"과 "트레이 아래쪽 끝"으로 옮긴다 —
+   그러면 남는 공간은 전부 (헤더~트레이 위) 바깥쪽과 (트레이 아래~화면 끝) 바깥쪽으로만 가고,
+   트레이-박스-트레이 세 개는 화면 크기와 무관하게 항상 붙어있는 한 덩어리로 화면 중앙에
+   자리잡는다. */
+.level-reward.reward-centered { margin-top: 0; margin-bottom: 0; z-index: 40; }
+.reward-puzzle-tray.reward-tray-anchor-top { margin-top: auto; }
+.reward-puzzle-tray.reward-tray-anchor-bottom { margin-bottom: auto; }
 /* 2026-08-22: 모자이크/변신 영상/퍼즐 세 단계가 전부 이 정사각형 무대 하나를 공유한다 —
    "단계마다 그림 크기/위치가 튄다" 피드백으로, 각 단계가 저마다 다른 크기 공식을 쓰던 걸
    그만두고 여기 하나로 통일했다(art/video/target-grid 전부 width:100%;height:100%로 이
