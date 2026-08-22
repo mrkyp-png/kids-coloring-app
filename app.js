@@ -1798,7 +1798,14 @@
   // 2026-08-17: "Back으로 예전에 클리어한 레벨에 재진입하면 매번 다시 뜬다" 버그 수정 —
   // isRewardPuzzleSolvedPersisted(영구 기록)도 같이 확인한다.
   function maybeShowRewardPuzzle(level) {
-    if (rewardPuzzle && rewardPuzzle.level === level) return; // 이미 진행 중
+    // 2026-08-22: "16개 원형 아이콘이 자꾸 다시 생긴다" 신고 — openLevel()은 레벨 진입 때마다
+    // galleryGrid.hidden을 무조건 false로 되돌리는데, 이미 진행 중인 퍼즐이 있어(뒤로가기 후
+    // 재진입 등) 이 가드로 바로 return해버리면 그 아래 숨김 로직을 다시 안 타서 계속 보였다.
+    // 진행 중인 퍼즐이 있으면 여기서도 숨김을 다시 확인해준다.
+    if (rewardPuzzle && rewardPuzzle.level === level) {
+      galleryGrid.hidden = true;
+      return; // 이미 진행 중
+    }
     if (rewardPuzzleSolvedLevels.has(level) || isRewardPuzzleSolvedPersisted(level)) return; // 이미 다 품(이번 세션 또는 예전에)
     const list = getTemplatesForLevel(level);
     if (list.length === 0) return; // 아직 레벨이 선택 안 됐거나(level=undefined) 존재하지 않는 레벨
@@ -2344,8 +2351,10 @@
         piece.classList.remove('dragging');
         piece.style.left = '';
         piece.style.top = '';
-        piece.style.width = '';
-        piece.style.height = '';
+        // 2026-08-22: "실패하면 조각이 커진다" 신고 — width/height를 여기서 지우면 CSS 기본값
+        // (96px)으로 되돌아가는데, 실제 칸 크기(tileSize)는 화면마다 다를 수 있어(96px보다
+        // 작을 수도 클 수도 있음) 잘못된 크기로 보였다. 이 값은 pointerdown 때 이미 올바른
+        // 크기(rect.width/height)로 잡혀 있으니 그대로 둔다.
         rejectPuzzlePiece(piece);
       }
     });
