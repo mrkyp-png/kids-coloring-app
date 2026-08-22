@@ -5023,7 +5023,25 @@
   const isLocalPreview = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   if ('serviceWorker' in navigator && !isLocalPreview) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
+      navigator.serviceWorker.register('sw.js').then((reg) => {
+        // 2026-08-22: "업데이트가 너무 늦다, 저장공간을 통째로 지워야만 반영된다" 신고 —
+        // 브라우저가 새 sw.js를 찾으러 가는 걸 최대 24시간에 한 번으로 미뤄두는 정책이 있어서,
+        // 폰에서 앱을 며칠씩 켜둔 채로 두면 새 버전이 알아서 안 잡혔다. 페이지를 열 때/다시
+        // 화면에 보일 때마다 직접 업데이트를 확인하고, 새 버전이 활성화되면(controllerchange)
+        // 자동으로 한 번 새로고침해서 사용자가 캐시/데이터를 손으로 지울 필요가 없게 한다.
+        if (reg) {
+          reg.update().catch(() => {});
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') reg.update().catch(() => {});
+          });
+        }
+      }).catch(() => {});
+      let reloadedForUpdate = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (reloadedForUpdate) return;
+        reloadedForUpdate = true;
+        location.reload();
+      });
     });
   }
 })();
