@@ -1387,6 +1387,7 @@
     levelRewardStage.style.transform = ''; // 레벨1 정면 확대 연출을 다른 레벨/재진입 시 원복.
     levelRewardStage.style.transition = '';
     levelRewardStage.style.opacity = ''; // 확대+페이드 연출(zoomRewardToFullscreenAndAdvance) 원복.
+    levelRewardStage.style.filter = ''; // 확대+블러 연출 원복.
     // 2026-08-22: "퍼즐이 3줄로 밀리고 박스가 안 돌아온다" 신고 — 변신 영상 재생 중(약 10초)에
     // 뒤로 갔다가 같은 레벨로 재진입하면, 예전 영상이 배경에서 계속 재생되다 나중에 끝나며
     // onended가 그 시점의(이미 새로 시작된) 화면 위에 뒤늦게 퍼즐을 다시 만들어버려 상태가
@@ -1642,9 +1643,12 @@
       train: TRAIN_INLINE, racingcar: RACINGCAR_INLINE, scooter: SCOOTER_INLINE,
       helicopter: HELICOPTER_INLINE,
     };
+    // 2026-08-22: 퍼즐 조각용(sheep-final.png)은 검정 배경이 필요하지만(투명하면 조각 사이
+    // 빈 공간이 비쳐 보이는 버그가 있었음), 완성 그림을 통째로 보여줄 땐(여기) 그 검정이 그대로
+    // 남아 "검정 배경이 안 없어진다"로 보였다 — 이 용도로는 투명배경 버전을 따로 쓴다.
     const base = INLINE_BY_EMOJI[art.emoji] ||
       (art.emoji === 'sheep-robot'
-        ? '<image class="reward-emoji-img" href="assets/transform/sheep-final.png" x="0" y="0" width="100" height="100"/>'
+        ? '<image class="reward-emoji-img" href="assets/transform/sheep-final-transparent.png" x="0" y="0" width="100" height="100"/>'
         : '<image class="reward-emoji-img" href="assets/emoji/' + art.emoji + '.svg" x="0" y="0" width="100" height="100"/>');
     // 2026-08-17: "스피드선은 이미지 뒤에 나와야" 요청 — 스피드선류(바퀴 달린 탈것)는 차체보다
     // 먼저(=아래) 그려서 차체가 그 위에 겹쳐 보이게 한다. 나머지 장식은 원래대로 위에.
@@ -2001,11 +2005,13 @@
     // (#level-reward-praise)가 일반 flex 항목이라, 안 보이다가 나타나는 순간 레이아웃이
     // 밀리면서 이 박스 위치가 같이 흔들렸다. 소리만 내고 문구는 띄우지 않는다(true=skipVisual).
     playExcellent(true);
-    // 2026-08-22: "커지면서 희미해지게" 요청 — 확대와 함께 서서히 투명해지다가 다음 레벨로 넘어감.
-    levelRewardStage.style.transition = 'transform 1.1s cubic-bezier(0.45, 0, 0.4, 1), opacity 1.1s ease-in';
+    // 2026-08-22: "커지면서 희미해지게" + "클로즈샷 흐리게" 요청 — 확대와 함께 서서히
+    // 투명해지고 블러(초점이 나가는 느낌)되다가 다음 레벨로 넘어감.
+    levelRewardStage.style.transition = 'transform 1.1s cubic-bezier(0.45, 0, 0.4, 1), opacity 1.1s ease-in, filter 1.1s ease-in';
     requestAnimationFrame(() => {
       levelRewardStage.style.transform = 'scale(' + scale.toFixed(2) + ')';
       levelRewardStage.style.opacity = '0';
+      levelRewardStage.style.filter = 'blur(20px)';
     });
     setTimeout(() => {
       if (currentLevel !== level) { console.log('[퍼즐] 확대 완료 시점에 레벨 불일치, 다음 레벨 이동 안 함'); return; }
@@ -2307,6 +2313,7 @@
   function finishRewardPuzzle(level) {
     console.log('[퍼즐] finishRewardPuzzle 시작(레벨' + level + ') — 칸 선 사라짐 → 완성 이미지 크로스페이드');
     btnPuzzleMagnify.hidden = true; // 다 맞췄으니 미리보기 버튼은 필요 없음
+    levelRewardStageBg.classList.remove('is-dark'); // 퍼즐 완료 시 검정 배경 원복(요청).
     const art = LEVEL_REWARD_ART[level];
     const transformVideo = LEVEL_TRANSFORM_VIDEO[level];
     const total = getTemplatesForLevel(level).length;
