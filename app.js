@@ -2425,6 +2425,16 @@
         rejectPuzzlePiece(piece);
       }
     });
+    // 2026-08-22: "조각이 트레이 밖 엉뚱한 자리에 혼자 떨어져 있다" 신고 — pointerup만 처리하고
+    // 있었는데, 알림 내려오기/화면 전환 등으로 브라우저가 드래그를 pointerup 없이
+    // pointercancel로 끊어버리는 경우가 있다. 그러면 position:fixed로 마지막 좌표에 그대로
+    // 멈춘 채(dragging 클래스도 안 지워짐) 영원히 트레이로 안 돌아왔다 — 같은 방식으로 정리.
+    piece.addEventListener('pointercancel', () => {
+      if (!piece.classList.contains('dragging')) return;
+      piece.classList.remove('dragging');
+      piece.style.left = '';
+      piece.style.top = '';
+    });
   }
 
   function placePuzzlePiece(piece, cellIndex, targetSlotEl) {
