@@ -472,6 +472,22 @@ button:active { transform: scale(0.94); }
 .level-header-mid .coloring-title { font-size: 1.3rem; }
 .level-header-mid .subtitle { font-size: 0.85rem; margin-top: 2px; }
 .icon-btn-spacer { width: 56px; height: 56px; flex: 0 0 auto; }
+/* 2026-08-22: 퍼즐 미리보기 버튼 — 제목 바로 옆에 붙인다(위치는 임시, 추후 조정 예정). */
+.level-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.level-magnify-btn {
+  padding: 0;
+  overflow: hidden; /* 안의 이미지가 원형 밖으로 안 삐져나가게 */
+}
+.level-magnify-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 
 /* ---------- 레벨 지도 ---------- */
 /* 2026-08-16: "레벨 1~10이 스크롤 없이 한 화면에" 요청으로 2열×5행 고정 + overflow:hidden이었음.
@@ -551,6 +567,48 @@ button:active { transform: scale(0.94); }
   position: relative;
   width: 45%; /* .map-grid(PC에서도 420px 고정) 기준 — vw였다가 PC에서 비율 깨지던 버그 수정 */
   container-type: inline-size; /* 아래 .lv-curve-label의 cqw가 이 30% 폭을 기준으로 계산되게 */
+}
+/* 2026-08-22: "탭하면 바로 들어가던 것" → "원 밖 링이 다 찰 때까지 눌러야 들어감" 요청 —
+   중앙 원 바깥을 감싸는 진행 링. 평소엔 완전히 빈 채로 숨어있다가, 누르는 동안(.lv-charging)
+   700ms에 걸쳐 시계방향으로 꽉 찬다. 중간에 손을 떼면(클래스 제거) 그 자리에서부터 스르륵
+   되감긴다 — 기본 규칙의 0.3s가 "취소 시 되감기 속도", .lv-charging 규칙의 700ms가
+   "채워지는 속도"라 트랜지션 지속시간이 상황마다 달라짐.
+   viewBox 100 기준 r=47 원의 둘레(2πr ≈ 295.3)를 stroke-dasharray/dashoffset에 그대로 씀. */
+.lv-hold-ring {
+  position: absolute;
+  inset: -8%;
+  pointer-events: none;
+  transform: rotate(-90deg); /* 12시 방향에서 시작해 시계방향으로 채워지게 */
+}
+.lv-hold-ring circle { fill: none; stroke-width: 5; }
+.lv-hold-ring-track { stroke: rgba(0, 0, 0, 0.08); }
+.lv-hold-ring-fill {
+  stroke: var(--lv-bezel, #7C6FEA);
+  stroke-linecap: round;
+  stroke-dasharray: 295.3;
+  stroke-dashoffset: 295.3;
+  transition: stroke-dashoffset 0.3s ease;
+}
+.lv-circle-stage.lv-charging .lv-hold-ring-fill {
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 700ms linear;
+}
+/* 채워지는 동안 링이 두근거리듯 밝기가 맥동하고, 원도 눌린 채(5px, 기존 키캡 눌림과 동일)로
+   아주 살짝 숨쉬듯 커졌다 작아졌다 — "충전 중"이라는 느낌을 손맛+시각 둘 다로 준다. */
+.lv-charging .lv-hold-ring-fill { animation: lv-hold-pulse 0.35s ease-in-out infinite; }
+.lv-circle-stage.lv-charging .lv-circle { animation: lv-hold-breathe 0.35s ease-in-out infinite; }
+@keyframes lv-hold-pulse {
+  0%, 100% { stroke-opacity: 0.65; }
+  50% { stroke-opacity: 1; }
+}
+@keyframes lv-hold-breathe {
+  0%, 100% { transform: translateY(5px) scale(1); }
+  50% { transform: translateY(5px) scale(1.025); }
+}
+/* 링이 차는 트랜지션 자체는 "다 찼는지"를 판단하는 신호(app.js transitionend)라 기능상
+   필요 — reduced-motion에서도 유지하고, 순수 장식용 맥동/숨쉬기만 끈다. */
+@media (prefers-reduced-motion: reduce) {
+  .lv-charging .lv-hold-ring-fill, .lv-circle-stage.lv-charging .lv-circle { animation: none; }
 }
 .lv-curve-label {
   display: none; /* 2026-08-21(15): "카테고리 글자는 일단 없애고" 요청 — 임시로 숨김 */
@@ -784,6 +842,9 @@ button:active { transform: scale(0.94); }
    정렬한다. margin:auto는 트랜지션이 안 먹으므로(모션은 app.js moveRewardBoxToCenter가
    FLIP 기법으로 별도 처리), 여기선 최종 위치만 정의한다. */
 .level-reward.reward-centered { margin-top: auto; margin-bottom: auto; }
+/* app.js moveRewardBoxToCenter가 이 자리를 찾은 뒤 곧바로 position:fixed로 고정하는데(인라인
+   top/left/width), 그때도 트레이 조각들 위에 확실히 그려지도록. */
+.level-reward.reward-centered { z-index: 40; }
 /* 2026-08-22: 모자이크/변신 영상/퍼즐 세 단계가 전부 이 정사각형 무대 하나를 공유한다 —
    "단계마다 그림 크기/위치가 튄다" 피드백으로, 각 단계가 저마다 다른 크기 공식을 쓰던 걸
    그만두고 여기 하나로 통일했다(art/video/target-grid 전부 width:100%;height:100%로 이

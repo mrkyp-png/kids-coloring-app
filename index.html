@@ -129,7 +129,16 @@
   <header class="coloring-header">
     <button id="btn-map-back" class="icon-btn" aria-label="Back to map">⬅️</button>
     <div class="level-header-mid">
-      <h1 id="level-title" class="coloring-title"></h1>
+      <div class="level-title-row">
+        <h1 id="level-title" class="coloring-title"></h1>
+        <!-- 2026-08-22: "퍼즐할 때 완성 그림을 크게 볼 수 있게" 요청 — 퍼즐 조각 맞추는 동안만
+             보이는 버튼. 기존 goal 이미지 확대 모달(#goal-zoom-modal)을 그대로 재사용한다.
+             돋보기 아이콘은 안 예뻐서 대신 완성 그림 자체를 작은 원형 썸네일로 보여준다
+             (src는 app.js가 레벨별로 채움). -->
+        <button id="btn-puzzle-magnify" class="icon-btn icon-btn-sm level-magnify-btn" type="button" hidden aria-label="Preview finished picture" data-i18n-aria-label="puzzle.previewLabel">
+          <img id="btn-puzzle-magnify-img" src="" alt="">
+        </button>
+      </div>
       <p id="level-progress" class="subtitle"></p>
       <span id="level-next-text" class="level-timer-text" hidden></span>
     </div>

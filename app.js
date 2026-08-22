@@ -163,6 +163,8 @@
   const levelRewardStageBg = document.getElementById('level-reward-stage-bg');
   const levelRewardVideo = document.getElementById('level-reward-video');
   const btnMapBack = document.getElementById('btn-map-back');
+  const btnPuzzleMagnify = document.getElementById('btn-puzzle-magnify');
+  const btnPuzzleMagnifyImg = document.getElementById('btn-puzzle-magnify-img');
   const levelTitle = document.getElementById('level-title');
   const levelProgress = document.getElementById('level-progress');
   const levelNextText = document.getElementById('level-next-text');
@@ -266,6 +268,20 @@
   });
   goalZoomModal.addEventListener('click', () => {
     goalZoomModal.hidden = true;
+  });
+
+  // 2026-08-22: "퍼즐할 때 완성 그림을 크게 볼 수 있게" 요청 — 위 goal 이미지 확대와 같은
+  // 모달을 재사용, 대신 canvas에 그리는 이미지만 그 레벨의 완성(퍼즐) 이미지로 바꾼다.
+  btnPuzzleMagnify.addEventListener('click', () => {
+    const href = btnPuzzleMagnifyImg.getAttribute('src');
+    if (!href) return;
+    const img = new Image();
+    img.onload = () => {
+      goalZoomCtx.clearRect(0, 0, WORK_SIZE, WORK_SIZE);
+      goalZoomCtx.drawImage(img, 0, 0, WORK_SIZE, WORK_SIZE);
+      goalZoomModal.hidden = false;
+    };
+    img.src = href;
   });
 
   let wallMask = null; // Uint8Array WORK_SIZE*WORK_SIZE, 1 = 벽(선), 0 = 칠할 수 있음
@@ -1071,6 +1087,14 @@
       escapeHtml('카테고리' + lv) + '</textPath></text>' +
       '</svg>';
     stage.appendChild(buildLevelCircle(lv, scores, false));
+    // 2026-08-22: "누르면 원 밖으로 링이 360도 다 돌면 진입" 요청 — 중앙 원에만(미리보기 원엔
+    // 안 붙임) 진행 링을 얹는다. 채우기/되감기 동작은 순수 CSS 트랜지션(style.css .lv-hold-ring*)
+    // 이 담당하고, 여기선 마크업만 만든다.
+    stage.insertAdjacentHTML('beforeend',
+      '<svg class="lv-hold-ring" viewBox="0 0 100 100" aria-hidden="true">' +
+      '<circle class="lv-hold-ring-track" cx="50" cy="50" r="47"/>' +
+      '<circle class="lv-hold-ring-fill" cx="50" cy="50" r="47"/>' +
+      '</svg>');
 
     if (unlocked) {
       const progress = document.createElement('div');
@@ -1182,8 +1206,48 @@
   // 2026-08-21(7): "오로지 중앙에 있는 원이 움직여야 바뀌게, 작은 원은 터치해도 안 움직이게"
   // 요청 — 드래그 시작점이 중앙 원(.lv-circle-stage) 안이 아니면(위/아래 미리보기 원이나
   // 빈 공간에서 시작했으면) 아예 드래그로 안 침, 즉 아무 반응 없음.
+  // 2026-08-22: "탭하면 바로 들어가던 것" → "원 밖 링이 다 찰 때까지 눌러야 들어감" 요청 —
+  // 700ms(style.css .lv-hold-ring-fill.lv-charging 트랜지션 시간) 누르고 있으면 링이 다 차면서
+  // 레벨에 들어가고, 그 전에 손을 떼거나 스와이프로 바뀌면 취소(안 들어감)된다. 진동도 같이:
+  // 처음엔 느긋하게, 다 찰수록 촘촘하게.
   (function setupMapCarousel() {
     let dragging = false, startY = 0, moved = false, downCircle = null;
+    let holdCircle = null, holdRing = null;
+    function onHoldFillTransitionEnd(e) {
+      if (e.propertyName !== 'stroke-dashoffset' || !holdCircle) return;
+      const stage = holdCircle.parentElement;
+      if (!stage || !stage.classList.contains('lv-charging')) return; // 취소 되감기가 끝난 것 — 무시
+      // 다 찼다 — 진입 성공. 완성 임팩트로 짧고 강한 진동 한 번, 링/펄스 정리 후 실제로 입장.
+      const circle = holdCircle;
+      cancelHoldVisuals();
+      if (navigator.vibrate) { try { navigator.vibrate([0, 60]); } catch (err) { /* 무시 */ } }
+      circle.click();
+    }
+    function cancelHoldVisuals() {
+      if (!holdCircle) return;
+      holdCircle.parentElement.classList.remove('lv-charging');
+      if (holdRing) holdRing.removeEventListener('transitionend', onHoldFillTransitionEnd);
+      holdCircle = null;
+      holdRing = null;
+    }
+    function startHold(circle) {
+      const stage = circle.parentElement;
+      const ring = stage.querySelector('.lv-hold-ring-fill');
+      if (!ring) return;
+      holdCircle = circle;
+      holdRing = ring;
+      ring.addEventListener('transitionend', onHoldFillTransitionEnd);
+      stage.classList.add('lv-charging'); // CSS 트랜지션(700ms linear)이 링을 채움
+      if (navigator.vibrate) {
+        // 초반엔 느슨하게, 완성 직전엔 촘촘하게 — 700ms 안에 대략 맞춰지는 고정 패턴.
+        try { navigator.vibrate([40, 60, 40, 55, 45, 45, 45, 35, 50, 25, 55, 15, 60]); } catch (err) { /* 무시 */ }
+      }
+    }
+    function cancelHold() {
+      if (!holdCircle) return;
+      cancelHoldVisuals();
+      if (navigator.vibrate) { try { navigator.vibrate(0); } catch (err) { /* 무시 */ } }
+    }
     mapGrid.addEventListener('pointerdown', (e) => {
       if (!e.target.closest('.lv-circle-stage')) return;
       // 터치에서 브라우저가 나중에 따로 합성해서 쏘는 호환용 click을 막는다 — 안 막으면
@@ -1203,7 +1267,11 @@
       // :active는 터치에서 원래도 불안정한데, 위 pointerdown의 preventDefault()가 그 활성화
       // 자체를 막아버려서 폰에서는 아예 안 뜨게 된 것. :active에 기대는 대신 직접 클래스를
       // 붙였다 떼서 CSS 눌림 효과를 확실하게 재현한다.
-      if (downCircle) downCircle.classList.add('lv-pressed');
+      if (downCircle) {
+        downCircle.classList.add('lv-pressed');
+        // 잠긴 원은 눌러도 어차피 안 들어가지므로(클릭 리스너 자체가 없음) 링을 안 채운다.
+        if (!downCircle.classList.contains('locked')) startHold(downCircle);
+      }
       mapGrid.setPointerCapture(e.pointerId);
     });
     // pointerdown의 preventDefault만으로는 터치용 호환 click 합성이 안 막혀서(실측 확인),
@@ -1214,7 +1282,10 @@
     }, { passive: false });
     mapGrid.addEventListener('pointermove', (e) => {
       if (!dragging) return;
-      if (Math.abs(e.clientY - startY) > 4) moved = true;
+      if (Math.abs(e.clientY - startY) > 4) {
+        if (!moved) cancelHold(); // 손가락이 움직이기 시작하면(스와이프로 판단) 채우던 링은 취소
+        moved = true;
+      }
     });
     function endDrag(e) {
       if (!dragging) return;
@@ -1230,10 +1301,10 @@
         else if (dy >= STEP_THRESHOLD) mapCarouselIndex = (mapCarouselIndex - 1 + n) % n;
         else return; // 살짝만 끌었으면 안 넘김
         renderCarouselSlots();
-      } else if (downCircle) {
-        // pointer capture 부작용으로 네이티브 click은 mapGrid 자신에게만 가서 원 버튼의
-        // openLevel 리스너에 안 닿는다 — 눌렀던 원을 직접 클릭시켜 우회.
-        downCircle.click();
+      } else {
+        // 링이 다 차기 전에 손을 뗐으면 취소(안 들어감) — 이미 다 차서 onHoldFillTransitionEnd가
+        // 알아서 입장까지 끝냈다면 holdCircle이 비어있어 여기선 조용히 아무 일도 안 함.
+        cancelHold();
       }
     }
     mapGrid.addEventListener('pointerup', endDrag);
@@ -1300,10 +1371,17 @@
     currentLevel = level;
     galleryGrid.hidden = false; // 퍼즐 미니게임 중 숨겼던 도안 목록을 새 레벨 진입 시 복원.
     galleryGrid.classList.remove('gallery-grid-hiding');
+    btnPuzzleMagnify.hidden = true; // 퍼즐 미리보기 버튼도 새 레벨 진입 시 원복(explodeIntoPuzzle이 다시 켬).
     levelRewardStageBg.classList.remove('is-dark'); // 레벨1 변신 연출용 검정 배경을 다른 레벨/재진입 시 원복.
     levelReward.classList.remove('reward-centered'); // 레벨1 중앙 이동 연출을 다른 레벨/재진입 시 원복.
     levelReward.style.transform = '';
     levelReward.style.transition = '';
+    // moveRewardBoxToCenter가 고정해둔 position:fixed 관련 값들 원복.
+    levelReward.style.position = '';
+    levelReward.style.top = '';
+    levelReward.style.left = '';
+    levelReward.style.width = '';
+    levelReward.style.margin = '';
     levelRewardStage.style.transform = ''; // 레벨1 정면 확대 연출을 다른 레벨/재진입 시 원복.
     levelRewardStage.style.transition = '';
     if (isLevelCleared(level)) clearLevelAttempt(level); // 이미 클리어된 레벨은 타이머 불필요
@@ -1734,6 +1812,16 @@
       dims: dims,
       edges: (dims.cols === PUZZLE_COLS && dims.rows === PUZZLE_ROWS) ? PUZZLE_EDGES : buildPuzzleJigEdges(dims.cols, dims.rows),
     };
+    // 2026-08-22: "퍼즐 조각이 잠깐 깨진 것처럼 보인다"(사용자 폰 실측) — 원인은 16조각이
+    // 전부 같은 큰 이미지(양로봇 최종 프레임)를 각자 자기 <image>로 불러오는데, 실제로 퍼즐이
+    // 터지는 시점(영상 재생 등으로 10초 이상 뒤)까지 브라우저가 아직 안 불러와 두면 처음
+    // 몇 프레임 비어 보이거나 깨져 보임. 지금(퍼즐 흐름이 막 시작되는 시점, 훨씬 이른 시점)
+    // 미리 한 번 디코딩해두면 실제 퍼즐이 나올 땐 이미 캐시에 있어 이 문제가 없어진다.
+    const art0 = LEVEL_REWARD_ART[level];
+    if (art0 && art0.puzzleEmoji === 'sheep-robot') {
+      const preload = new Image();
+      preload.src = 'assets/transform/sheep-final.png';
+    }
     const transformVideo = LEVEL_TRANSFORM_VIDEO[level];
     // 2026-08-22: "퍼즐 진행 중~다음 레벨로 넘어가기 전까지 도안 아이콘 목록은 안 보이게" 요청 —
     // 퍼즐 박스에 화면 공간을 더 주기 위해 숨긴다. 다시 보이는 시점은 openLevel()(다음/뒤로가기로
@@ -1781,6 +1869,18 @@
         levelReward.style.transform = '';
         setTimeout(() => {
           levelReward.style.transition = '';
+          // 2026-08-22: "퍼즐칸이 나타나면 박스가 아래로 밀린다" 제보 — 원인은 margin:auto가
+          // 아니라 앞에 있는 형제(#reward-puzzle-tray-top)가 나중에(explodeIntoPuzzle) 실제
+          // 조각으로 채워지며 키가 커지는 것 — margin을 고정해도 앞 형제가 커지면 뒤에 오는
+          // 이 박스는 그만큼 같이 밀려난다. 지금(트레이가 비어서 위치가 정확한 이 시점) 뷰포트
+          // 기준 좌표를 읽어 position:fixed로 완전히 박아버리면, 문서 흐름 자체에서 벗어나
+          // 있어서 트레이가 나중에 커져도 전혀 영향을 안 받는다.
+          const rect = levelReward.getBoundingClientRect();
+          levelReward.style.position = 'fixed';
+          levelReward.style.top = rect.top + 'px';
+          levelReward.style.left = rect.left + 'px';
+          levelReward.style.width = rect.width + 'px';
+          levelReward.style.margin = '0';
           onDone();
         }, 550);
       });
@@ -1987,6 +2087,11 @@
   function explodeIntoPuzzle(level) {
     if (currentLevel !== level) return; // 그 사이 다른 레벨로 이동했으면 건너뜀
     const art = LEVEL_REWARD_ART[level];
+    // 퍼즐 미리보기 버튼: 이 레벨의 완성 이미지를 썸네일/모달 소스로 채우고 보여준다.
+    const puzzleEmoji = art.puzzleEmoji || art.emoji;
+    const puzzleImgHref = puzzleEmoji === 'sheep-robot' ? 'assets/transform/sheep-final.png' : 'assets/emoji/' + puzzleEmoji + '.svg';
+    btnPuzzleMagnifyImg.src = puzzleImgHref;
+    btnPuzzleMagnify.hidden = false;
     const puzzleTotal = rewardPuzzle.dims.cols * rewardPuzzle.dims.rows;
     const centerRect = levelRewardArt.getBoundingClientRect();
     const centerX = centerRect.left + centerRect.width / 2;
@@ -2063,6 +2168,7 @@
   // playExcellent/showLevelClearPraise 재활용)를 재생. "다음" 버튼은 애니메이션을 기다리지
   // 않고 즉시 열림(다른 레벨들과 동일).
   function finishRewardPuzzle(level) {
+    btnPuzzleMagnify.hidden = true; // 다 맞췄으니 미리보기 버튼은 필요 없음
     const art = LEVEL_REWARD_ART[level];
     const transformVideo = LEVEL_TRANSFORM_VIDEO[level];
     const total = getTemplatesForLevel(level).length;
