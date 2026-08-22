@@ -1859,20 +1859,18 @@
   function reserveTrayHeight(dims) {
     const total = dims.cols * dims.rows;
     const half = Math.ceil(total / 2);
-    const tileSize = levelRewardStage.getBoundingClientRect().width / dims.cols;
+    const rows = Math.ceil(half / dims.cols); // 트레이는 무대보다 항상 넓거나 같아 열 개수만큼은 한 줄에 들어간다고 가정
     const gap = 8;
     rewardPuzzleTrayTop.hidden = false;
     rewardPuzzleTrayBottom.hidden = false;
-    // 2026-08-22: "박스 위아래로 빈 공간이 크게 뜬다" 제보 — 트레이 실측 폭으로 한 줄에 몇 개
-    // 들어가는지 계산했는데, 특정 기기/타이밍에서 그 실측값이 비정상적으로 작게 잡히면(0에
-    // 가까우면) 한 줄에 1개만 들어간다고 착각해 실제로는 2줄이면 될 걸 8줄 높이만큼 예약해서
-    // 거대한 빈 칸이 생겼다. 트레이는 무대(폭 최대 320px)보다 항상 넓거나 같으므로, 실측 대신
-    // "무대와 같은 열 개수만큼은 한 줄에 들어간다"는 안전한 가정으로 계산한다.
-    const perRow = dims.cols;
-    const rows = Math.ceil(half / perRow);
-    const height = rows * tileSize + (rows - 1) * gap;
-    rewardPuzzleTrayTop.style.minHeight = height + 'px';
-    rewardPuzzleTrayBottom.style.minHeight = height + 'px';
+    // 2026-08-22(2차): "박스 위아래로 빈 공간이 크게 뜬다"가 기기를 바꿔도 재현됨 —
+    // levelRewardStage.getBoundingClientRect()로 실측한 값이 그 순간 아직 신뢰할 수 없을 때가
+    // 있었던 걸로 보인다(원인을 확정하진 못함). 아예 실측을 빼고, .level-reward-stage의 폭
+    // 공식(min(78vw,320px))을 그대로 CSS calc()에 재사용해서 브라우저가 직접 계산하게 한다 —
+    // JS 쪽 측정 타이밍 문제 자체가 있을 수 없다.
+    const height = 'calc(min(78vw, 320px) / ' + dims.cols + ' * ' + rows + ' + ' + ((rows - 1) * gap) + 'px)';
+    rewardPuzzleTrayTop.style.minHeight = height;
+    rewardPuzzleTrayBottom.style.minHeight = height;
   }
 
   // 2026-08-22: 레벨1 전용 — 변신 시작 직전, 아이콘 목록을 아래로 슬라이드시켜 치우고 그
