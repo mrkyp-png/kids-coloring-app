@@ -146,9 +146,15 @@
        실제 이모지 그림이 드러나고, 다 채워지면 완성 연출이 재생된다(레벨1~10 전부 적용). -->
   <div id="level-reward" class="level-reward" hidden aria-hidden="true">
     <svg id="level-reward-art" class="level-reward-art"></svg>
-    <!-- 2026-08-21: 레벨을 다 깨면(레벨1=16개) 조각을 다시 흩뿌리기 전, 이 자리에서 변신 영상이
-         한 번 재생된다(sheep→robot). goal 이미지 박스 밖으로는 절대 안 나감. -->
-    <video id="level-reward-video" class="level-reward-video" muted playsinline hidden></video>
+    <!-- 2026-08-22: 레벨을 다 깨면(레벨1=16개) 조각을 다시 흩뿌리기 전, 이 자리에서 변신
+         연출이 한 번 재생된다(sheep→robot). 영상 파일 대신 이미지 2장의 CSS 크로스페이드 —
+         AI 영상 생성이 만든 검정 배경을 지우려던 시도(컬러키/AI 배경제거)가 전부 지저분하거나
+         너무 느려서, 애초에 배경이 필요 없는 방식으로 바꿨다. goal 이미지 박스 밖으로는 안 나감. -->
+    <div id="level-reward-transform" class="level-reward-transform" hidden>
+      <img id="level-reward-transform-before" class="level-reward-transform-img">
+      <img id="level-reward-transform-after" class="level-reward-transform-img">
+      <div class="level-reward-transform-sparkle" aria-hidden="true">✨</div>
+    </div>
     <!-- 2026-08-16: 조각 맞추기 미니게임 진행 중에만 보임(그 외엔 위 svg를 씀) — 정답 칸을
          트레이 조각과 완전히 같은 정사각형 타일(.reward-puzzle-tile)로 만들어서 크기를
          정확히 맞춘다. -->

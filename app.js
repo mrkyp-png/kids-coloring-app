@@ -159,7 +159,9 @@
   const rewardPuzzleTrayBottom = document.getElementById('reward-puzzle-tray-bottom');
   const rewardPuzzleTargetGrid = document.getElementById('reward-puzzle-target-grid');
   // 2026-08-21: 레벨1(동물)이 16개 다 완료됐을 때 goal 이미지 박스 안에서 재생되는 변신 영상.
-  const levelRewardVideo = document.getElementById('level-reward-video');
+  const levelRewardTransform = document.getElementById('level-reward-transform');
+  const levelRewardTransformBefore = document.getElementById('level-reward-transform-before');
+  const levelRewardTransformAfter = document.getElementById('level-reward-transform-after');
   const btnMapBack = document.getElementById('btn-map-back');
   const levelTitle = document.getElementById('level-title');
   const levelProgress = document.getElementById('level-progress');
@@ -1686,8 +1688,11 @@
   function puzzleDimsForLevel(level) {
     return level === 1 ? { cols: 4, rows: 4 } : { cols: PUZZLE_COLS, rows: PUZZLE_ROWS };
   }
-  // 레벨1처럼 완료 시 goal 박스 안에서 변신 영상이 먼저 재생된 뒤 그 마지막 프레임이 퍼즐이 되는 레벨.
-  const LEVEL_TRANSFORM_VIDEO = { 1: 'assets/transform/sheep.mp4' };
+  // 레벨1처럼 완료 시 goal 박스 안에서 변신 연출(이미지 2장 크로스페이드)이 먼저 재생된 뒤
+  // 그 "이후" 이미지가 퍼즐이 되는 레벨. 3600ms는 style.css의 크로스페이드 애니메이션 총 길이와
+  // 맞춰야 한다(reward-transform-fade-out/-in/-sparkle 참고).
+  const LEVEL_TRANSFORM_IMAGES = { 1: { before: 'assets/emoji/sheep.svg', after: 'assets/transform/sheep-final.png' } };
+  const LEVEL_TRANSFORM_DURATION_MS = 3600;
   let rewardPuzzle = null; // { level, solved: Set<number>, dims: {cols,rows}, edges }
   // 이번 세션에 이미 다 맞춘 레벨(다시 들어가도 매번 또 안 뜨게) — 세션 한정 캐시일 뿐, 진짜
   // 영구 기록은 REWARD_PUZZLE_SOLVED_KEY(localStorage)에 있다(아래 maybeShowRewardPuzzle 참고).
@@ -1730,29 +1735,28 @@
       levelRewardArt.classList.add('reward-puzzle-clean');
     }, 450);
     setTimeout(() => levelRewardArt.classList.add('reward-puzzle-shrink'), 700);
-    const videoSrc = LEVEL_TRANSFORM_VIDEO[level];
-    if (videoSrc) {
-      setTimeout(() => playLevelTransformVideo(level, videoSrc), 1300);
+    const transformImages = LEVEL_TRANSFORM_IMAGES[level];
+    if (transformImages) {
+      setTimeout(() => playLevelTransform(level, transformImages), 1300);
     } else {
       setTimeout(() => explodeIntoPuzzle(level), 1300);
     }
   }
 
   // 레벨1: goal 이미지 박스(levelRewardArt와 정확히 같은 자리, CSS grid-area 공유) 안에서만
-  // 변신 영상을 재생하고, 끝나면(또는 자동재생이 막히면) 그대로 조각 맞추기로 넘어간다.
-  function playLevelTransformVideo(level, src) {
+  // 변신 연출(이미지 2장 크로스페이드, style.css의 reward-transform-* 애니메이션)을 재생하고,
+  // 끝나면 그대로 조각 맞추기로 넘어간다.
+  function playLevelTransform(level, images) {
     if (currentLevel !== level) return;
     levelRewardArt.hidden = true;
-    levelRewardVideo.src = src;
-    levelRewardVideo.currentTime = 0;
-    levelRewardVideo.hidden = false;
-    const proceed = () => {
-      levelRewardVideo.hidden = true;
+    levelRewardTransformBefore.src = images.before;
+    levelRewardTransformAfter.src = images.after;
+    levelRewardTransform.hidden = false;
+    setTimeout(() => {
+      levelRewardTransform.hidden = true;
       levelRewardArt.hidden = false;
       explodeIntoPuzzle(level);
-    };
-    levelRewardVideo.onended = proceed;
-    levelRewardVideo.play().catch(proceed);
+    }, LEVEL_TRANSFORM_DURATION_MS);
   }
 
   function puzzleCellRect(i) {
