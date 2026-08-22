@@ -931,8 +931,13 @@ button:active { transform: scale(0.94); }
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
-  padding: 0 16px;
+  gap: 6px;
+  /* 2026-08-22: "8개가 2줄로 안 들어가고 3줄로 밀린다" 신고 — 조각 4개(=칸 크기 그대로)가
+     한 줄에 들어가려면 필요한 폭(4×타일+간격)과 이 트레이가 실제로 가진 폭(바깥
+     .screen 컨테이너 padding+이 padding을 뺀 나머지) 사이 여유가 좁은 화면에서는 몇 px밖에
+     안 남아, 스크롤바/노치 등 아주 작은 차이로도 3줄로 밀렸다. 좌우 padding을 줄여 여유를
+     넉넉히 둔다. */
+  padding: 0 4px;
 }
 #reward-puzzle-tray-top { margin-bottom: -24px; }
 /* 아래쪽은 .level-reward 자체에 이미 margin-bottom:28px가 있어서(보상 이미지 아래 콘텐츠와의

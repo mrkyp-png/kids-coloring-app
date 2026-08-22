@@ -1384,6 +1384,14 @@
     rewardPuzzleTrayBottom.classList.remove('reward-tray-anchor-bottom');
     levelRewardStage.style.transform = ''; // 레벨1 정면 확대 연출을 다른 레벨/재진입 시 원복.
     levelRewardStage.style.transition = '';
+    // 2026-08-22: "퍼즐이 3줄로 밀리고 박스가 안 돌아온다" 신고 — 변신 영상 재생 중(약 10초)에
+    // 뒤로 갔다가 같은 레벨로 재진입하면, 예전 영상이 배경에서 계속 재생되다 나중에 끝나며
+    // onended가 그 시점의(이미 새로 시작된) 화면 위에 뒤늦게 퍼즐을 다시 만들어버려 상태가
+    // 꼬였다. 재진입 시 이전 영상 재생/콜백을 확실히 끊는다.
+    levelRewardVideo.pause();
+    levelRewardVideo.onended = null;
+    levelRewardVideo.removeAttribute('src');
+    levelRewardVideo.hidden = true;
     if (isLevelCleared(level)) clearLevelAttempt(level); // 이미 클리어된 레벨은 타이머 불필요
     // 주의: 그림 목록만 구경하는 걸로는 시간이 소모되면 안 되므로, 여기서는 타임어택을 시작하지
     // 않는다 — 실제로 그림 하나를 열 때(openTemplate)가 되어서야 처음 시작한다.
