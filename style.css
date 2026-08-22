@@ -905,7 +905,11 @@ button:active { transform: scale(0.94); }
 .reward-puzzle-tile {
   width: 96px;
   height: 96px;
-  overflow: hidden;
+  /* 2026-08-22: overflow:hidden이면 puzzleTileInnerSvg가 JIG_PAD만큼 여유를 두고 그린
+     돌출부(tab)까지 이 박스 경계에서 잘려서, 트레이/드래그 중인 조각이 정답 칸(잘리지 않는
+     하나짜리 배경 SVG)과 달리 밋밋한 네모로 보였다 — "조각과 박스 크기가 안 맞다" 신고의
+     실제 원인. 클리핑을 없애 조각 자체도 진짜 직소 돌출부 모양 그대로 보이게 함. */
+  overflow: visible;
 }
 .reward-puzzle-tile svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .reward-puzzle-tray {
