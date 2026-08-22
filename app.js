@@ -1818,17 +1818,29 @@
   // 임의 오프셋에서 시작해 다음 틱에 원위치로 트랜지션)을 재사용.
   // 2026-08-22: 칸(rect)마다 따로 흩뿌리는 버전은 SVG 내부 좌표계 문제로 신뢰성이 낮아서
   // (사용자 승인) 그림 전체가 살짝 흔들리며 위에서 흩날리듯 내려오는 단순한 버전으로 대체.
+  // 2026-08-22: "위에서 내려오는" 등장 연출 대신 — 완성된 그림을 잠깐 그대로 보여준 뒤, 제자리에
+  // 멈춰 돌지 않고 계속 아래로 떨어지면서 동시에 계속 회전하다 작아지며 사라지는 퇴장 연출로
+  // 교체(요청). 시작은 그대로(transform 없음) → 끝에서 아래로 떨어짐+회전+축소+투명해짐이
+  // 하나의 트랜지션으로 동시에 진행되므로 "제자리에서 돌다가 떨어지는" 게 아니라 처음부터
+  // 끝까지 계속 이동하며 돈다.
   function scatterMosaicIn(container) {
     container.style.transition = 'none';
-    container.style.transform = 'translateY(-90px) rotate(-10deg) scale(0.6)';
-    container.style.opacity = '0';
+    container.style.transform = '';
+    container.style.opacity = '1';
     requestAnimationFrame(() => {
-      container.style.transition = 'transform 0.6s cubic-bezier(0.25, 0.7, 0.3, 1), opacity 0.4s ease';
-      container.style.transform = '';
-      container.style.opacity = '';
-      setTimeout(() => {
-        container.style.transition = '';
-      }, 600);
+      requestAnimationFrame(() => {
+        container.style.transition = 'transform 1.1s cubic-bezier(0.4, 0.2, 0.7, 1), opacity 1.1s ease-in';
+        container.style.transform = 'translateY(220px) rotate(540deg) scale(0.2)';
+        container.style.opacity = '0';
+        // 주의: 여기서 opacity를 원복하면 사라졌던 그림이 다시 보여버린다 — 이후 실제로
+        // 숨겨지는 시점(hidden 속성, explodeIntoPuzzle 등)까지 투명한 채로 둬야 한다.
+        // transform은 opacity:0이라 안 보이는 동안 지워도 안전하고, 지워야 다음 번(영상 끝난
+        // 뒤 크로스페이드 등)에 회전/축소된 채로 다시 나타나는 걸 막는다.
+        setTimeout(() => {
+          container.style.transition = '';
+          container.style.transform = '';
+        }, 1100);
+      });
     });
   }
 
@@ -1881,7 +1893,7 @@
     // 나오는데 그 직전에 양이 퍼즐 조각 크기로 작아졌다 사라지면 "작아졌다 다시 커지는" 튐이
     // 보였다(사용자 제보). 영상 없는 레벨만 조각으로 터지기 전 축소 연출을 그대로 쓴다.
     scatterMosaicIn(levelRewardArt);
-    const scatterSettleMs = 650; // scatterMosaicIn 자체 트랜지션(0.6s) 끝난 뒤
+    const scatterSettleMs = 1450; // scatterMosaicIn 자체 트랜지션(1.4s)이 눈에 보이게 늘어난 만큼 맞춤
     setTimeout(() => {
       levelRewardArt.classList.add('reward-puzzle-clean');
     }, scatterSettleMs);
@@ -2040,7 +2052,15 @@
       levelRewardVideo.src = videoSrc;
       levelRewardVideo.hidden = false;
       levelRewardVideo.currentTime = 0;
-      levelRewardVideo.play();
+      // 2026-08-22: "원래 이 영상에 효과음이 있었는데" — 영상 파일에 오디오 트랙(aac)이 실제로
+      // 있는데 자동재생 정책 때문에 muted로 붙여뒀었다. 앱 사운드 설정(soundOn)을 따르고,
+      // 그래도 브라우저가 소리 있는 자동재생을 막으면(정책상 거부될 수 있음) 무음으로
+      // 재시도해서 최소한 영상 자체는 항상 재생되게 한다.
+      levelRewardVideo.muted = !soundOn;
+      levelRewardVideo.play().catch(() => {
+        levelRewardVideo.muted = true;
+        levelRewardVideo.play();
+      });
       console.log('[퍼즐] 변신 영상 재생 시작');
       levelRewardVideo.onended = () => {
         console.log('[퍼즐] 영상 종료(onended) — currentLevel=' + currentLevel + ', 대상레벨=' + level);
