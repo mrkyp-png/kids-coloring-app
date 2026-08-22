@@ -1863,8 +1863,12 @@
     const gap = 8;
     rewardPuzzleTrayTop.hidden = false;
     rewardPuzzleTrayBottom.hidden = false;
-    const trayWidth = rewardPuzzleTrayTop.getBoundingClientRect().width - 32; // padding: 0 16px 좌우
-    const perRow = Math.max(1, Math.floor((trayWidth + gap) / (tileSize + gap)));
+    // 2026-08-22: "박스 위아래로 빈 공간이 크게 뜬다" 제보 — 트레이 실측 폭으로 한 줄에 몇 개
+    // 들어가는지 계산했는데, 특정 기기/타이밍에서 그 실측값이 비정상적으로 작게 잡히면(0에
+    // 가까우면) 한 줄에 1개만 들어간다고 착각해 실제로는 2줄이면 될 걸 8줄 높이만큼 예약해서
+    // 거대한 빈 칸이 생겼다. 트레이는 무대(폭 최대 320px)보다 항상 넓거나 같으므로, 실측 대신
+    // "무대와 같은 열 개수만큼은 한 줄에 들어간다"는 안전한 가정으로 계산한다.
+    const perRow = dims.cols;
     const rows = Math.ceil(half / perRow);
     const height = rows * tileSize + (rows - 1) * gap;
     rewardPuzzleTrayTop.style.minHeight = height + 'px';
