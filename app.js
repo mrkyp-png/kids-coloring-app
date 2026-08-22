@@ -975,10 +975,11 @@
     } else {
       statLine.hidden = true;
     }
-    // 이 모드로 뭔가 한 번이라도 진행한 게 있을 때만 "이 모드 초기화" 버튼을 보여준다.
+    // 2026-08-22: "완료 안 하더라도 리셋은 필요할 것 같다" 요청 — 예전엔 진행한 게 있을
+    // 때만 보였는데, 이제 항상 보이게 한다.
     // 2026-08-16: 아이콘 전용 버튼(🔄)으로 바뀌면서 텍스트는 aria-label로만 남음(data-i18n-aria-label,
     // applyStatic()이 처리).
-    btnResetAll.hidden = doneCount === 0;
+    btnResetAll.hidden = false;
 
     // 2026-08-11: "🚀 N more levels to go!" 문구 삭제 요청 — levelsLeftLine 자체는 index.html에
     // 남아있지만 항상 숨김 처리만 한다(엘리먼트를 지우는 것보다 안전).
@@ -1376,12 +1377,9 @@
     levelReward.classList.remove('reward-centered'); // 레벨1 중앙 이동 연출을 다른 레벨/재진입 시 원복.
     levelReward.style.transform = '';
     levelReward.style.transition = '';
-    // moveRewardBoxToCenter가 고정해둔 position:fixed 관련 값들 원복.
-    levelReward.style.position = '';
-    levelReward.style.top = '';
-    levelReward.style.left = '';
-    levelReward.style.width = '';
-    levelReward.style.margin = '';
+    // reserveTrayHeight가 미리 잡아둔 트레이 높이 예약을 다른 레벨/재진입 시 원복.
+    rewardPuzzleTrayTop.style.minHeight = '';
+    rewardPuzzleTrayBottom.style.minHeight = '';
     levelRewardStage.style.transform = ''; // 레벨1 정면 확대 연출을 다른 레벨/재진입 시 원복.
     levelRewardStage.style.transition = '';
     if (isLevelCleared(level)) clearLevelAttempt(level); // 이미 클리어된 레벨은 타이머 불필요
@@ -1850,6 +1848,29 @@
     }
   }
 
+  // 2026-08-22: "채워지기 전엔 비어있다가, 채워지면 박스 뒤로 숨어버린다"(퍼즐오류3/4 제보) —
+  // position:fixed로 박스를 고정해도, 트레이가 아직 비어서(hidden) 자리를 하나도 안 차지하고
+  // 있다가 나중에(explodeIntoPuzzle) 실제 조각으로 채워지면 그만큼 부피가 갑자기 생겨서 고정된
+  // 박스와 겹쳐버렸다(조각이 박스 뒤로 숨거나, 박스와 겹쳐 보이는 원인). 트레이가 실제로
+  // 채워지기 훨씬 전(지금, 박스가 중앙으로 이동하는 시점)에 미리 "이만큼 차지할 거다"라는
+  // 높이를 예약해두면, 나중에 조각이 들어와도 트레이 크기가 안 바뀌어서 절대 안 겹친다 —
+  // 이러면 박스도 position:fixed 같은 특수 처리 없이 평범한 margin:auto 중앙정렬만으로
+  // 충분히 안 흔들린다(explodeIntoPuzzle의 tileSize 계산과 같은 공식).
+  function reserveTrayHeight(dims) {
+    const total = dims.cols * dims.rows;
+    const half = Math.ceil(total / 2);
+    const tileSize = levelRewardStage.getBoundingClientRect().width / dims.cols;
+    const gap = 8;
+    rewardPuzzleTrayTop.hidden = false;
+    rewardPuzzleTrayBottom.hidden = false;
+    const trayWidth = rewardPuzzleTrayTop.getBoundingClientRect().width - 32; // padding: 0 16px 좌우
+    const perRow = Math.max(1, Math.floor((trayWidth + gap) / (tileSize + gap)));
+    const rows = Math.ceil(half / perRow);
+    const height = rows * tileSize + (rows - 1) * gap;
+    rewardPuzzleTrayTop.style.minHeight = height + 'px';
+    rewardPuzzleTrayBottom.style.minHeight = height + 'px';
+  }
+
   // 2026-08-22: 레벨1 전용 — 변신 시작 직전, 아이콘 목록을 아래로 슬라이드시켜 치우고 그
   // 빈 자리로 보상 박스(#level-reward)를 화면 중앙까지 부드럽게 옮긴다. FLIP 기법(이동 전/후
   // 실제 좌표를 재서 역방향 위치에서 시작해 제자리로 트랜지션) — 퍼즐 조각이 트레이에서 튀어
@@ -1861,6 +1882,7 @@
       if (currentLevel !== level) { onDone(); return; }
       galleryGrid.hidden = true;
       galleryGrid.classList.remove('gallery-grid-hiding');
+      reserveTrayHeight(rewardPuzzle.dims); // 트레이가 나중에 채워져도 더는 안 흔들리게 지금 미리 자리를 예약
       levelReward.classList.add('reward-centered'); // margin-top/bottom:auto로 남는 공간에서 중앙 정렬
       const after = levelReward.getBoundingClientRect();
       levelReward.style.transform = 'translateY(' + (before.top - after.top) + 'px)';
@@ -1869,18 +1891,6 @@
         levelReward.style.transform = '';
         setTimeout(() => {
           levelReward.style.transition = '';
-          // 2026-08-22: "퍼즐칸이 나타나면 박스가 아래로 밀린다" 제보 — 원인은 margin:auto가
-          // 아니라 앞에 있는 형제(#reward-puzzle-tray-top)가 나중에(explodeIntoPuzzle) 실제
-          // 조각으로 채워지며 키가 커지는 것 — margin을 고정해도 앞 형제가 커지면 뒤에 오는
-          // 이 박스는 그만큼 같이 밀려난다. 지금(트레이가 비어서 위치가 정확한 이 시점) 뷰포트
-          // 기준 좌표를 읽어 position:fixed로 완전히 박아버리면, 문서 흐름 자체에서 벗어나
-          // 있어서 트레이가 나중에 커져도 전혀 영향을 안 받는다.
-          const rect = levelReward.getBoundingClientRect();
-          levelReward.style.position = 'fixed';
-          levelReward.style.top = rect.top + 'px';
-          levelReward.style.left = rect.left + 'px';
-          levelReward.style.width = rect.width + 'px';
-          levelReward.style.margin = '0';
           onDone();
         }, 550);
       });
@@ -2256,6 +2266,15 @@
     let offsetX = 0, offsetY = 0;
     piece.addEventListener('pointerdown', (e) => {
       if (piece.classList.contains('placed')) return;
+      // 2026-08-22: "잡으면 작아진 채로 고정된다" 제보 — 트레이에 막 나타난 조각은 등장
+      // 애니메이션(0.3배로 작게 시작 → 원래 크기로 커짐)이 아직 안 끝났을 수 있는데, 그 도중에
+      // 잡으면 그 순간의 작은 크기가 getBoundingClientRect로 그대로 찍혀서 드래그 내내 고정돼
+      // 버렸다. 잡는 순간 등장 애니메이션을 강제로 끝내(원래 크기·위치로) 항상 정확한 크기로
+      // 잡히게 한다.
+      piece.style.transition = 'none';
+      piece.style.transform = '';
+      piece.style.opacity = '1';
+      void piece.offsetWidth; // 강제 리플로우 — 위 스타일이 바로 반영되게
       piece.setPointerCapture(e.pointerId);
       const rect = piece.getBoundingClientRect();
       offsetX = e.clientX - rect.left;
