@@ -1383,6 +1383,7 @@
     rewardPuzzleTrayBottom.style.minHeight = '';
     rewardPuzzleTrayTop.classList.remove('reward-tray-anchor-top');
     rewardPuzzleTrayBottom.classList.remove('reward-tray-anchor-bottom');
+    unlockRewardTrioPosition(); // 매 프레임 좌표 강제 고정(watchdog) 해제 — 안 하면 다음 레벨에서도 계속 돎.
     levelRewardStage.style.transform = ''; // 레벨1 정면 확대 연출을 다른 레벨/재진입 시 원복.
     levelRewardStage.style.transition = '';
     levelRewardStage.style.opacity = ''; // 확대+페이드 연출(zoomRewardToFullscreenAndAdvance) 원복.
@@ -1920,6 +1921,38 @@
   // 빈 자리로 보상 박스(#level-reward)를 화면 중앙까지 부드럽게 옮긴다. FLIP 기법(이동 전/후
   // 실제 좌표를 재서 역방향 위치에서 시작해 제자리로 트랜지션) — 퍼즐 조각이 트레이에서 튀어
   // 나오는 연출(explodeIntoPuzzle)과 같은 방식이라 좌표 계산 없이도 항상 정확하다.
+  // 2026-08-22: 트레이-박스-트레이가 계속 움직인다는 신고가 반복됐다 — 원인을 하나씩 막아도
+  // (margin:auto 위치, [hidden] 우선순위, align-items, 트레이 접힘...) 매번 다른 경로로 다시
+  // 움직여서, 원인 추적 대신 "물리적으로 움직일 수 없게" 매 프레임 좌표를 다시 박아버리는
+  // watchdog으로 바꾼다 — 뭐가 원인이든 상관없이 100% 고정된다.
+  let rewardTrioLockRAF = null;
+  function lockRewardTrioPosition() {
+    const els = [rewardPuzzleTrayTop, levelReward, rewardPuzzleTrayBottom];
+    const fixed = els.map((el) => el.getBoundingClientRect());
+    const apply = () => {
+      els.forEach((el, i) => {
+        el.style.position = 'fixed';
+        el.style.top = fixed[i].top + 'px';
+        el.style.left = fixed[i].left + 'px';
+        el.style.width = fixed[i].width + 'px';
+        el.style.margin = '0';
+      });
+      rewardTrioLockRAF = requestAnimationFrame(apply);
+    };
+    if (rewardTrioLockRAF) cancelAnimationFrame(rewardTrioLockRAF);
+    apply();
+  }
+  function unlockRewardTrioPosition() {
+    if (rewardTrioLockRAF) { cancelAnimationFrame(rewardTrioLockRAF); rewardTrioLockRAF = null; }
+    [rewardPuzzleTrayTop, levelReward, rewardPuzzleTrayBottom].forEach((el) => {
+      el.style.position = '';
+      el.style.top = '';
+      el.style.left = '';
+      el.style.width = '';
+      el.style.margin = '';
+    });
+  }
+
   function moveRewardBoxToCenter(level, onDone) {
     console.log('[퍼즐] moveRewardBoxToCenter 시작 — 박스를 중앙으로 이동');
     const before = levelReward.getBoundingClientRect();
@@ -2262,6 +2295,7 @@
       });
 
       renderLevelGallery(); // "다음" 버튼 막힘 상태 반영
+      lockRewardTrioPosition(); // 트레이에 조각까지 다 채운 지금 좌표를 매 프레임 강제 고정
     }, 250);
   }
 
