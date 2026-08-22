@@ -1964,10 +1964,18 @@
           const { cols, rows } = gridDims(gridTotal);
           levelRewardArt.innerHTML = buildRewardSvg(finishedArt, cols, rows);
           levelRewardArt.querySelectorAll('.reward-cell').forEach((el) => el.classList.add('is-active'));
-          levelRewardArt.setAttribute('class', 'level-reward-art reward-puzzle-clean reward-drop-in');
+          // 2026-08-22: "위로 올랐다 내려온다" 신고 — reward-drop-in(다른 레벨 모자이크 완성용
+          // 연출)은 위(-26px)에서 떨어지는 이동 애니메이션이 있어서, "위치이동없이"가 요구사항인
+          // 레벨1(영상 있는 레벨)엔 안 맞았다. 이동 없이 페이드만.
+          levelRewardArt.setAttribute('class', 'level-reward-art reward-puzzle-clean');
+          levelRewardArt.style.opacity = '0';
+          levelRewardArt.style.transition = 'opacity 0.4s ease';
           levelRewardArt.removeAttribute('hidden');
+          requestAnimationFrame(() => { levelRewardArt.style.opacity = '1'; });
           setTimeout(() => {
             if (currentLevel !== level) return;
+            levelRewardArt.style.opacity = '';
+            levelRewardArt.style.transition = '';
             levelRewardVideo.hidden = true; // 이미 위 art가 완전히 덮은 뒤라 안 보이는 채로 사라짐
             setTimeout(() => {
               if (currentLevel !== level) return;
