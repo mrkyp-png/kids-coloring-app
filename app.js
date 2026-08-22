@@ -1868,17 +1868,27 @@
       '</svg>';
   }
 
-  // 정답 칸(가운데)이 아직 안 채워졌을 때 — 조각과 똑같은 직소 윤곽을 옅은 보라색으로 채워서
-  // "이 모양 조각이 여기 들어가야 함"을 보여준다.
-  function puzzleEmptySlotSvg(cellIndex) {
-    const edges = (rewardPuzzle && rewardPuzzle.edges) || PUZZLE_EDGES;
-    const outline = jigsawPathD(edges[cellIndex]);
-    // 2026-08-22: 예전엔 stroke가 배경색(#FFF8ED)이라 칸끼리 맞닿는 자리마다 선 두 겹이
-    // 겹쳐 "틈"처럼 보였다("16칸이 따로 떨어져 있다" 피드백) — 배경과 다른 옅은 선 색으로
-    // 바꿔서, 채움은 하나로 이어지고 칸 경계만 안에 새겨진 선으로 보이게 한다.
-    return '<svg viewBox="' + (-JIG_PAD) + ' ' + (-JIG_PAD) + ' ' + (JIG + JIG_PAD * 2) + ' ' + (JIG + JIG_PAD * 2) + '">' +
-      '<path d="' + outline + '" fill="#EDEBF9" stroke="#D8D0F5" stroke-width="2"/>' +
-      '</svg>';
+  // 2026-08-22: "16칸이 따로 떨어져 보인다" 피드백 — 예전엔 칸마다 각자 클리핑된 작은 SVG를
+  // 썼는데, 그러면 이웃 칸 쪽으로 튀어나오는 돌출부가 칸 경계에서 잘려서 이어져 보이지 않았다.
+  // 빈 칸 전체를 박스 하나짜리 SVG에 한 번에 그려서(자르지 않음) 돌출부/홈이 그대로 맞물려
+  // 보이게 하고, 실제 정답 칸 div(rewardPuzzleTargetGrid의 자식)들은 이 배경 위에 투명하게
+  // 얹혀서 드래그 히트테스트 자리만 잡는다 — 조각을 맞추면 그 자리에 실제 이미지가 덮인다.
+  function buildTargetBoxBackgroundSvg(cols, rows, edges) {
+    let paths = '';
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const i = r * cols + c;
+        const cx = c * JIG, cy = r * JIG;
+        const e = edges[i];
+        let d = 'M' + cx + ',' + cy + ' ';
+        d += jigEdge(cx, cy, cx + JIG, cy, e.top) + ' ';
+        d += jigEdge(cx + JIG, cy, cx + JIG, cy + JIG, e.right) + ' ';
+        d += jigEdge(cx + JIG, cy + JIG, cx, cy + JIG, e.bottom) + ' ';
+        d += jigEdge(cx, cy + JIG, cx, cy, e.left) + ' Z';
+        paths += '<path d="' + d + '" fill="#EDEBF9" stroke="#D8D0F5" stroke-width="1.5"/>';
+      }
+    }
+    return '<svg class="reward-puzzle-target-bg" viewBox="0 0 ' + (cols * JIG) + ' ' + (rows * JIG) + '" preserveAspectRatio="none">' + paths + '</svg>';
   }
 
   function explodeIntoPuzzle(level) {
@@ -1907,12 +1917,11 @@
       rewardPuzzleTargetGrid.classList.toggle('reward-puzzle-4x4', isBig);
       rewardPuzzleTrayTop.classList.toggle('reward-puzzle-4x4', isBig);
       rewardPuzzleTrayBottom.classList.toggle('reward-puzzle-4x4', isBig);
-      rewardPuzzleTargetGrid.innerHTML = '';
+      rewardPuzzleTargetGrid.innerHTML = buildTargetBoxBackgroundSvg(rewardPuzzle.dims.cols, rewardPuzzle.dims.rows, rewardPuzzle.edges);
       for (let i = 0; i < puzzleTotal; i++) {
         const slot = document.createElement('div');
         slot.className = 'reward-puzzle-tile reward-puzzle-target';
         slot.dataset.piece = 'cell-' + i;
-        slot.innerHTML = puzzleEmptySlotSvg(i);
         rewardPuzzleTargetGrid.appendChild(slot);
       }
       rewardPuzzleTargetGrid.hidden = false;

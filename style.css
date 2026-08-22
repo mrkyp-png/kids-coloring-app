@@ -912,11 +912,28 @@ button:active { transform: scale(0.94); }
   justify-content: center;
   align-content: center;
   /* 2026-08-22: "16칸이 따로 떨어져 보인다" 피드백 — 칸 하나하나가 아니라 박스 전체를
-     하나의 카드로 보이게 바깥 테두리/배경을 여기(컨테이너)에 준다. 안쪽 칸 경계는
-     이제 옅은 선(위 puzzleEmptySlotSvg stroke)으로만 표시됨. */
+     하나의 카드로 보이게 바깥 테두리/배경을 여기(컨테이너)에 준다. */
   background: #EDEBF9;
   border-radius: 16px;
   overflow: hidden;
+  position: relative;
+}
+/* 2026-08-22: 빈 칸 배경(돌출부/홈 전부)을 박스 전체 SVG 하나로 한 번에 그린다(자르지 않음 —
+   칸마다 따로 클리핑하면 이웃 칸으로 튀어나오는 돌출부가 잘려서 이어져 보이지 않았다).
+   실제 정답 칸 div(.reward-puzzle-target)들은 이 위에 투명하게 얹혀 드래그 히트테스트
+   자리만 잡고, 조각이 맞춰지면 그 자리에 실제 이미지가 이 배경을 덮는다. */
+.reward-puzzle-target-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 0;
+}
+.reward-puzzle-target-grid .reward-puzzle-target {
+  position: relative;
+  z-index: 1;
+  background: transparent;
 }
 /* 조각 하나하나의 흰 윤곽선 — 다 맞춘 직후 이 선만 먼저 슬쩍 지운다(빈틈도 이미 없어서
    그 다음 완성 그림으로 바꿔치기해도 거의 티가 안 남). */
