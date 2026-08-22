@@ -1823,14 +1823,63 @@
   // 교체(요청). 시작은 그대로(transform 없음) → 끝에서 아래로 떨어짐+회전+축소+투명해짐이
   // 하나의 트랜지션으로 동시에 진행되므로 "제자리에서 돌다가 떨어지는" 게 아니라 처음부터
   // 끝까지 계속 이동하며 돈다.
+  // 2026-08-22: "16개 원도 양이 사라지는 그 순간부터 각자 다른 경로로 움직이며 같이 사라짐,
+  // 서로 안 겹침" 요청 — flyToReward(기존 뱃지 1개 날아가는 연출)와 같은 기법(원본 이미지를
+  // 복제한 "고스트"를 body에 붙여 자유롭게 움직임)을 16개 전부에 동시에 적용한다. 도착점은
+  // 전부 같은 지점(양이 사라지는 화면 중앙)이되, 겹치지 않도록 각자 살짝 다른 시작 지연과
+  // 도착점 흩뿌림(jitter)을 준다.
+  function scatterGalleryIconsToPoint(targetX, targetY) {
+    const badges = Array.from(galleryGrid.querySelectorAll('.tpl-badge'));
+    badges.forEach((badge, i) => {
+      const img = badge.querySelector('.tpl-emoji');
+      if (!img) return;
+      const fromRect = img.getBoundingClientRect();
+      if (!fromRect.width) return; // 화면 밖(스크롤 아웃 등)이면 건너뜀
+      badge.style.visibility = 'hidden'; // 원본은 숨기고 고스트만 움직이는 걸 보여줌
+      const ghost = img.cloneNode(true);
+      ghost.className = 'reward-absorb-ghost';
+      ghost.style.left = fromRect.left + 'px';
+      ghost.style.top = fromRect.top + 'px';
+      ghost.style.width = fromRect.width + 'px';
+      ghost.style.height = fromRect.height + 'px';
+      document.body.appendChild(ghost);
+      // 겹치지 않도록: 도착점을 중앙 지점 주변으로 살짝(±25px) 흩뿌리고, 시작 지연도 조금씩 다르게.
+      const jitterX = (Math.random() - 0.5) * 50;
+      const jitterY = (Math.random() - 0.5) * 50;
+      const dx = (targetX + jitterX) - (fromRect.left + fromRect.width / 2);
+      const dy = (targetY + jitterY) - (fromRect.top + fromRect.height / 2);
+      const delay = i * 25;
+      setTimeout(() => {
+        ghost.style.transition = 'transform 1s cubic-bezier(0.4, 0.1, 0.7, 1), opacity 1s ease-in';
+        requestAnimationFrame(() => {
+          ghost.style.transform = 'translate(' + dx.toFixed(0) + 'px,' + dy.toFixed(0) + 'px) scale(0.15)';
+          ghost.style.opacity = '0';
+        });
+      }, delay);
+      setTimeout(() => ghost.remove(), delay + 1100);
+    });
+  }
+
   function scatterMosaicIn(container) {
+    // 2026-08-22: "사라지는 위치를 화면 중앙까지 연장" 요청 — 따로 중앙 이동 단계를 두지 않고,
+    // 지금 돌면서 내려가는 이동거리 자체를 화면 정중앙에 닿을 때까지 늘린다.
+    const rect = container.getBoundingClientRect();
+    const currentCenterX = rect.left + rect.width / 2;
+    const currentCenterY = rect.top + rect.height / 2;
+    const viewportCenterX = window.innerWidth / 2;
+    const viewportCenterY = window.innerHeight / 2;
+    const dx = viewportCenterX - currentCenterX;
+    const dy = viewportCenterY - currentCenterY;
+    // renderLevelGallery 안에서 이 함수(maybeShowRewardPuzzle)보다 galleryGrid를 실제로 채우는
+    // renderQueue가 나중에 호출되므로, 지금 당장 찾으면 아직 뱃지가 하나도 없다 — 다음 틱으로 미룸.
+    setTimeout(() => scatterGalleryIconsToPoint(viewportCenterX, viewportCenterY), 0);
     container.style.transition = 'none';
     container.style.transform = '';
     container.style.opacity = '1';
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         container.style.transition = 'transform 1.1s cubic-bezier(0.4, 0.2, 0.7, 1), opacity 1.1s ease-in';
-        container.style.transform = 'translateY(220px) rotate(540deg) scale(0.2)';
+        container.style.transform = 'translate(' + dx.toFixed(0) + 'px,' + dy.toFixed(0) + 'px) rotate(540deg) scale(0.2)';
         container.style.opacity = '0';
         // 주의: 여기서 opacity를 원복하면 사라졌던 그림이 다시 보여버린다 — 이후 실제로
         // 숨겨지는 시점(hidden 속성, explodeIntoPuzzle 등)까지 투명한 채로 둬야 한다.
@@ -1886,25 +1935,24 @@
     if (!transformVideo) {
       galleryGrid.hidden = true;
     }
-    // 완성된 그림이 위에서 살짝 내려오며 가운데 자리잡는 연출(0.4s) → 칸 구분선이 지워져
-    // 깔끔한 한 장의 그림이 됨 → 퍼즐 트레이 크기로 줄어들며 살짝 아래로 자리잡음(0.5s) →
-    // 그 자리에서 조각들로 터뜨린다.
-    // 2026-08-22: 레벨1(변신 영상 있음)은 이 축소를 건너뛴다 — 영상이 무대 100% 크기로 바로
-    // 나오는데 그 직전에 양이 퍼즐 조각 크기로 작아졌다 사라지면 "작아졌다 다시 커지는" 튐이
-    // 보였다(사용자 제보). 영상 없는 레벨만 조각으로 터지기 전 축소 연출을 그대로 쓴다.
-    scatterMosaicIn(levelRewardArt);
-    const scatterSettleMs = 1450; // scatterMosaicIn 자체 트랜지션(1.4s)이 눈에 보이게 늘어난 만큼 맞춤
+    // 2026-08-22: "칸 구분선이 즉시 사라져 완전한 그림이 보인 뒤 0.5초 있다 돌아야 하는데
+    // 너무 빠르다" 신고 — 순서를 ①칸 구분선 즉시 제거(완성 그림 노출) → ②0.5초 대기 →
+    // ③빙글빙글 돌며 중앙으로 사라짐(양+아이콘 16개 동시)으로 바꿈.
+    // renderLevelGallery 안에서 이 함수보다 나중에 호출되는 updateLevelReward가 처음 진입 시
+    // levelRewardArt의 class 속성을 통째로 새로 지정해버려서, 여기서 바로 클래스를 붙이면
+    // 그 뒤에 지워진다 — 다음 틱으로 미룬다.
+    setTimeout(() => levelRewardArt.classList.add('reward-puzzle-clean'), 0);
+    const preSpinDelayMs = 500;
+    const scatterSettleMs = preSpinDelayMs + 1100; // scatterMosaicIn 자체 트랜지션(1.1s) 끝난 뒤
     setTimeout(() => {
-      levelRewardArt.classList.add('reward-puzzle-clean');
-    }, scatterSettleMs);
+      scatterMosaicIn(levelRewardArt);
+    }, preSpinDelayMs);
     if (!transformVideo) {
       setTimeout(() => levelRewardArt.classList.add('reward-puzzle-shrink'), scatterSettleMs + 250);
       setTimeout(() => explodeIntoPuzzle(level), scatterSettleMs + 850);
     } else {
-      // 레벨1: 아이콘 목록을 슬라이드로 치우고 보상 박스를 화면 중앙으로 옮긴 뒤 변신을 시작한다.
-      // 2026-08-22: "내려오자마자 훅 지나간다" 피드백 — 완성된 모자이크를 볼 틈도 없이 바로
-      // 이동/영상으로 넘어갔음. 흩뿌려져 다 자리잡은 뒤 잠깐 그대로 보여주는 여유를 더 준다.
-      setTimeout(() => moveRewardBoxToCenter(level, () => playLevelTransform(level, transformVideo)), scatterSettleMs + 1500);
+      // 레벨1: 다 사라진 뒤 보상 박스를 화면 중앙으로 옮기고 변신을 시작한다.
+      setTimeout(() => moveRewardBoxToCenter(level, () => playLevelTransform(level, transformVideo)), scatterSettleMs + 400);
     }
   }
 
@@ -1970,8 +2018,12 @@
   }
 
   function moveRewardBoxToCenter(level, onDone) {
-    console.log('[퍼즐] moveRewardBoxToCenter 시작 — 박스를 중앙으로 이동');
-    const before = levelReward.getBoundingClientRect();
+    console.log('[퍼즐] moveRewardBoxToCenter 시작 — 박스를 중앙에 점에서부터 확대');
+    // 2026-08-22: "빈 박스가 화면을 가로질러 슬라이드하는 게 이상하다, 중앙에서 점부터
+    // 확대되게" 요청 — 예전엔 원래 자리→중앙으로 실제로 슬라이드(FLIP)했는데, 이 시점엔
+    // 이미 그림/아이콘이 다 사라진 뒤라 "빈 크림색 박스"가 화면을 가로질러 미끄러지는 것처럼
+    // 보였다. 이제 슬라이드 없이 중앙 자리에 바로(안 보이게, scale:0) 배치한 뒤 그 자리에서만
+    // 커지게 한다 — 위치 이동 자체가 없으니 "박스가 위로 간다" 문제도 원천적으로 없다.
     galleryGrid.classList.add('gallery-grid-hiding');
     setTimeout(() => {
       if (currentLevel !== level) { console.log('[퍼즐] moveRewardBoxToCenter: 그 사이 레벨 변경됨(' + currentLevel + '≠' + level + '), 중단'); onDone(); return; }
@@ -1979,26 +2031,21 @@
       galleryGrid.classList.remove('gallery-grid-hiding');
       reserveTrayHeight(rewardPuzzle.dims); // 트레이가 나중에 채워져도 더는 안 흔들리게 지금 미리 자리를 예약
       levelReward.classList.add('reward-centered');
-      // 2026-08-22(3차): 박스가 아니라 트레이 위/아래 끝에 margin:auto를 줘서, 남는 공간이
-      // 트레이-박스 사이가 아니라 (헤더~트레이) 바깥/(트레이~화면끝) 바깥으로 가게 한다 —
-      // 그래야 화면이 커도 트레이-박스-트레이가 항상 붙은 한 덩어리로 중앙에 온다.
       rewardPuzzleTrayTop.classList.add('reward-tray-anchor-top');
       rewardPuzzleTrayBottom.classList.add('reward-tray-anchor-bottom');
-      const after = levelReward.getBoundingClientRect();
-      levelReward.style.transform = 'translateY(' + (before.top - after.top) + 'px)';
+      // 2026-08-22: "밋밋하다, 점에서 빙글빙글 돌며 커지면서 제자리로" 요청 — 회전도 같이 준다.
+      levelRewardStage.style.transition = 'none';
+      levelRewardStage.style.transform = 'scale(0) rotate(-540deg)';
+      lockRewardTrioPosition(); // 지금 이 좌표(=화면 중앙)에 매 프레임 강제 고정, 다시는 안 움직임.
       requestAnimationFrame(() => {
-        levelReward.style.transition = 'transform 0.55s cubic-bezier(0.34, 1.1, 0.4, 1)';
-        levelReward.style.transform = '';
-        setTimeout(() => {
-          levelReward.style.transition = '';
-          const trTop = rewardPuzzleTrayTop.getBoundingClientRect();
-          const lr = levelReward.getBoundingClientRect();
-          const gg = galleryGrid.getBoundingClientRect();
-          console.log('[퍼즐] rect 진단 — trayTop: top=' + trTop.top.toFixed(0) + ' bottom=' + trTop.bottom.toFixed(0) + ' h=' + trTop.height.toFixed(0) + ' minHeight=' + rewardPuzzleTrayTop.style.minHeight
-            + ' | levelReward: top=' + lr.top.toFixed(0) + ' h=' + lr.height.toFixed(0)
-            + ' | galleryGrid: display=' + getComputedStyle(galleryGrid).display + ' hidden=' + galleryGrid.hidden + ' h=' + gg.height.toFixed(0));
-          onDone();
-        }, 550);
+        requestAnimationFrame(() => {
+          levelRewardStage.style.transition = 'transform 0.7s cubic-bezier(0.34, 1.2, 0.4, 1)';
+          levelRewardStage.style.transform = '';
+          setTimeout(() => {
+            levelRewardStage.style.transition = '';
+            onDone();
+          }, 700);
+        });
       });
     }, 320);
   }
@@ -2057,11 +2104,21 @@
       // 그래도 브라우저가 소리 있는 자동재생을 막으면(정책상 거부될 수 있음) 무음으로
       // 재시도해서 최소한 영상 자체는 항상 재생되게 한다.
       levelRewardVideo.muted = !soundOn;
+      levelRewardVideo.volume = 1;
       levelRewardVideo.play().catch(() => {
         levelRewardVideo.muted = true;
         levelRewardVideo.play();
       });
       console.log('[퍼즐] 변신 영상 재생 시작');
+      // 2026-08-22: "마지막에 소리가 뚝 끊겨서 이상하다" 요청 — 원본 음원 자체가 페이드아웃
+      // 없이 끝나서, 끝나기 직전 0.6초 동안 볼륨을 서서히 낮춰 부드럽게 마무리한다.
+      const FADE_OUT_SEC = 0.6;
+      levelRewardVideo.ontimeupdate = () => {
+        const remain = levelRewardVideo.duration - levelRewardVideo.currentTime;
+        if (isFinite(remain) && remain <= FADE_OUT_SEC) {
+          levelRewardVideo.volume = Math.max(0, remain / FADE_OUT_SEC);
+        }
+      };
       levelRewardVideo.onended = () => {
         console.log('[퍼즐] 영상 종료(onended) — currentLevel=' + currentLevel + ', 대상레벨=' + level);
         if (currentLevel !== level) { console.log('[퍼즐] 레벨 불일치로 중단(이 영상은 무시됨)'); return; }
