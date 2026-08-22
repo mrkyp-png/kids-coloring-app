@@ -790,6 +790,11 @@ button:active { transform: scale(0.94); }
 .tpl-card .tpl-badge-good { background: var(--good); }
 .tpl-card .tpl-badge-bad { background: var(--bad); }
 
+/* 2026-08-22: "박스가 계속 아래로 밀린다" 신고 — .gallery-grid에 display:flex가 있으면
+   [hidden] 속성을 줘도(자바스크립트로 galleryGrid.hidden=true) 브라우저 기본 [hidden]{display:
+   none} 규칙과 우선순위가 같아 나중에 선언된(=여기) display:flex가 이겨버려 실제로는 안 사라짐
+   — 내용 없이 빈 채로 flex:1만큼 공간을 계속 차지해서 그 아래(퍼즐 박스 등)가 밀려났다. */
+.gallery-grid[hidden] { display: none; }
 .gallery-grid {
   flex: 1;
   min-height: 0; /* flex 자식이 내용만큼 커지지 않고 실제로 줄어들어 스크롤되게 하는 필수 설정 */
