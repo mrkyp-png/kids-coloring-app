@@ -2251,36 +2251,44 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 
 /* ===== 챌린지 모드 (Phase 1) ===== */
 .challenge-select-header { display: flex; align-items: center; gap: 8px; padding: 12px; }
-/* 2026-08-23: 난이도(쉬움/보통/어려움) 선택을 지도 화면과 같은 원형+홀드링 캐러셀로 교체
-   (기존 EASY/NORMAL/HARD 알약 버튼 3개 → 좌우로 넘기는 원 3자리). .lv-circle, .lv-circle-stage,
-   .lv-peek, .lv-hold-ring 계열, .lv-clear-badge, .lv-progress를 그대로 재사용하고, 이 캐러셀
-   안에서만 가로 배치·크기·색을 덮어쓴다. */
-.diff-node-wrap {
+/* 2026-08-23(2): "화면 위/중간/아래 = 쉬움/보통/어려움, 셋이 항상 동시에 보이고 구역마다 따로
+   좌우 캐러셀로 스테이지 1~10을 넘긴다" — 난이도 하나를 먼저 고르는 버전(직전 커밋)을 대체.
+   .screen의 min-height(바닥값)만으론 3구역이 화면을 정확히 3등분 못 하고 페이지가 그냥
+   늘어나므로(예전 #coloring-screen 때와 같은 이유), 이 화면만 실제 height를 준다. */
+#challenge-select-screen { height: 100dvh; }
+.challenge-tiers { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.challenge-tier-zone {
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  width: 100%; /* .map-grid와 동일한 이유 — max-width만 있으면 shrink-to-fit이라 %폭 자식들이
-                  기준 크기를 못 찾고 다 찌그러짐(순환 참조). 실제 폭을 줘야 38%/26%가 계산됨. */
-  max-width: 420px;
-  margin: 0 auto;
-  padding: 12px;
+  container-type: size; /* 아래 원 크기를 이 구역의 실제 폭/높이 중 더 빡빡한 쪽 기준으로 잡기 위함 */
 }
-.diff-node-wrap .lv-circle-stage { width: 38%; }
-.diff-node-wrap .lv-peek { width: 26%; }
+.challenge-tier-label { margin: 0 0 2px; font-weight: 800; font-size: 0.8rem; }
+.challenge-tier-zone[data-tier="easy"] .challenge-tier-label { color: #2f9e44; }
+.challenge-tier-zone[data-tier="normal"] .challenge-tier-label { color: #e8590c; }
+.challenge-tier-zone[data-tier="hard"] .challenge-tier-label { color: #e03131; }
+
+/* .lv-circle, .lv-circle-stage, .lv-peek, .lv-hold-ring 계열을 지도 화면에서 그대로 재사용하고,
+   이 캐러셀(구역 하나 = 스테이지 1~10 좌우 캐러셀) 안에서만 가로 배치·크기·색을 덮어쓴다. */
+.diff-node-wrap { display: flex; align-items: center; justify-content: center; gap: 20px; width: 100%; }
+.challenge-tier-zone .lv-circle-stage { width: min(34cqw, 62cqh); }
+.challenge-tier-zone .lv-peek { width: min(24cqw, 44cqh); }
+.challenge-tier-zone .lv-circle {
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 800;
+  color: var(--lv-bezel, #333);
+}
+.challenge-tier-zone .lv-circle-stage .lv-circle { font-size: min(11cqw, 20cqh); }
+.challenge-tier-zone .lv-peek .lv-circle { font-size: min(8cqw, 15cqh); }
 /* 신호등 관례: 쉬움=초록/보통=주황/어려움=빨강. 레벨 원의 --lv-bg/--lv-bezel 변수를 그대로
-   읽는 기존 .lv-circle 규칙을 재사용 — data-lv 대신 data-diff로 값만 새로 꽂는다. */
+   읽는 기존 .lv-circle 규칙을 재사용 — data-lv 대신 data-diff로 그 구역의 난이도 값을 꽂는다
+   (구역 안 10칸 전부 같은 값 — "어떤 스테이지인지"가 아니라 "어떤 난이도 구역인지"의 색). */
 .lv-circle[data-diff="easy"] { --lv-bg: #eafbea; --lv-bezel: #40c057; }
 .lv-circle[data-diff="normal"] { --lv-bg: #fff4e0; --lv-bezel: #ff922b; }
 .lv-circle[data-diff="hard"] { --lv-bg: #ffe8e8; --lv-bezel: #ff6b6b; }
-.challenge-level-grid {
-  display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; padding: 16px 12px;
-}
-.challenge-level-btn {
-  aspect-ratio: 1; border-radius: 14px; border: none; background: #4dabf7; color: #fff;
-  font-size: 1.3rem; font-weight: 800; cursor: pointer;
-}
-.challenge-level-btn:disabled { background: #ccc; cursor: not-allowed; opacity: 0.6; }
 .challenge-hud {
   display: flex; justify-content: space-between; gap: 8px;
   padding: 8px 12px; font-weight: 700; font-size: 0.9rem;

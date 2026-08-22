@@ -18,15 +18,11 @@
   const weatherLayer = document.getElementById('challenge-weather-layer');
   const goalOccluder = document.getElementById('challenge-goal-occluder');
   const TOTAL_CHALLENGE_LEVELS = 10;
-  const IMPLEMENTED_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // Phase 1에서 실제로 플레이 가능한 레벨. Phase 2에서 3~10 추가.
 
   const coverScreen = document.getElementById('cover-screen');
   const selectScreen = document.getElementById('challenge-select-screen');
   const btnCoverStartChallenge = document.getElementById('btn-cover-start-challenge');
   const btnChallengeBack = document.getElementById('btn-challenge-back');
-  const diffCarousel = document.getElementById('challenge-diff-carousel');
-  const levelGrid = document.getElementById('challenge-level-grid');
-
   const state = { difficulty: 'easy', level: null };
 
   // I7(최종 리뷰): 미완성 상태로 전체 배포되는 걸 막기 위해 진입 버튼을 기본 숨김.
@@ -37,9 +33,7 @@
   function openSelectScreen() {
     coverScreen.hidden = true;
     selectScreen.hidden = false;
-    diffCarouselIndex = DIFFICULTIES.indexOf(state.difficulty);
-    renderDiffCarouselSlots();
-    renderLevelGrid();
+    tierCarousels.forEach((c) => c.render());
   }
 
   function closeSelectScreen() {
@@ -47,73 +41,38 @@
     coverScreen.hidden = false;
   }
 
-  // 2026-08-23: 난이도 선택을 지도 화면(맵 캐러셀)과 같은 원형+홀드링 캐러셀로 교체 —
-  // 좌우 드래그/휠로 후보를 넘기고, 중앙 원을 700ms 꾹 눌러야 실제로 선택이 확정된다.
-  const DIFFICULTIES = ['easy', 'normal', 'hard'];
-  let diffCarouselIndex = 0;
+  // 2026-08-23(2): "화면 위/중간/아래 = 쉬움/보통/어려움, 셋이 항상 동시에 보이고 구역마다 따로
+  // 좌우 캐러셀로 스테이지 1~10을 넘긴다" — 난이도 하나를 먼저 고르는 버전(직전 커밋)을 대체.
+  // 원형+홀드링 캐러셀(포인터/휠, 700ms 홀드로 확정) 자체는 지도 화면(setupMapCarousel)과 같은
+  // 패턴을 세로(dy)->가로(dx)로 바꿔 재사용하되, 이번엔 구역 3개가 각자 독립 인스턴스가 필요해서
+  // 공용 헬퍼(createHorizontalHoldCarousel)로 뽑아 3번 생성한다(복붙 방지).
+  const TIER_DIFFICULTIES = ['easy', 'normal', 'hard'];
 
-  function buildDiffCircle(diff, isPeek) {
-    const isActive = diff === state.difficulty;
+  function buildTierCircle(difficulty, level, isPeek) {
     const node = document.createElement('button');
     node.type = 'button';
     node.className = 'lv-circle lv-swap-fade';
-    node.dataset.diff = diff;
+    node.dataset.diff = difficulty;
     node.disabled = isPeek;
     node.tabIndex = isPeek ? -1 : 0;
-    const label = I18N.t('challenge.difficulty.' + diff);
-    node.setAttribute('aria-label', label + (isActive ? ' (selected)' : ''));
-    node.innerHTML = '<span class="lv-progress">' + label + '</span>' +
-      (isActive ? '<span class="lv-clear-badge">✓</span>' : '');
-    if (!isPeek) node.addEventListener('click', () => selectDifficulty(diff));
+    node.textContent = String(level);
+    node.setAttribute('aria-label', I18N.t('challenge.difficulty.' + difficulty) + ' ' + level);
+    if (!isPeek) {
+      node.addEventListener('click', () => {
+        state.difficulty = difficulty;
+        startLevel(level);
+      });
+    }
     return node;
   }
 
-  function renderDiffCarouselSlots() {
-    const n = DIFFICULTIES.length;
-    const leftDiff = DIFFICULTIES[(diffCarouselIndex - 1 + n) % n];
-    const centerDiff = DIFFICULTIES[diffCarouselIndex];
-    const rightDiff = DIFFICULTIES[(diffCarouselIndex + 1) % n];
+  // 캐러셀 하나(컨테이너, 항목 개수 n, "현재 index로 좌/중앙/우 슬롯을 채워라" 콜백)를 만들고
+  // { render } 컨트롤을 돌려준다. 포인터 드래그/휠로 index를 한 칸씩 옮기고, 중앙 원을 700ms
+  // 꾹 누르면 중앙 원의 click 리스너(버튼별로 다름 — 여기선 startLevel 진입)가 실행된다.
+  function createHorizontalHoldCarousel(container, n, renderSlots) {
+    let index = 0;
+    function render() { renderSlots(index); }
 
-    const leftSlot = diffCarousel.querySelector('.diff-peek-left');
-    leftSlot.innerHTML = '';
-    leftSlot.appendChild(buildDiffCircle(leftDiff, true));
-
-    const rightSlot = diffCarousel.querySelector('.diff-peek-right');
-    rightSlot.innerHTML = '';
-    rightSlot.appendChild(buildDiffCircle(rightDiff, true));
-
-    const stage = diffCarousel.querySelector('.lv-circle-stage');
-    stage.innerHTML = '';
-    stage.appendChild(buildDiffCircle(centerDiff, false));
-    stage.insertAdjacentHTML('beforeend',
-      '<svg class="lv-hold-ring" viewBox="0 0 100 100" aria-hidden="true">' +
-      '<circle class="lv-hold-ring-track" cx="50" cy="50" r="47"/>' +
-      '<circle class="lv-hold-ring-fill" cx="50" cy="50" r="47"/>' +
-      '</svg>');
-  }
-
-  function selectDifficulty(diff) {
-    state.difficulty = diff;
-    renderDiffCarouselSlots();
-    renderLevelGrid();
-  }
-
-  function renderLevelGrid() {
-    levelGrid.innerHTML = '';
-    for (let lv = 1; lv <= TOTAL_CHALLENGE_LEVELS; lv++) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'challenge-level-btn';
-      btn.textContent = String(lv);
-      btn.disabled = !IMPLEMENTED_LEVELS.includes(lv);
-      btn.addEventListener('click', () => startLevel(lv));
-      levelGrid.appendChild(btn);
-    }
-  }
-
-  // app.js의 setupMapCarousel()과 동일한 패턴(포인터/휠, 한 번에 한 칸, 중앙 원 700ms 홀드로
-  // 확정)을 세로(dy) 대신 가로(dx)로만 바꿔 재사용.
-  (function setupDiffCarousel() {
     let dragging = false, startX = 0, moved = false, downCircle = null;
     let holdCircle = null, holdRing = null;
     function onHoldFillTransitionEnd(e) {
@@ -149,7 +108,7 @@
       cancelHoldVisuals();
       if (navigator.vibrate) { try { navigator.vibrate(0); } catch (err) { /* 무시 */ } }
     }
-    diffCarousel.addEventListener('pointerdown', (e) => {
+    container.addEventListener('pointerdown', (e) => {
       if (!e.target.closest('.lv-circle-stage')) return;
       e.preventDefault();
       dragging = true;
@@ -160,12 +119,12 @@
         downCircle.classList.add('lv-pressed');
         startHold(downCircle);
       }
-      diffCarousel.setPointerCapture(e.pointerId);
+      container.setPointerCapture(e.pointerId);
     });
-    diffCarousel.addEventListener('touchstart', (e) => {
+    container.addEventListener('touchstart', (e) => {
       if (e.target.closest('.lv-circle-stage')) e.preventDefault();
     }, { passive: false });
-    diffCarousel.addEventListener('pointermove', (e) => {
+    container.addEventListener('pointermove', (e) => {
       if (!dragging) return;
       if (Math.abs(e.clientX - startX) > 4) {
         if (!moved) cancelHold();
@@ -180,35 +139,62 @@
       if (moved) {
         const dx = e.clientX - startX;
         const STEP_THRESHOLD = 40;
-        const n = DIFFICULTIES.length;
-        if (dx <= -STEP_THRESHOLD) diffCarouselIndex = (diffCarouselIndex + 1) % n;
-        else if (dx >= STEP_THRESHOLD) diffCarouselIndex = (diffCarouselIndex - 1 + n) % n;
+        if (dx <= -STEP_THRESHOLD) index = (index + 1) % n;
+        else if (dx >= STEP_THRESHOLD) index = (index - 1 + n) % n;
         else return;
-        renderDiffCarouselSlots();
+        render();
       } else {
         cancelHold();
       }
     }
-    diffCarousel.addEventListener('pointerup', endDrag);
-    diffCarousel.addEventListener('pointercancel', endDrag);
-    diffCarousel.addEventListener('click', (e) => {
+    container.addEventListener('pointerup', endDrag);
+    container.addEventListener('pointercancel', endDrag);
+    container.addEventListener('click', (e) => {
       if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; }
     }, true);
 
     let wheelCooldown = false;
-    diffCarousel.addEventListener('wheel', (e) => {
+    container.addEventListener('wheel', (e) => {
       e.preventDefault();
       if (wheelCooldown) return;
-      const n = DIFFICULTIES.length;
       const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-      if (delta > 0) diffCarouselIndex = (diffCarouselIndex + 1) % n;
-      else if (delta < 0) diffCarouselIndex = (diffCarouselIndex - 1 + n) % n;
+      if (delta > 0) index = (index + 1) % n;
+      else if (delta < 0) index = (index - 1 + n) % n;
       else return;
-      renderDiffCarouselSlots();
+      render();
       wheelCooldown = true;
       setTimeout(() => { wheelCooldown = false; }, 350);
     }, { passive: false });
-  })();
+
+    return { render };
+  }
+
+  const tierCarousels = TIER_DIFFICULTIES.map((difficulty) => {
+    const container = document.getElementById('challenge-tier-carousel-' + difficulty);
+    return createHorizontalHoldCarousel(container, TOTAL_CHALLENGE_LEVELS, (index) => {
+      const n = TOTAL_CHALLENGE_LEVELS;
+      const leftLv = ((index - 1 + n) % n) + 1;
+      const centerLv = index + 1;
+      const rightLv = ((index + 1) % n) + 1;
+
+      const leftSlot = container.querySelector('.tier-peek-left');
+      leftSlot.innerHTML = '';
+      leftSlot.appendChild(buildTierCircle(difficulty, leftLv, true));
+
+      const rightSlot = container.querySelector('.tier-peek-right');
+      rightSlot.innerHTML = '';
+      rightSlot.appendChild(buildTierCircle(difficulty, rightLv, true));
+
+      const stage = container.querySelector('.lv-circle-stage');
+      stage.innerHTML = '';
+      stage.appendChild(buildTierCircle(difficulty, centerLv, false));
+      stage.insertAdjacentHTML('beforeend',
+        '<svg class="lv-hold-ring" viewBox="0 0 100 100" aria-hidden="true">' +
+        '<circle class="lv-hold-ring-track" cx="50" cy="50" r="47"/>' +
+        '<circle class="lv-hold-ring-fill" cx="50" cy="50" r="47"/>' +
+        '</svg>');
+    });
+  });
 
   btnChallengeBack.addEventListener('click', closeSelectScreen);
 
@@ -435,7 +421,7 @@
     const isNewRecord = saveBestScoreIfHigher(run.difficulty, run.level, result.finalScore);
     coloringScreen.hidden = true;
     selectScreen.hidden = false;
-    renderLevelGrid();
+    tierCarousels.forEach((c) => c.render());
     let resultMsg = I18N.t('challenge.result.score', { score: result.finalScore });
     if (isNewRecord) resultMsg += ' ' + I18N.t('challenge.result.newRecord');
     if (result.isPerfect) resultMsg += ' ' + I18N.t('challenge.result.perfect');

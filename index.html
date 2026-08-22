@@ -115,15 +115,36 @@
     <h2 data-i18n="challenge.selectTitle">챌린지 모드</h2>
   </header>
 
-  <!-- 2026-08-23: 지도 화면의 원형+홀드링 캐러셀(.lv-circle 등)을 그대로 재사용, 좌우 방향으로만
-       새로 배치 — 위/중앙/아래 3자리 대신 좌/중앙/우 3자리. -->
-  <div id="challenge-diff-carousel" class="diff-node-wrap">
-    <div class="lv-peek diff-peek-left"></div>
-    <div class="lv-circle-stage"></div>
-    <div class="lv-peek diff-peek-right"></div>
+  <!-- 2026-08-23(2): "화면 위/중간/아래 = 쉬움/보통/어려움, 각자 독립된 좌우 캐러셀로 스테이지
+       1~10을 넘긴다" — 난이도를 먼저 고르는 방식(직전 버전) 대신, 3개 난이도가 항상 동시에
+       보이고 구역마다 따로 좌우로 움직인다. 지도 화면의 원형+홀드링(.lv-circle 등)을 그대로
+       재사용. -->
+  <div class="challenge-tiers">
+    <div class="challenge-tier-zone" data-tier="easy">
+      <p class="challenge-tier-label" data-i18n="challenge.difficulty.easy">EASY</p>
+      <div id="challenge-tier-carousel-easy" class="diff-node-wrap">
+        <div class="lv-peek tier-peek-left"></div>
+        <div class="lv-circle-stage"></div>
+        <div class="lv-peek tier-peek-right"></div>
+      </div>
+    </div>
+    <div class="challenge-tier-zone" data-tier="normal">
+      <p class="challenge-tier-label" data-i18n="challenge.difficulty.normal">NORMAL</p>
+      <div id="challenge-tier-carousel-normal" class="diff-node-wrap">
+        <div class="lv-peek tier-peek-left"></div>
+        <div class="lv-circle-stage"></div>
+        <div class="lv-peek tier-peek-right"></div>
+      </div>
+    </div>
+    <div class="challenge-tier-zone" data-tier="hard">
+      <p class="challenge-tier-label" data-i18n="challenge.difficulty.hard">HARD</p>
+      <div id="challenge-tier-carousel-hard" class="diff-node-wrap">
+        <div class="lv-peek tier-peek-left"></div>
+        <div class="lv-circle-stage"></div>
+        <div class="lv-peek tier-peek-right"></div>
+      </div>
+    </div>
   </div>
-
-  <div id="challenge-level-grid" class="challenge-level-grid"></div>
 </section>
 
 <!-- ===================== Level gallery screen ===================== -->
