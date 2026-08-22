@@ -1114,8 +1114,19 @@
     }
   }
 
+  // 2026-08-22: "스테이지1 클리어로 자동으로 스테이지2 넘어가는데, 지도 화면은 계속
+  // 스테이지1에 떠있다" 신고 — renderMap()이 매번 무조건 mapCarouselIndex를 0(스테이지1)으로
+  // 되돌려서, 진행 상황과 무관하게 항상 첫 스테이지가 보였다. 아직 안 깬 첫 스테이지(=이어할
+  // 곳)를 기본 위치로 잡는다 — 다 깼으면 마지막 스테이지.
+  function defaultMapCarouselIndex() {
+    for (let lv = 1; lv <= TOTAL_LEVELS; lv++) {
+      if (!isLevelCleared(lv)) return lv - 1;
+    }
+    return TOTAL_LEVELS - 1;
+  }
+
   function renderMap() {
-    mapCarouselIndex = 0;
+    mapCarouselIndex = defaultMapCarouselIndex();
     mapGrid.innerHTML = '';
     const wrap = document.createElement('div');
     wrap.className = 'level-node-wrap';
@@ -1365,9 +1376,18 @@
     if (currentLevel > 1) openLevel(currentLevel - 1);
   });
 
+  // 2026-08-22: "왜 오래 걸리는지 모르겠다" — 콘솔에 시간 정보가 없어서 어디서 지연되는지
+  // 못 봤다. 타임스탬프 설정을 못 찾는다는 피드백으로, 로그 문구 자체에 경과시간(ms)을
+  // 박아넣는다(레벨 진입 시점 기준). DevTools 설정을 안 건드려도 된다.
+  let puzzleFlowT0 = 0;
+  function plog(msg) {
+    console.log('[퍼즐] ' + msg + '  (+' + Math.round(performance.now() - puzzleFlowT0) + 'ms)');
+  }
+
   // ================= 레벨별 도안 갤러리 =================
   function openLevel(level) {
-    console.log('[퍼즐] openLevel(' + level + ') 진입');
+    puzzleFlowT0 = performance.now();
+    plog('openLevel(' + level + ') 진입');
     clearPendingCelebrationOverlays();
     currentBossMode = null;
     currentLevel = level;
@@ -1394,6 +1414,7 @@
     // 꼬였다. 재진입 시 이전 영상 재생/콜백을 확실히 끊는다.
     levelRewardVideo.pause();
     levelRewardVideo.onended = null;
+    if (rewardVideoFadeRAF) { cancelAnimationFrame(rewardVideoFadeRAF); rewardVideoFadeRAF = null; }
     levelRewardVideo.removeAttribute('src');
     levelRewardVideo.hidden = true;
     if (isLevelCleared(level)) clearLevelAttempt(level); // 이미 클리어된 레벨은 타이머 불필요
@@ -1843,9 +1864,10 @@
       ghost.style.width = fromRect.width + 'px';
       ghost.style.height = fromRect.height + 'px';
       document.body.appendChild(ghost);
-      // 겹치지 않도록: 도착점을 중앙 지점 주변으로 살짝(±25px) 흩뿌리고, 시작 지연도 조금씩 다르게.
-      const jitterX = (Math.random() - 0.5) * 50;
-      const jitterY = (Math.random() - 0.5) * 50;
+      // 2026-08-22: "양이 사라지는 지점이랑 아이콘 지점이 안 맞아 보인다" 피드백 — 겹침
+      // 방지용 흩뿌림 반경을 ±25px→±8px로 줄여 한 점에 훨씬 가깝게 모이게 한다.
+      const jitterX = (Math.random() - 0.5) * 16;
+      const jitterY = (Math.random() - 0.5) * 16;
       const dx = (targetX + jitterX) - (fromRect.left + fromRect.width / 2);
       const dy = (targetY + jitterY) - (fromRect.top + fromRect.height / 2);
       const delay = i * 25;
@@ -1899,7 +1921,7 @@
     // 재진입 등) 이 가드로 바로 return해버리면 그 아래 숨김 로직을 다시 안 타서 계속 보였다.
     // 진행 중인 퍼즐이 있으면 여기서도 숨김을 다시 확인해준다.
     if (rewardPuzzle && rewardPuzzle.level === level) {
-      console.log('[퍼즐] maybeShowRewardPuzzle: 이미 진행 중(레벨' + level + '), galleryGrid 재숨김');
+      plog('maybeShowRewardPuzzle: 이미 진행 중(레벨' + level + '), galleryGrid 재숨김');
       galleryGrid.hidden = true;
       return; // 이미 진행 중
     }
@@ -1909,7 +1931,7 @@
     const scores = getScores();
     const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
     if (doneCount < list.length) return; // 아직 다 안 깼음
-    console.log('[퍼즐] 16개 완료 확인, 레벨' + level + ' 퍼즐 초기화 시작');
+    plog('16개 완료 확인, 레벨' + level + ' 퍼즐 초기화 시작');
     const dims = puzzleDimsForLevel(level);
     rewardPuzzle = {
       level: level,
@@ -1987,13 +2009,19 @@
   // 나오는 연출(explodeIntoPuzzle)과 같은 방식이라 좌표 계산 없이도 항상 정확하다.
   // 2026-08-22: 트레이-박스-트레이가 계속 움직인다는 신고가 반복됐다 — 원인을 하나씩 막아도
   // (margin:auto 위치, [hidden] 우선순위, align-items, 트레이 접힘...) 매번 다른 경로로 다시
-  // 움직여서, 원인 추적 대신 "물리적으로 움직일 수 없게" 매 프레임 좌표를 다시 박아버리는
-  // watchdog으로 바꾼다 — 뭐가 원인이든 상관없이 100% 고정된다.
-  let rewardTrioLockRAF = null;
+  // 움직여서, 원인 추적 대신 "물리적으로 움직일 수 없게" 좌표를 박아버리는 방식으로 바꿨다.
+  // 처음엔 매 프레임(rAF 루프) 재적용이었는데, 이게 변신 영상 재생 10초 내내 쉬지 않고
+  // 돌면서 느린 기기에서 메인스레드를 영상 디코딩과 계속 다투게 만들어(사용자 실측 영상에서
+  // 확인: 흰 화면 정지 + 박스 확대회전 연출이 안 보이고 순간이동하듯 나타남) 성능 문제를
+  // 일으켰다. 한 번만 고정하고, 화면 크기가 바뀔 때만(리사이즈) 다시 고정하는 걸로 바꾼다 —
+  // 이 좌표를 건드리는 다른 코드가 없는 구간이라(reserveTrayHeight 등은 lock 이전에 끝남)
+  // 안전하다.
+  let rewardTrioLockResizeHandler = null;
+  let rewardVideoFadeRAF = null;
   function lockRewardTrioPosition() {
     const els = [rewardPuzzleTrayTop, levelReward, rewardPuzzleTrayBottom];
-    const fixed = els.map((el) => el.getBoundingClientRect());
     const apply = () => {
+      const fixed = els.map((el) => el.getBoundingClientRect());
       els.forEach((el, i) => {
         el.style.position = 'fixed';
         el.style.top = fixed[i].top + 'px';
@@ -2001,13 +2029,14 @@
         el.style.width = fixed[i].width + 'px';
         el.style.margin = '0';
       });
-      rewardTrioLockRAF = requestAnimationFrame(apply);
     };
-    if (rewardTrioLockRAF) cancelAnimationFrame(rewardTrioLockRAF);
     apply();
+    if (rewardTrioLockResizeHandler) window.removeEventListener('resize', rewardTrioLockResizeHandler);
+    rewardTrioLockResizeHandler = apply;
+    window.addEventListener('resize', rewardTrioLockResizeHandler);
   }
   function unlockRewardTrioPosition() {
-    if (rewardTrioLockRAF) { cancelAnimationFrame(rewardTrioLockRAF); rewardTrioLockRAF = null; }
+    if (rewardTrioLockResizeHandler) { window.removeEventListener('resize', rewardTrioLockResizeHandler); rewardTrioLockResizeHandler = null; }
     [rewardPuzzleTrayTop, levelReward, rewardPuzzleTrayBottom].forEach((el) => {
       el.style.position = '';
       el.style.top = '';
@@ -2018,35 +2047,31 @@
   }
 
   function moveRewardBoxToCenter(level, onDone) {
-    console.log('[퍼즐] moveRewardBoxToCenter 시작 — 박스를 중앙에 점에서부터 확대');
-    // 2026-08-22: "빈 박스가 화면을 가로질러 슬라이드하는 게 이상하다, 중앙에서 점부터
-    // 확대되게" 요청 — 예전엔 원래 자리→중앙으로 실제로 슬라이드(FLIP)했는데, 이 시점엔
-    // 이미 그림/아이콘이 다 사라진 뒤라 "빈 크림색 박스"가 화면을 가로질러 미끄러지는 것처럼
-    // 보였다. 이제 슬라이드 없이 중앙 자리에 바로(안 보이게, scale:0) 배치한 뒤 그 자리에서만
-    // 커지게 한다 — 위치 이동 자체가 없으니 "박스가 위로 간다" 문제도 원천적으로 없다.
+    plog('moveRewardBoxToCenter 시작 — 양이 회전하며 중앙으로 되돌아온 뒤 박스로 전환');
+    // 2026-08-22: "박스가 나타나는" 연출을 여러 방식(회전+확대, 위아래로만 커지기)으로
+    // 시도했는데 느린 기기에서 전부 순간이동처럼 보여 포기 — 대신 방금 중앙으로 사라졌던
+    // 그 양 그림(levelRewardArt)이 회전하며 같은 자리로 되돌아오는 걸로 대체한다(사용자
+    // 확인: "사라졌던 양이 다시 중앙으로", "1번"). 사라지는 쪽(scatterMosaicIn)은 이 기기
+    // 에서도 문제없이 보였으니 그 반대 방향도 같은 이유로 잘 보일 가능성이 높다. 다 돌아온
+    // 뒤엔 곧바로(추가 연출 없이) 검은 박스+영상으로 넘어간다(스타일시트 reward-art-return
+    // 참고).
     galleryGrid.classList.add('gallery-grid-hiding');
     setTimeout(() => {
-      if (currentLevel !== level) { console.log('[퍼즐] moveRewardBoxToCenter: 그 사이 레벨 변경됨(' + currentLevel + '≠' + level + '), 중단'); onDone(); return; }
+      if (currentLevel !== level) { plog('moveRewardBoxToCenter: 그 사이 레벨 변경됨(' + currentLevel + '≠' + level + '), 중단'); onDone(); return; }
       galleryGrid.hidden = true;
       galleryGrid.classList.remove('gallery-grid-hiding');
       reserveTrayHeight(rewardPuzzle.dims); // 트레이가 나중에 채워져도 더는 안 흔들리게 지금 미리 자리를 예약
       levelReward.classList.add('reward-centered');
       rewardPuzzleTrayTop.classList.add('reward-tray-anchor-top');
       rewardPuzzleTrayBottom.classList.add('reward-tray-anchor-bottom');
-      // 2026-08-22: "밋밋하다, 점에서 빙글빙글 돌며 커지면서 제자리로" 요청 — 회전도 같이 준다.
-      levelRewardStage.style.transition = 'none';
-      levelRewardStage.style.transform = 'scale(0) rotate(-540deg)';
-      lockRewardTrioPosition(); // 지금 이 좌표(=화면 중앙)에 매 프레임 강제 고정, 다시는 안 움직임.
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          levelRewardStage.style.transition = 'transform 0.7s cubic-bezier(0.34, 1.2, 0.4, 1)';
-          levelRewardStage.style.transform = '';
-          setTimeout(() => {
-            levelRewardStage.style.transition = '';
-            onDone();
-          }, 700);
-        });
-      });
+      lockRewardTrioPosition(); // 지금 이 좌표(=화면 중앙)에 고정, 다시는 안 움직임.
+      levelRewardArt.classList.add('reward-art-return');
+      setTimeout(() => {
+        levelRewardArt.classList.remove('reward-art-return');
+        levelRewardArt.style.opacity = '';
+        levelRewardArt.style.transform = '';
+        onDone();
+      }, 1100);
     }, 320);
   }
 
@@ -2057,7 +2082,7 @@
   // 작은 검정 박스 밖으로 튀어나와 보임. 화면 크기에 안 맞는 고정 배율 대신, 실제 뷰포트
   // 기준으로 배율을 계산해서 어떤 화면에서도 확실히 화면을 덮게 한다.
   function zoomRewardToFullscreenAndAdvance(level) {
-    console.log('[퍼즐] zoomRewardToFullscreenAndAdvance 시작 — 화면 꽉 채우게 확대');
+    plog('zoomRewardToFullscreenAndAdvance 시작 — 화면 꽉 채우게 확대');
     const rect = levelRewardStage.getBoundingClientRect();
     const scale = (Math.max(window.innerWidth, window.innerHeight) / Math.min(rect.width, rect.height)) * 1.15;
     // 2026-08-22: "박스가 위로 올라갔다"(사용자 실측) — playExcellent()의 시각 문구
@@ -2066,23 +2091,31 @@
     playExcellent(true);
     // 2026-08-22: "커지면서 희미해지게" + "클로즈샷 흐리게" 요청 — 확대와 함께 서서히
     // 투명해지고 블러(초점이 나가는 느낌)되다가 다음 레벨로 넘어감.
-    levelRewardStage.style.transition = 'transform 1.1s cubic-bezier(0.45, 0, 0.4, 1), opacity 1.1s ease-in, filter 1.1s ease-in';
+    // 2026-08-22(2차): "너무 확 커진다" — 속도를 늦춘다(1.1s → 2.5s).
+    // 2026-08-22(3차): "너무 희미하고 안 선명하다" — 블러를 20px→8px로 완화하고, 확대
+    // 전반(60%)은 또렷하게 커지기만 하다가 마지막 40%에서만 페이드+블러가 들어가게 한다.
+    const ZOOM_SEC = 2.5;
+    const FADE_DELAY_SEC = ZOOM_SEC * 0.6;
+    const FADE_SEC = ZOOM_SEC - FADE_DELAY_SEC;
+    levelRewardStage.style.transition = 'transform ' + ZOOM_SEC + 's cubic-bezier(0.45, 0, 0.4, 1), '
+      + 'opacity ' + FADE_SEC + 's ease-in ' + FADE_DELAY_SEC + 's, '
+      + 'filter ' + FADE_SEC + 's ease-in ' + FADE_DELAY_SEC + 's';
     requestAnimationFrame(() => {
       levelRewardStage.style.transform = 'scale(' + scale.toFixed(2) + ')';
       levelRewardStage.style.opacity = '0';
-      levelRewardStage.style.filter = 'blur(20px)';
+      levelRewardStage.style.filter = 'blur(8px)';
     });
     setTimeout(() => {
-      if (currentLevel !== level) { console.log('[퍼즐] 확대 완료 시점에 레벨 불일치, 다음 레벨 이동 안 함'); return; }
+      if (currentLevel !== level) { plog('확대 완료 시점에 레벨 불일치, 다음 레벨 이동 안 함'); return; }
       const nextLevel = level + 1;
       if (nextLevel <= TOTAL_LEVELS && isLevelUnlocked(nextLevel)) {
-        console.log('[퍼즐] 다음 스테이지(' + nextLevel + ')로 이동');
+        plog('다음 스테이지(' + nextLevel + ')로 이동');
         openLevel(nextLevel);
       } else {
-        console.log('[퍼즐] 다음 스테이지 없음/잠김 — 지도로 이동');
+        plog('다음 스테이지 없음/잠김 — 지도로 이동');
         goToMap();
       }
-    }, 1100);
+    }, 2500);
   }
 
   // 레벨1: goal 박스(#level-reward-stage) 안에서만 변신 영상을 재생한다. 영상 원본 배경이
@@ -2109,19 +2142,31 @@
         levelRewardVideo.muted = true;
         levelRewardVideo.play();
       });
-      console.log('[퍼즐] 변신 영상 재생 시작');
+      plog('변신 영상 재생 시작');
       // 2026-08-22: "마지막에 소리가 뚝 끊겨서 이상하다" 요청 — 원본 음원 자체가 페이드아웃
       // 없이 끝나서, 끝나기 직전 0.6초 동안 볼륨을 서서히 낮춰 부드럽게 마무리한다.
+      // 처음엔 ontimeupdate로 했는데, 이 이벤트는 브라우저가 대략 초당 4번 정도만 불러줘서
+      // (스펙상 보장 안 됨) 0.6초짜리 페이드 구간에 1~2번밖에 안 걸려 여전히 뚝 끊기는
+      // 것처럼 들렸다 — 매 프레임 확인하는 requestAnimationFrame으로 바꿔 촘촘하게 낮춘다.
       const FADE_OUT_SEC = 0.6;
-      levelRewardVideo.ontimeupdate = () => {
+      if (rewardVideoFadeRAF) cancelAnimationFrame(rewardVideoFadeRAF);
+      const fadeTick = () => {
+        if (levelRewardVideo.paused || levelRewardVideo.ended) { rewardVideoFadeRAF = null; return; }
         const remain = levelRewardVideo.duration - levelRewardVideo.currentTime;
         if (isFinite(remain) && remain <= FADE_OUT_SEC) {
-          levelRewardVideo.volume = Math.max(0, remain / FADE_OUT_SEC);
+          // 2026-08-22: "그래도 끊기는 느낌" — 볼륨을 직선(linear)으로 줄이면, 사람 귀는
+          // 소리 크기를 로그로 느끼기 때문에 대부분 구간에서 거의 안 줄어든 것처럼 들리다가
+          // 막판에 갑자기 확 조용해져 여전히 "뚝 끊김"처럼 느껴진다. 제곱 곡선으로 바꿔
+          // 체감 감쇠를 고르게 만든다.
+          const t = Math.max(0, remain / FADE_OUT_SEC);
+          levelRewardVideo.volume = t * t;
         }
+        rewardVideoFadeRAF = requestAnimationFrame(fadeTick);
       };
+      rewardVideoFadeRAF = requestAnimationFrame(fadeTick);
       levelRewardVideo.onended = () => {
-        console.log('[퍼즐] 영상 종료(onended) — currentLevel=' + currentLevel + ', 대상레벨=' + level);
-        if (currentLevel !== level) { console.log('[퍼즐] 레벨 불일치로 중단(이 영상은 무시됨)'); return; }
+        plog('영상 종료(onended) — currentLevel=' + currentLevel + ', 대상레벨=' + level);
+        if (currentLevel !== level) { plog('레벨 불일치로 중단(이 영상은 무시됨)'); return; }
         // 마지막 프레임(변신 완료된 로봇양)에서 정지된 채로 잠깐 보여준다.
         setTimeout(() => {
           if (currentLevel !== level) return;
@@ -2302,9 +2347,9 @@
   }
 
   function explodeIntoPuzzle(level) {
-    console.log('[퍼즐] explodeIntoPuzzle 호출 — currentLevel=' + currentLevel + ', 대상레벨=' + level);
-    if (currentLevel !== level) { console.log('[퍼즐] 레벨 불일치로 중단'); return; } // 그 사이 다른 레벨로 이동했으면 건너뜀
-    console.log('[퍼즐] 조각 16개로 터짐 시작(트레이 생성)');
+    plog('explodeIntoPuzzle 호출 — currentLevel=' + currentLevel + ', 대상레벨=' + level);
+    if (currentLevel !== level) { plog('레벨 불일치로 중단'); return; } // 그 사이 다른 레벨로 이동했으면 건너뜀
+    plog('조각 16개로 터짐 시작(트레이 생성)');
     const art = LEVEL_REWARD_ART[level];
     // 퍼즐 미리보기 버튼: 이 레벨의 완성 이미지를 썸네일/모달 소스로 채우고 보여준다.
     const puzzleEmoji = art.puzzleEmoji || art.emoji;
@@ -2388,7 +2433,7 @@
   // playExcellent/showLevelClearPraise 재활용)를 재생. "다음" 버튼은 애니메이션을 기다리지
   // 않고 즉시 열림(다른 레벨들과 동일).
   function finishRewardPuzzle(level) {
-    console.log('[퍼즐] finishRewardPuzzle 시작(레벨' + level + ') — 칸 선 사라짐 → 완성 이미지 크로스페이드');
+    plog('finishRewardPuzzle 시작(레벨' + level + ') — 칸 선 사라짐 → 완성 이미지 크로스페이드');
     btnPuzzleMagnify.hidden = true; // 다 맞췄으니 미리보기 버튼은 필요 없음
     levelRewardStageBg.classList.remove('is-dark'); // 퍼즐 완료 시 검정 배경 원복(요청).
     const art = LEVEL_REWARD_ART[level];
@@ -2575,14 +2620,19 @@
     // 안 되므로 되돌림(빈 트레이 공간보다 박스 위치 안정이 우선).
     playPuzzleCorrectSfx();
     if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) { /* 무시 */ } }
-    if (rewardPuzzle) console.log('[퍼즐] 조각 배치: cell-' + cellIndex + ' (' + rewardPuzzle.solved.size + '/' + (rewardPuzzle.dims.cols * rewardPuzzle.dims.rows) + ')');
+    if (rewardPuzzle) plog('조각 배치: cell-' + cellIndex + ' (' + rewardPuzzle.solved.size + '/' + (rewardPuzzle.dims.cols * rewardPuzzle.dims.rows) + ')');
     if (rewardPuzzle && rewardPuzzle.solved.size >= rewardPuzzle.dims.cols * rewardPuzzle.dims.rows) {
       const solvedLevel = rewardPuzzle.level;
-      console.log('[퍼즐] 16/16 완성 — finishRewardPuzzle 호출');
+      plog('16/16 완성 — finishRewardPuzzle 호출');
       rewardPuzzleSolvedLevels.add(solvedLevel);
       markRewardPuzzleSolvedPersisted(solvedLevel);
       rewardPuzzleTrayTop.hidden = true;
       rewardPuzzleTrayBottom.hidden = true;
+      // 2026-08-22: "완료된 레벨1로 뒤로가기하면 로봇만 있고 16개 원이 안 보인다" 신고 원인 —
+      // 다 푼 뒤에도 rewardPuzzle이 그대로 남아있어서, maybeShowRewardPuzzle의 "이미 진행
+      // 중"(rewardPuzzle.level===level) 체크가 계속 참이 되어 galleryGrid를 매번 다시
+      // 숨겼다. 다 푼 시점에 null로 비워 이 오판을 없앤다.
+      rewardPuzzle = null;
       finishRewardPuzzle(solvedLevel);
     }
   }
