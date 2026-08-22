@@ -145,20 +145,20 @@
   <!-- 2026-08-16: 레벨별 "퍼즐 조각 보상" 그래픽 — 그림을 완료할 때마다 칸이 하나씩 열리며
        실제 이모지 그림이 드러나고, 다 채워지면 완성 연출이 재생된다(레벨1~10 전부 적용). -->
   <div id="level-reward" class="level-reward" hidden aria-hidden="true">
-    <svg id="level-reward-art" class="level-reward-art"></svg>
-    <!-- 2026-08-22: 레벨을 다 깨면(레벨1=16개) 조각을 다시 흩뿌리기 전, 이 자리에서 변신
-         연출이 한 번 재생된다(sheep→robot). 영상 파일 대신 이미지 2장의 CSS 크로스페이드 —
-         AI 영상 생성이 만든 검정 배경을 지우려던 시도(컬러키/AI 배경제거)가 전부 지저분하거나
-         너무 느려서, 애초에 배경이 필요 없는 방식으로 바꿨다. goal 이미지 박스 밖으로는 안 나감. -->
-    <div id="level-reward-transform" class="level-reward-transform" hidden>
-      <img id="level-reward-transform-before" class="level-reward-transform-img">
-      <img id="level-reward-transform-after" class="level-reward-transform-img">
-      <div class="level-reward-transform-sparkle" aria-hidden="true">✨</div>
+    <!-- 2026-08-22: 모자이크(그림)→변신 영상→퍼즐, 세 단계 전부 이 정사각형 무대 하나
+         안에서 겹쳐 그려진다 — 그림 크기/위치가 단계마다 안 바뀌게(이전엔 각자 다른 박스라
+         전환마다 튀었음). #level-reward-stage-bg가 무대 배경색을 크림↔검정으로 전환하고,
+         영상은 배경 제거 없이 원본(검정 배경) 그대로 쓴다 — 그 시점엔 무대가 이미 검정이라
+         이질감이 없다. -->
+    <div id="level-reward-stage" class="level-reward-stage">
+      <div id="level-reward-stage-bg" class="level-reward-stage-bg"></div>
+      <svg id="level-reward-art" class="level-reward-art"></svg>
+      <video id="level-reward-video" class="level-reward-video" muted playsinline hidden></video>
+      <!-- 2026-08-16: 조각 맞추기 미니게임 진행 중에만 보임(그 외엔 위 svg를 씀) — 정답 칸을
+           트레이 조각과 완전히 같은 정사각형 타일(.reward-puzzle-tile)로 만들어서 크기를
+           정확히 맞춘다. -->
+      <div id="reward-puzzle-target-grid" class="reward-puzzle-target-grid" hidden></div>
     </div>
-    <!-- 2026-08-16: 조각 맞추기 미니게임 진행 중에만 보임(그 외엔 위 svg를 씀) — 정답 칸을
-         트레이 조각과 완전히 같은 정사각형 타일(.reward-puzzle-tile)로 만들어서 크기를
-         정확히 맞춘다. -->
-    <div id="reward-puzzle-target-grid" class="reward-puzzle-target-grid" hidden></div>
   </div>
   <div id="reward-puzzle-tray-bottom" class="reward-puzzle-tray" hidden></div>
   <!-- 2026-08-16: 레벨을 방금 클리어한 순간에만 잠깐 뜨는 칭찬 문구(보상 이미지 바로 아래) —

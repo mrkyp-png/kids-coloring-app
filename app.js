@@ -159,9 +159,9 @@
   const rewardPuzzleTrayBottom = document.getElementById('reward-puzzle-tray-bottom');
   const rewardPuzzleTargetGrid = document.getElementById('reward-puzzle-target-grid');
   // 2026-08-21: 레벨1(동물)이 16개 다 완료됐을 때 goal 이미지 박스 안에서 재생되는 변신 영상.
-  const levelRewardTransform = document.getElementById('level-reward-transform');
-  const levelRewardTransformBefore = document.getElementById('level-reward-transform-before');
-  const levelRewardTransformAfter = document.getElementById('level-reward-transform-after');
+  const levelRewardStage = document.getElementById('level-reward-stage');
+  const levelRewardStageBg = document.getElementById('level-reward-stage-bg');
+  const levelRewardVideo = document.getElementById('level-reward-video');
   const btnMapBack = document.getElementById('btn-map-back');
   const levelTitle = document.getElementById('level-title');
   const levelProgress = document.getElementById('level-progress');
@@ -1299,6 +1299,13 @@
     currentBossMode = null;
     currentLevel = level;
     galleryGrid.hidden = false; // 퍼즐 미니게임 중 숨겼던 도안 목록을 새 레벨 진입 시 복원.
+    galleryGrid.classList.remove('gallery-grid-hiding');
+    levelRewardStageBg.classList.remove('is-dark'); // 레벨1 변신 연출용 검정 배경을 다른 레벨/재진입 시 원복.
+    levelReward.classList.remove('reward-centered'); // 레벨1 중앙 이동 연출을 다른 레벨/재진입 시 원복.
+    levelReward.style.transform = '';
+    levelReward.style.transition = '';
+    levelRewardStage.style.transform = ''; // 레벨1 정면 확대 연출을 다른 레벨/재진입 시 원복.
+    levelRewardStage.style.transition = '';
     if (isLevelCleared(level)) clearLevelAttempt(level); // 이미 클리어된 레벨은 타이머 불필요
     // 주의: 그림 목록만 구경하는 걸로는 시간이 소모되면 안 되므로, 여기서는 타임어택을 시작하지
     // 않는다 — 실제로 그림 하나를 열 때(openTemplate)가 되어서야 처음 시작한다.
@@ -1689,11 +1696,11 @@
   function puzzleDimsForLevel(level) {
     return level === 1 ? { cols: 4, rows: 4 } : { cols: PUZZLE_COLS, rows: PUZZLE_ROWS };
   }
-  // 레벨1처럼 완료 시 goal 박스 안에서 변신 연출(이미지 2장 크로스페이드)이 먼저 재생된 뒤
-  // 그 "이후" 이미지가 퍼즐이 되는 레벨. 3600ms는 style.css의 크로스페이드 애니메이션 총 길이와
-  // 맞춰야 한다(reward-transform-fade-out/-in/-sparkle 참고).
-  const LEVEL_TRANSFORM_IMAGES = { 1: { before: 'assets/emoji/sheep.svg', after: 'assets/transform/sheep-final.png' } };
-  const LEVEL_TRANSFORM_DURATION_MS = 3600;
+  // 레벨1처럼 완료 시 goal 박스 안에서 실제 변신 영상이 먼저 재생된 뒤 그 "이후" 이미지가
+  // 퍼즐이 되는 레벨. 2026-08-22: 크로스페이드(정지 이미지 2장)는 보상 효과가 약하다는 피드백으로
+  // 원본(배경 검정) 영상을 다시 씀 — 배경 제거 없이, 대신 박스 배경을 먼저 검정으로 바꿔서
+  // 영상 배경과 자연스럽게 이어지게 한다(playLevelTransform 참고).
+  const LEVEL_TRANSFORM_VIDEO = { 1: 'assets/transform/sheep.mp4' };
   let rewardPuzzle = null; // { level, solved: Set<number>, dims: {cols,rows}, edges }
   // 이번 세션에 이미 다 맞춘 레벨(다시 들어가도 매번 또 안 뜨게) — 세션 한정 캐시일 뿐, 진짜
   // 영구 기록은 REWARD_PUZZLE_SOLVED_KEY(localStorage)에 있다(아래 maybeShowRewardPuzzle 참고).
@@ -1727,41 +1734,127 @@
       dims: dims,
       edges: (dims.cols === PUZZLE_COLS && dims.rows === PUZZLE_ROWS) ? PUZZLE_EDGES : buildPuzzleJigEdges(dims.cols, dims.rows),
     };
+    const transformVideo = LEVEL_TRANSFORM_VIDEO[level];
     // 2026-08-22: "퍼즐 진행 중~다음 레벨로 넘어가기 전까지 도안 아이콘 목록은 안 보이게" 요청 —
     // 퍼즐 박스에 화면 공간을 더 주기 위해 숨긴다. 다시 보이는 시점은 openLevel()(다음/뒤로가기로
-    // 레벨을 새로 열 때) 참고.
-    galleryGrid.hidden = true;
+    // 레벨을 새로 열 때) 참고. 레벨1(변신 영상 있음)은 여기서 바로 숨기지 않고, 변신 시작 직전에
+    // moveRewardBoxToCenter가 슬라이드로 치우면서 그 빈 자리로 보상 박스를 중앙까지 옮긴다.
+    if (!transformVideo) {
+      galleryGrid.hidden = true;
+    }
     // 완성된 그림이 위에서 살짝 내려오며 가운데 자리잡는 연출(0.4s) → 칸 구분선이 지워져
     // 깔끔한 한 장의 그림이 됨 → 퍼즐 트레이 크기로 줄어들며 살짝 아래로 자리잡음(0.5s) →
-    // 그 자리에서 조각들로 터뜨린다(레벨1은 그 전에 goal 박스 안에서 변신 영상이 먼저 재생됨).
+    // 그 자리에서 조각들로 터뜨린다.
+    // 2026-08-22: 레벨1(변신 영상 있음)은 이 축소를 건너뛴다 — 영상이 무대 100% 크기로 바로
+    // 나오는데 그 직전에 양이 퍼즐 조각 크기로 작아졌다 사라지면 "작아졌다 다시 커지는" 튐이
+    // 보였다(사용자 제보). 영상 없는 레벨만 조각으로 터지기 전 축소 연출을 그대로 쓴다.
     levelRewardArt.classList.add('reward-drop-in');
     setTimeout(() => {
       levelRewardArt.classList.remove('reward-drop-in');
       levelRewardArt.classList.add('reward-puzzle-clean');
     }, 450);
-    setTimeout(() => levelRewardArt.classList.add('reward-puzzle-shrink'), 700);
-    const transformImages = LEVEL_TRANSFORM_IMAGES[level];
-    if (transformImages) {
-      setTimeout(() => playLevelTransform(level, transformImages), 1300);
-    } else {
+    if (!transformVideo) {
+      setTimeout(() => levelRewardArt.classList.add('reward-puzzle-shrink'), 700);
       setTimeout(() => explodeIntoPuzzle(level), 1300);
+    } else {
+      // 레벨1: 아이콘 목록을 슬라이드로 치우고 보상 박스를 화면 중앙으로 옮긴 뒤 변신을 시작한다.
+      setTimeout(() => moveRewardBoxToCenter(level, () => playLevelTransform(level, transformVideo)), 1300);
     }
   }
 
-  // 레벨1: goal 이미지 박스(levelRewardArt와 정확히 같은 자리, CSS grid-area 공유) 안에서만
-  // 변신 연출(이미지 2장 크로스페이드, style.css의 reward-transform-* 애니메이션)을 재생하고,
-  // 끝나면 그대로 조각 맞추기로 넘어간다.
-  function playLevelTransform(level, images) {
-    if (currentLevel !== level) return;
-    levelRewardArt.hidden = true;
-    levelRewardTransformBefore.src = images.before;
-    levelRewardTransformAfter.src = images.after;
-    levelRewardTransform.hidden = false;
+  // 2026-08-22: 레벨1 전용 — 변신 시작 직전, 아이콘 목록을 아래로 슬라이드시켜 치우고 그
+  // 빈 자리로 보상 박스(#level-reward)를 화면 중앙까지 부드럽게 옮긴다. FLIP 기법(이동 전/후
+  // 실제 좌표를 재서 역방향 위치에서 시작해 제자리로 트랜지션) — 퍼즐 조각이 트레이에서 튀어
+  // 나오는 연출(explodeIntoPuzzle)과 같은 방식이라 좌표 계산 없이도 항상 정확하다.
+  function moveRewardBoxToCenter(level, onDone) {
+    const before = levelReward.getBoundingClientRect();
+    galleryGrid.classList.add('gallery-grid-hiding');
     setTimeout(() => {
-      levelRewardTransform.hidden = true;
-      levelRewardArt.hidden = false;
-      explodeIntoPuzzle(level);
-    }, LEVEL_TRANSFORM_DURATION_MS);
+      if (currentLevel !== level) { onDone(); return; }
+      galleryGrid.hidden = true;
+      galleryGrid.classList.remove('gallery-grid-hiding');
+      levelReward.classList.add('reward-centered'); // margin-top/bottom:auto로 남는 공간에서 중앙 정렬
+      const after = levelReward.getBoundingClientRect();
+      levelReward.style.transform = 'translateY(' + (before.top - after.top) + 'px)';
+      requestAnimationFrame(() => {
+        levelReward.style.transition = 'transform 0.55s cubic-bezier(0.34, 1.1, 0.4, 1)';
+        levelReward.style.transform = '';
+        setTimeout(() => {
+          levelReward.style.transition = '';
+          onDone();
+        }, 550);
+      });
+    }, 320);
+  }
+
+  // 2026-08-22: 레벨1 전용 — 퍼즐을 다 맞춰 원본(양로봇) 이미지로 돌아온 뒤, 그 자리에서
+  // 화면을 꽉 채우도록 확대(정면으로 다가오는 느낌)했다가 다음 레벨로 자동 이동한다.
+  // 그림(#level-reward-art)만이 아니라 무대(#level-reward-stage) 전체(검정 배경 포함)를
+  // 한 덩어리로 확대해야 배경과 그림이 같이 커져서 자연스럽다 — 그림만 커지면 확대된 그림이
+  // 작은 검정 박스 밖으로 튀어나와 보임. 화면 크기에 안 맞는 고정 배율 대신, 실제 뷰포트
+  // 기준으로 배율을 계산해서 어떤 화면에서도 확실히 화면을 덮게 한다.
+  function zoomRewardToFullscreenAndAdvance(level) {
+    const rect = levelRewardStage.getBoundingClientRect();
+    const scale = (Math.max(window.innerWidth, window.innerHeight) / Math.min(rect.width, rect.height)) * 1.15;
+    playExcellent();
+    levelRewardStage.style.transition = 'transform 1.1s cubic-bezier(0.45, 0, 0.4, 1)';
+    requestAnimationFrame(() => {
+      levelRewardStage.style.transform = 'scale(' + scale.toFixed(2) + ')';
+    });
+    setTimeout(() => {
+      if (currentLevel !== level) return;
+      const nextLevel = level + 1;
+      if (nextLevel <= TOTAL_LEVELS && isLevelUnlocked(nextLevel)) {
+        openLevel(nextLevel);
+      } else {
+        goToMap();
+      }
+    }, 1100);
+  }
+
+  // 레벨1: goal 박스(#level-reward-stage) 안에서만 변신 영상을 재생한다. 영상 원본 배경이
+  // 검정이라, 재생 전에 박스 배경(levelRewardStageBg)부터 검정으로 트랜지션시켜 이어붙인 것처럼
+  // 보이게 한 뒤 재생 — 별도의 배경 제거 처리가 필요 없다. levelRewardArt(양 SVG)와 영상이
+  // 같은 stage 안, 같은 크기(grid-area:1/1, width/height:100%)를 공유해서 전환 전후로 양의
+  // 위치·크기가 흔들리지 않는다.
+  function playLevelTransform(level, videoSrc) {
+    if (currentLevel !== level) return;
+    levelRewardStageBg.classList.add('is-dark');
+    setTimeout(() => {
+      if (currentLevel !== level) return;
+      levelRewardArt.setAttribute('hidden', '');
+      levelRewardVideo.src = videoSrc;
+      levelRewardVideo.hidden = false;
+      levelRewardVideo.currentTime = 0;
+      levelRewardVideo.play();
+      levelRewardVideo.onended = () => {
+        if (currentLevel !== level) return;
+        // 마지막 프레임(변신 완료된 로봇양)에서 정지된 채로 잠깐 보여준다.
+        setTimeout(() => {
+          if (currentLevel !== level) return;
+          // 2026-08-22: "영상이 끝나자마자 뚝 끊기고 빈 무대만 보이다 퍼즐칸이 나타나 깜빡여
+          // 보인다" 피드백 — 영상을 바로 지우지 않고, 그 위에 같은 완성 모습(정지된 로봇양)을
+          // reward-drop-in(다른 레벨 모자이크 완성과 같은 연출)으로 겹쳐 보여준 뒤(z-index로
+          // 영상 위에 그려서 크로스페이드처럼 보임) 완전히 가려진 뒤에야 영상을 지운다.
+          const art = LEVEL_REWARD_ART[level];
+          const finishedArt = art.puzzleEmoji ? Object.assign({}, art, { emoji: art.puzzleEmoji }) : art;
+          const gridTotal = Math.max(getTemplatesForLevel(level).length, GALLERY_GRID_TARGET);
+          const { cols, rows } = gridDims(gridTotal);
+          levelRewardArt.innerHTML = buildRewardSvg(finishedArt, cols, rows);
+          levelRewardArt.querySelectorAll('.reward-cell').forEach((el) => el.classList.add('is-active'));
+          levelRewardArt.setAttribute('class', 'level-reward-art reward-puzzle-clean reward-drop-in');
+          levelRewardArt.removeAttribute('hidden');
+          setTimeout(() => {
+            if (currentLevel !== level) return;
+            levelRewardVideo.hidden = true; // 이미 위 art가 완전히 덮은 뒤라 안 보이는 채로 사라짐
+            setTimeout(() => {
+              if (currentLevel !== level) return;
+              explodeIntoPuzzle(level);
+            }, 600);
+          }, 450); // reward-drop-in 애니메이션(0.4s) 끝난 뒤
+        }, 500);
+      };
+    }, 650); // 배경색 트랜지션(0.6s, style.css)이 끝난 뒤 영상 시작
   }
 
   function puzzleCellRect(i) {
@@ -1911,12 +2004,11 @@
 
       // 정답 칸(가운데) — 트레이 조각과 완전히 같은 타일 클래스를 씀(크기 통일), 해당
       // 조각과 정확히 같은 직소 윤곽을 옅은 색으로 미리 보여줌.
-      // 레벨1(4x4=16조각)은 다른 레벨(2x2)보다 조각이 훨씬 많아서 타일을 작게(64px) 줄여야
-      // goal 박스 폭 안에 들어간다 — reward-puzzle-4x4 클래스로 CSS에서 크기/열 개수를 바꾼다.
-      const isBig = rewardPuzzle.dims.cols > PUZZLE_COLS;
-      rewardPuzzleTargetGrid.classList.toggle('reward-puzzle-4x4', isBig);
-      rewardPuzzleTrayTop.classList.toggle('reward-puzzle-4x4', isBig);
-      rewardPuzzleTrayBottom.classList.toggle('reward-puzzle-4x4', isBig);
+      // 2026-08-22: 정답 칸은 goal 박스(#level-reward-stage)와 항상 같은 크기를 채우도록
+      // 열 개수만큼 1fr로 나눈다(레벨마다 조각 수가 달라도 박스 자체 크기는 안 변함) —
+      // 트레이 조각도 그 칸 크기(stage 폭 / 열 개수)에 맞춰 아래에서 px로 직접 지정한다.
+      rewardPuzzleTargetGrid.style.gridTemplateColumns = 'repeat(' + rewardPuzzle.dims.cols + ', 1fr)';
+      const tileSize = levelRewardStage.getBoundingClientRect().width / rewardPuzzle.dims.cols;
       rewardPuzzleTargetGrid.innerHTML = buildTargetBoxBackgroundSvg(rewardPuzzle.dims.cols, rewardPuzzle.dims.rows, rewardPuzzle.edges);
       for (let i = 0; i < puzzleTotal; i++) {
         const slot = document.createElement('div');
@@ -1941,6 +2033,8 @@
       order.forEach((cellIndex, i) => {
         const piece = document.createElement('div');
         piece.className = 'reward-puzzle-tile reward-puzzle-piece';
+        piece.style.width = tileSize + 'px';
+        piece.style.height = tileSize + 'px';
         piece.dataset.cell = String(cellIndex);
         piece.innerHTML = puzzleTileInnerSvg(art.puzzleEmoji || art.emoji, cellIndex);
         wirePuzzlePieceDrag(piece, cellIndex);
@@ -1970,6 +2064,7 @@
   // 않고 즉시 열림(다른 레벨들과 동일).
   function finishRewardPuzzle(level) {
     const art = LEVEL_REWARD_ART[level];
+    const transformVideo = LEVEL_TRANSFORM_VIDEO[level];
     const total = getTemplatesForLevel(level).length;
     // updateLevelReward와 같은 격자 크기를 써야 이 완성 연출 직전/직후 칸 크기가 안 튄다.
     const { cols, rows } = gridDims(Math.max(total, GALLERY_GRID_TARGET));
@@ -1999,7 +2094,9 @@
       // 동안에도 계속 유지해야 해서 이후 class를 바꿀 때도 계속 같이 붙여줌).
       // reward-puzzle-shrunk: 조각이 있던 자리와 같은 축소 크기로 시작 — "분리되기 전 크기로
       // 합쳐진다"는 요청대로, 크로스페이드가 원본 크기가 아니라 이 축소 크기에서 시작됨.
-      levelRewardArt.setAttribute('class', 'level-reward-art reward-puzzle-clean reward-puzzle-shrunk');
+      // 2026-08-22: 레벨1(변신 영상 있음)은 "크기·위치 변화 없이 그대로 원본이 됨"이 요구사항 —
+      // 축소를 거치지 않고 바로 원본 크기로 크로스페이드한다.
+      levelRewardArt.setAttribute('class', 'level-reward-art reward-puzzle-clean' + (transformVideo ? '' : ' reward-puzzle-shrunk'));
       levelRewardArt.removeAttribute('hidden');
       levelRewardArt.style.opacity = '0';
       levelRewardArt.style.transition = 'opacity 0.35s ease';
@@ -2018,6 +2115,13 @@
         rewardPuzzleTargetGrid.style.transition = '';
         levelRewardArt.style.opacity = '';
         levelRewardArt.style.transition = '';
+
+        if (transformVideo) {
+          // 레벨1: 바운스(축소→확대) 없이 그 자리에서 화면을 꽉 채우도록 확대된 뒤
+          // 다음 레벨로 자동 이동한다.
+          zoomRewardToFullscreenAndAdvance(level);
+          return;
+        }
 
         // ③ 축소 크기에서 원본 크기로 천천히 커지는 연출
         levelRewardArt.setAttribute('class', 'level-reward-art reward-puzzle-clean reward-puzzle-grow');
