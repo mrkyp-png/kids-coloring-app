@@ -1298,6 +1298,7 @@
     clearPendingCelebrationOverlays();
     currentBossMode = null;
     currentLevel = level;
+    galleryGrid.hidden = false; // 퍼즐 미니게임 중 숨겼던 도안 목록을 새 레벨 진입 시 복원.
     if (isLevelCleared(level)) clearLevelAttempt(level); // 이미 클리어된 레벨은 타이머 불필요
     // 주의: 그림 목록만 구경하는 걸로는 시간이 소모되면 안 되므로, 여기서는 타임어택을 시작하지
     // 않는다 — 실제로 그림 하나를 열 때(openTemplate)가 되어서야 처음 시작한다.
@@ -1726,6 +1727,10 @@
       dims: dims,
       edges: (dims.cols === PUZZLE_COLS && dims.rows === PUZZLE_ROWS) ? PUZZLE_EDGES : buildPuzzleJigEdges(dims.cols, dims.rows),
     };
+    // 2026-08-22: "퍼즐 진행 중~다음 레벨로 넘어가기 전까지 도안 아이콘 목록은 안 보이게" 요청 —
+    // 퍼즐 박스에 화면 공간을 더 주기 위해 숨긴다. 다시 보이는 시점은 openLevel()(다음/뒤로가기로
+    // 레벨을 새로 열 때) 참고.
+    galleryGrid.hidden = true;
     // 완성된 그림이 위에서 살짝 내려오며 가운데 자리잡는 연출(0.4s) → 칸 구분선이 지워져
     // 깔끔한 한 장의 그림이 됨 → 퍼즐 트레이 크기로 줄어들며 살짝 아래로 자리잡음(0.5s) →
     // 그 자리에서 조각들로 터뜨린다(레벨1은 그 전에 goal 박스 안에서 변신 영상이 먼저 재생됨).
@@ -1866,8 +1871,11 @@
   function puzzleEmptySlotSvg(cellIndex) {
     const edges = (rewardPuzzle && rewardPuzzle.edges) || PUZZLE_EDGES;
     const outline = jigsawPathD(edges[cellIndex]);
+    // 2026-08-22: 예전엔 stroke가 배경색(#FFF8ED)이라 칸끼리 맞닿는 자리마다 선 두 겹이
+    // 겹쳐 "틈"처럼 보였다("16칸이 따로 떨어져 있다" 피드백) — 배경과 다른 옅은 선 색으로
+    // 바꿔서, 채움은 하나로 이어지고 칸 경계만 안에 새겨진 선으로 보이게 한다.
     return '<svg viewBox="' + (-JIG_PAD) + ' ' + (-JIG_PAD) + ' ' + (JIG + JIG_PAD * 2) + ' ' + (JIG + JIG_PAD * 2) + '">' +
-      '<path d="' + outline + '" fill="#EDEBF9" stroke="#FFF8ED" stroke-width="2"/>' +
+      '<path d="' + outline + '" fill="#EDEBF9" stroke="#D8D0F5" stroke-width="2"/>' +
       '</svg>';
   }
 

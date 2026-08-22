@@ -890,10 +890,11 @@ button:active { transform: scale(0.94); }
 /* 아래쪽은 .level-reward 자체에 이미 margin-bottom:28px가 있어서(보상 이미지 아래 콘텐츠와의
    기본 여백), 위쪽과 같은 정도로 당기려면 그만큼(28px)을 더 빼야 한다(-24-28=-52). */
 #reward-puzzle-tray-bottom { margin-top: -52px; }
-/* 2026-08-21: 레벨1(sheep→robot, 16조각)은 조각이 4배 많아서 타일을 64px로 줄이고 4열로 배치 —
-   goal 박스(min(78vw,320px)) 안에 96px×4=384px가 아니라 64px×4=256px로 들어가게 한다. */
-.reward-puzzle-4x4.reward-puzzle-target-grid { grid-template-columns: repeat(4, 64px); }
-.reward-puzzle-4x4 .reward-puzzle-tile { width: 64px; height: 64px; }
+/* 2026-08-22: 레벨1(sheep→robot, 16조각)은 조각이 4배 많아서 4열로 배치한다. 도안 아이콘
+   목록을 퍼즐 중엔 숨기기로 해서(app.js maybeShowRewardPuzzle 참고) 생긴 여유 공간으로,
+   기존 64px보다 키워서(84px) 터치하기 편하고 잘 보이게 한다. */
+.reward-puzzle-4x4.reward-puzzle-target-grid { grid-template-columns: repeat(4, 84px); }
+.reward-puzzle-4x4 .reward-puzzle-tile { width: 84px; height: 84px; }
 .reward-puzzle-target-grid {
   grid-area: 1 / 1; /* .level-reward-art와 같은 칸에 둬서 크로스페이드 때 겹치게 함 */
   display: grid;
@@ -905,6 +906,12 @@ button:active { transform: scale(0.94); }
   gap: 0;
   justify-content: center;
   align-content: center;
+  /* 2026-08-22: "16칸이 따로 떨어져 보인다" 피드백 — 칸 하나하나가 아니라 박스 전체를
+     하나의 카드로 보이게 바깥 테두리/배경을 여기(컨테이너)에 준다. 안쪽 칸 경계는
+     이제 옅은 선(위 puzzleEmptySlotSvg stroke)으로만 표시됨. */
+  background: #EDEBF9;
+  border-radius: 16px;
+  overflow: hidden;
 }
 /* 조각 하나하나의 흰 윤곽선 — 다 맞춘 직후 이 선만 먼저 슬쩍 지운다(빈틈도 이미 없어서
    그 다음 완성 그림으로 바꿔치기해도 거의 티가 안 남). */
