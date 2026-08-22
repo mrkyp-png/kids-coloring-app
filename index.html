@@ -115,10 +115,12 @@
     <h2 data-i18n="challenge.selectTitle">챌린지 모드</h2>
   </header>
 
-  <div id="challenge-difficulty-row" class="challenge-difficulty-row">
-    <button class="challenge-diff-btn" data-difficulty="easy" data-i18n="challenge.difficulty.easy" type="button">EASY</button>
-    <button class="challenge-diff-btn" data-difficulty="normal" data-i18n="challenge.difficulty.normal" type="button">NORMAL</button>
-    <button class="challenge-diff-btn" data-difficulty="hard" data-i18n="challenge.difficulty.hard" type="button">HARD</button>
+  <!-- 2026-08-23: 지도 화면의 원형+홀드링 캐러셀(.lv-circle 등)을 그대로 재사용, 좌우 방향으로만
+       새로 배치 — 위/중앙/아래 3자리 대신 좌/중앙/우 3자리. -->
+  <div id="challenge-diff-carousel" class="diff-node-wrap">
+    <div class="lv-peek diff-peek-left"></div>
+    <div class="lv-circle-stage"></div>
+    <div class="lv-peek diff-peek-right"></div>
   </div>
 
   <div id="challenge-level-grid" class="challenge-level-grid"></div>

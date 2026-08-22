@@ -2251,12 +2251,28 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 
 /* ===== 챌린지 모드 (Phase 1) ===== */
 .challenge-select-header { display: flex; align-items: center; gap: 8px; padding: 12px; }
-.challenge-difficulty-row { display: flex; gap: 8px; padding: 0 12px; flex-wrap: wrap; }
-.challenge-diff-btn {
-  flex: 1 1 auto; min-width: 80px; padding: 10px; border-radius: 12px;
-  border: 2px solid #ddd; background: #fff; font-weight: 700; cursor: pointer;
+/* 2026-08-23: 난이도(쉬움/보통/어려움) 선택을 지도 화면과 같은 원형+홀드링 캐러셀로 교체
+   (기존 EASY/NORMAL/HARD 알약 버튼 3개 → 좌우로 넘기는 원 3자리). .lv-circle, .lv-circle-stage,
+   .lv-peek, .lv-hold-ring 계열, .lv-clear-badge, .lv-progress를 그대로 재사용하고, 이 캐러셀
+   안에서만 가로 배치·크기·색을 덮어쓴다. */
+.diff-node-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%; /* .map-grid와 동일한 이유 — max-width만 있으면 shrink-to-fit이라 %폭 자식들이
+                  기준 크기를 못 찾고 다 찌그러짐(순환 참조). 실제 폭을 줘야 38%/26%가 계산됨. */
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 12px;
 }
-.challenge-diff-btn.selected { border-color: #ff6b6b; background: #fff0ec; }
+.diff-node-wrap .lv-circle-stage { width: 38%; }
+.diff-node-wrap .lv-peek { width: 26%; }
+/* 신호등 관례: 쉬움=초록/보통=주황/어려움=빨강. 레벨 원의 --lv-bg/--lv-bezel 변수를 그대로
+   읽는 기존 .lv-circle 규칙을 재사용 — data-lv 대신 data-diff로 값만 새로 꽂는다. */
+.lv-circle[data-diff="easy"] { --lv-bg: #eafbea; --lv-bezel: #40c057; }
+.lv-circle[data-diff="normal"] { --lv-bg: #fff4e0; --lv-bezel: #ff922b; }
+.lv-circle[data-diff="hard"] { --lv-bg: #ffe8e8; --lv-bezel: #ff6b6b; }
 .challenge-level-grid {
   display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; padding: 16px 12px;
 }

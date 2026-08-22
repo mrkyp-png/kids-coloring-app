@@ -24,7 +24,7 @@
   const selectScreen = document.getElementById('challenge-select-screen');
   const btnCoverStartChallenge = document.getElementById('btn-cover-start-challenge');
   const btnChallengeBack = document.getElementById('btn-challenge-back');
-  const diffRow = document.getElementById('challenge-difficulty-row');
+  const diffCarousel = document.getElementById('challenge-diff-carousel');
   const levelGrid = document.getElementById('challenge-level-grid');
 
   const state = { difficulty: 'easy', level: null };
@@ -37,7 +37,8 @@
   function openSelectScreen() {
     coverScreen.hidden = true;
     selectScreen.hidden = false;
-    renderDifficultyRow();
+    diffCarouselIndex = DIFFICULTIES.indexOf(state.difficulty);
+    renderDiffCarouselSlots();
     renderLevelGrid();
   }
 
@@ -46,10 +47,55 @@
     coverScreen.hidden = false;
   }
 
-  function renderDifficultyRow() {
-    Array.from(diffRow.children).forEach((btn) => {
-      btn.classList.toggle('selected', btn.dataset.difficulty === state.difficulty);
-    });
+  // 2026-08-23: 난이도 선택을 지도 화면(맵 캐러셀)과 같은 원형+홀드링 캐러셀로 교체 —
+  // 좌우 드래그/휠로 후보를 넘기고, 중앙 원을 700ms 꾹 눌러야 실제로 선택이 확정된다.
+  const DIFFICULTIES = ['easy', 'normal', 'hard'];
+  let diffCarouselIndex = 0;
+
+  function buildDiffCircle(diff, isPeek) {
+    const isActive = diff === state.difficulty;
+    const node = document.createElement('button');
+    node.type = 'button';
+    node.className = 'lv-circle lv-swap-fade';
+    node.dataset.diff = diff;
+    node.disabled = isPeek;
+    node.tabIndex = isPeek ? -1 : 0;
+    const label = I18N.t('challenge.difficulty.' + diff);
+    node.setAttribute('aria-label', label + (isActive ? ' (selected)' : ''));
+    node.innerHTML = '<span class="lv-progress">' + label + '</span>' +
+      (isActive ? '<span class="lv-clear-badge">✓</span>' : '');
+    if (!isPeek) node.addEventListener('click', () => selectDifficulty(diff));
+    return node;
+  }
+
+  function renderDiffCarouselSlots() {
+    const n = DIFFICULTIES.length;
+    const leftDiff = DIFFICULTIES[(diffCarouselIndex - 1 + n) % n];
+    const centerDiff = DIFFICULTIES[diffCarouselIndex];
+    const rightDiff = DIFFICULTIES[(diffCarouselIndex + 1) % n];
+
+    const leftSlot = diffCarousel.querySelector('.diff-peek-left');
+    leftSlot.innerHTML = '';
+    leftSlot.appendChild(buildDiffCircle(leftDiff, true));
+
+    const rightSlot = diffCarousel.querySelector('.diff-peek-right');
+    rightSlot.innerHTML = '';
+    rightSlot.appendChild(buildDiffCircle(rightDiff, true));
+
+    const stage = diffCarousel.querySelector('.lv-circle-stage');
+    stage.innerHTML = '';
+    stage.appendChild(buildDiffCircle(centerDiff, false));
+    stage.insertAdjacentHTML('beforeend',
+      '<svg class="lv-hold-ring" viewBox="0 0 100 100" aria-hidden="true">' +
+      '<circle class="lv-hold-ring-track" cx="50" cy="50" r="47"/>' +
+      '<circle class="lv-hold-ring-fill" cx="50" cy="50" r="47"/>' +
+      '</svg>');
+  }
+
+  function selectDifficulty(diff) {
+    state.difficulty = diff;
+    renderDiffCarouselSlots();
+    renderLevelGrid();
   }
 
   function renderLevelGrid() {
@@ -65,12 +111,104 @@
     }
   }
 
-  diffRow.addEventListener('click', (e) => {
-    const btn = e.target.closest('.challenge-diff-btn');
-    if (!btn) return;
-    state.difficulty = btn.dataset.difficulty;
-    renderDifficultyRow();
-  });
+  // app.js의 setupMapCarousel()과 동일한 패턴(포인터/휠, 한 번에 한 칸, 중앙 원 700ms 홀드로
+  // 확정)을 세로(dy) 대신 가로(dx)로만 바꿔 재사용.
+  (function setupDiffCarousel() {
+    let dragging = false, startX = 0, moved = false, downCircle = null;
+    let holdCircle = null, holdRing = null;
+    function onHoldFillTransitionEnd(e) {
+      if (e.propertyName !== 'stroke-dashoffset' || !holdCircle) return;
+      const stage = holdCircle.parentElement;
+      if (!stage || !stage.classList.contains('lv-charging')) return;
+      const circle = holdCircle;
+      cancelHoldVisuals();
+      if (navigator.vibrate) { try { navigator.vibrate([0, 60]); } catch (err) { /* 무시 */ } }
+      circle.click();
+    }
+    function cancelHoldVisuals() {
+      if (!holdCircle) return;
+      holdCircle.parentElement.classList.remove('lv-charging');
+      if (holdRing) holdRing.removeEventListener('transitionend', onHoldFillTransitionEnd);
+      holdCircle = null;
+      holdRing = null;
+    }
+    function startHold(circle) {
+      const stage = circle.parentElement;
+      const ring = stage.querySelector('.lv-hold-ring-fill');
+      if (!ring) return;
+      holdCircle = circle;
+      holdRing = ring;
+      ring.addEventListener('transitionend', onHoldFillTransitionEnd);
+      stage.classList.add('lv-charging');
+      if (navigator.vibrate) {
+        try { navigator.vibrate([40, 60, 40, 55, 45, 45, 45, 35, 50, 25, 55, 15, 60]); } catch (err) { /* 무시 */ }
+      }
+    }
+    function cancelHold() {
+      if (!holdCircle) return;
+      cancelHoldVisuals();
+      if (navigator.vibrate) { try { navigator.vibrate(0); } catch (err) { /* 무시 */ } }
+    }
+    diffCarousel.addEventListener('pointerdown', (e) => {
+      if (!e.target.closest('.lv-circle-stage')) return;
+      e.preventDefault();
+      dragging = true;
+      moved = false;
+      startX = e.clientX;
+      downCircle = e.target.closest('.lv-circle');
+      if (downCircle) {
+        downCircle.classList.add('lv-pressed');
+        startHold(downCircle);
+      }
+      diffCarousel.setPointerCapture(e.pointerId);
+    });
+    diffCarousel.addEventListener('touchstart', (e) => {
+      if (e.target.closest('.lv-circle-stage')) e.preventDefault();
+    }, { passive: false });
+    diffCarousel.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      if (Math.abs(e.clientX - startX) > 4) {
+        if (!moved) cancelHold();
+        moved = true;
+      }
+    });
+    function endDrag(e) {
+      if (!dragging) return;
+      dragging = false;
+      e.preventDefault();
+      if (downCircle) downCircle.classList.remove('lv-pressed');
+      if (moved) {
+        const dx = e.clientX - startX;
+        const STEP_THRESHOLD = 40;
+        const n = DIFFICULTIES.length;
+        if (dx <= -STEP_THRESHOLD) diffCarouselIndex = (diffCarouselIndex + 1) % n;
+        else if (dx >= STEP_THRESHOLD) diffCarouselIndex = (diffCarouselIndex - 1 + n) % n;
+        else return;
+        renderDiffCarouselSlots();
+      } else {
+        cancelHold();
+      }
+    }
+    diffCarousel.addEventListener('pointerup', endDrag);
+    diffCarousel.addEventListener('pointercancel', endDrag);
+    diffCarousel.addEventListener('click', (e) => {
+      if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; }
+    }, true);
+
+    let wheelCooldown = false;
+    diffCarousel.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (wheelCooldown) return;
+      const n = DIFFICULTIES.length;
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (delta > 0) diffCarouselIndex = (diffCarouselIndex + 1) % n;
+      else if (delta < 0) diffCarouselIndex = (diffCarouselIndex - 1 + n) % n;
+      else return;
+      renderDiffCarouselSlots();
+      wheelCooldown = true;
+      setTimeout(() => { wheelCooldown = false; }, 350);
+    }, { passive: false });
+  })();
 
   btnChallengeBack.addEventListener('click', closeSelectScreen);
 
