@@ -890,6 +890,11 @@ button:active { transform: scale(0.94); }
 /* 아래쪽은 .level-reward 자체에 이미 margin-bottom:28px가 있어서(보상 이미지 아래 콘텐츠와의
    기본 여백), 위쪽과 같은 정도로 당기려면 그만큼(28px)을 더 빼야 한다(-24-28=-52). */
 #reward-puzzle-tray-bottom { margin-top: -52px; }
+/* 2026-08-22: 레벨1(84px 타일)은 조각이 2x2(96px 기준 음수 마진)보다 커서 트레이와 정답
+   박스가 겹친다. explodeIntoPuzzle이 트레이에도 reward-puzzle-4x4 클래스를 붙여주므로
+   그걸로 직접 겹치지 않는 양수 간격을 준다. */
+#reward-puzzle-tray-top.reward-puzzle-4x4 { margin-bottom: 12px; }
+#reward-puzzle-tray-bottom.reward-puzzle-4x4 { margin-top: 12px; }
 /* 2026-08-22: 레벨1(sheep→robot, 16조각)은 조각이 4배 많아서 4열로 배치한다. 도안 아이콘
    목록을 퍼즐 중엔 숨기기로 해서(app.js maybeShowRewardPuzzle 참고) 생긴 여유 공간으로,
    기존 64px보다 키워서(84px) 터치하기 편하고 잘 보이게 한다. */

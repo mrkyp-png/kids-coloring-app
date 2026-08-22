@@ -1862,7 +1862,9 @@
       '<g clip-path="url(#' + clipId + ')">' +
       '<image href="' + href + '" x="' + imgX + '" y="' + imgY + '" width="' + imgSize + '" height="' + imgSize + '"/>' +
       '</g>' +
-      '<path class="reward-puzzle-outline" d="' + outline + '" fill="none" stroke="#000" stroke-width="3"/>' +
+      // 2026-08-22: 놓인 조각도 검정 굵은 선이면 박스 하나로 안 붙어보여서, 빈 칸과 같은
+      // 옅은 선으로 통일(puzzleEmptySlotSvg 참고) — 트레이에 있을 때도 이 정도로 충분히 보임.
+      '<path class="reward-puzzle-outline" d="' + outline + '" fill="none" stroke="#D8D0F5" stroke-width="2"/>' +
       '</svg>';
   }
 
