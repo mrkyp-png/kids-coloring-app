@@ -1806,6 +1806,26 @@
   // rewardPuzzle/rewardPuzzleSolvedLevels로 중복 시작은 막는다.
   // 2026-08-17: "Back으로 예전에 클리어한 레벨에 재진입하면 매번 다시 뜬다" 버그 수정 —
   // isRewardPuzzleSolvedPersisted(영구 기록)도 같이 확인한다.
+  // 2026-08-22: "밋밋하다" 피드백으로 16개 완성 모자이크 등장 연출을 강화 — 칸(.reward-cell)
+  // 하나하나가 화면 위 사방에서 흩뿌려지듯 각자 다른 위치/회전으로 떨어지다 제자리(원래
+  // x/y 좌표)에 착 맞춰진다. explodeIntoPuzzle의 팝콘 등장과 같은 기법(FLIP 없이, transform을
+  // 임의 오프셋에서 시작해 다음 틱에 원위치로 트랜지션)을 재사용.
+  // 2026-08-22: 칸(rect)마다 따로 흩뿌리는 버전은 SVG 내부 좌표계 문제로 신뢰성이 낮아서
+  // (사용자 승인) 그림 전체가 살짝 흔들리며 위에서 흩날리듯 내려오는 단순한 버전으로 대체.
+  function scatterMosaicIn(container) {
+    container.style.transition = 'none';
+    container.style.transform = 'translateY(-90px) rotate(-10deg) scale(0.6)';
+    container.style.opacity = '0';
+    requestAnimationFrame(() => {
+      container.style.transition = 'transform 0.6s cubic-bezier(0.25, 0.7, 0.3, 1), opacity 0.4s ease';
+      container.style.transform = '';
+      container.style.opacity = '';
+      setTimeout(() => {
+        container.style.transition = '';
+      }, 600);
+    });
+  }
+
   function maybeShowRewardPuzzle(level) {
     // 2026-08-22: "16개 원형 아이콘이 자꾸 다시 생긴다" 신고 — openLevel()은 레벨 진입 때마다
     // galleryGrid.hidden을 무조건 false로 되돌리는데, 이미 진행 중인 퍼즐이 있어(뒤로가기 후
@@ -1854,17 +1874,19 @@
     // 2026-08-22: 레벨1(변신 영상 있음)은 이 축소를 건너뛴다 — 영상이 무대 100% 크기로 바로
     // 나오는데 그 직전에 양이 퍼즐 조각 크기로 작아졌다 사라지면 "작아졌다 다시 커지는" 튐이
     // 보였다(사용자 제보). 영상 없는 레벨만 조각으로 터지기 전 축소 연출을 그대로 쓴다.
-    levelRewardArt.classList.add('reward-drop-in');
+    scatterMosaicIn(levelRewardArt);
+    const scatterSettleMs = 650; // scatterMosaicIn 자체 트랜지션(0.6s) 끝난 뒤
     setTimeout(() => {
-      levelRewardArt.classList.remove('reward-drop-in');
       levelRewardArt.classList.add('reward-puzzle-clean');
-    }, 450);
+    }, scatterSettleMs);
     if (!transformVideo) {
-      setTimeout(() => levelRewardArt.classList.add('reward-puzzle-shrink'), 700);
-      setTimeout(() => explodeIntoPuzzle(level), 1300);
+      setTimeout(() => levelRewardArt.classList.add('reward-puzzle-shrink'), scatterSettleMs + 250);
+      setTimeout(() => explodeIntoPuzzle(level), scatterSettleMs + 850);
     } else {
       // 레벨1: 아이콘 목록을 슬라이드로 치우고 보상 박스를 화면 중앙으로 옮긴 뒤 변신을 시작한다.
-      setTimeout(() => moveRewardBoxToCenter(level, () => playLevelTransform(level, transformVideo)), 1300);
+      // 2026-08-22: "내려오자마자 훅 지나간다" 피드백 — 완성된 모자이크를 볼 틈도 없이 바로
+      // 이동/영상으로 넘어갔음. 흩뿌려져 다 자리잡은 뒤 잠깐 그대로 보여주는 여유를 더 준다.
+      setTimeout(() => moveRewardBoxToCenter(level, () => playLevelTransform(level, transformVideo)), scatterSettleMs + 1500);
     }
   }
 
@@ -2066,6 +2088,14 @@
   const JIG = 100; // 조각 하나의 "본체" 크기(로컬 단위, 정사각형)
   const JIG_R = 16; // 돌출부/홈 반지름(로컬 단위)
   const JIG_PAD = 20; // 바깥 여백(돌출부가 이 안쪽에 다 들어오게) — viewBox에 사방으로 더함
+  const CORNER_R = 14; // 2026-08-22: "박스는 완만한데 모서리 4칸은 직각" 피드백 — 퍼즐판 전체의
+  // 바깥쪽 4개 모서리(맨 앞/끝 칸의 바깥 모서리)만 이 반지름만큼 둥글게 깎는다.
+
+  // 이 칸(cellIndex)이 전체 격자(cols x rows)의 바깥쪽 네 모서리 중 어디에 해당하는지.
+  function gridCornerFlags(cellIndex, cols, rows) {
+    const r = Math.floor(cellIndex / cols), c = cellIndex % cols;
+    return { tl: r === 0 && c === 0, tr: r === 0 && c === cols - 1, bl: r === rows - 1 && c === 0, br: r === rows - 1 && c === cols - 1 };
+  }
 
   // 한 변(직선 A->B)을 그리는 path 조각. type이 'out'/'in'이면 중점에 반원 돌기를 그린다.
   // 항상 시계방향으로 변을 도는 걸 기준으로, 진행방향의 오른쪽이 조각 "바깥쪽"이 되도록
@@ -2082,12 +2112,25 @@
     return 'L' + p1x + ',' + p1y + ' A' + JIG_R + ',' + JIG_R + ' 0 1 ' + sweep + ' ' + p2x + ',' + p2y + ' L' + x2 + ',' + y2;
   }
 
-  function jigsawPathD(edges) {
-    let d = 'M0,0 ';
-    d += jigEdge(0, 0, JIG, 0, edges.top) + ' ';
-    d += jigEdge(JIG, 0, JIG, JIG, edges.right) + ' ';
-    d += jigEdge(JIG, JIG, 0, JIG, edges.bottom) + ' ';
-    d += jigEdge(0, JIG, 0, 0, edges.left) + ' Z';
+  // corners = {tl,tr,br,bl}(선택) — true인 모서리만 CORNER_R만큼 깎아 둥글게(전체 퍼즐판의
+  // 바깥쪽 네 모서리 칸에만 씀). ox,oy는 이 칸을 절대좌표 어디에 그릴지(박스 배경용, 기본 0,0).
+  function jigsawPathD(edges, corners, ox, oy) {
+    ox = ox || 0; oy = oy || 0;
+    corners = corners || {};
+    const tl = corners.tl ? CORNER_R : 0;
+    const tr = corners.tr ? CORNER_R : 0;
+    const br = corners.br ? CORNER_R : 0;
+    const bl = corners.bl ? CORNER_R : 0;
+    let d = 'M' + (ox + tl) + ',' + oy + ' ';
+    d += jigEdge(ox + tl, oy, ox + JIG - tr, oy, edges.top) + ' ';
+    if (tr) d += 'Q' + (ox + JIG) + ',' + oy + ' ' + (ox + JIG) + ',' + (oy + tr) + ' ';
+    d += jigEdge(ox + JIG, oy + tr, ox + JIG, oy + JIG - br, edges.right) + ' ';
+    if (br) d += 'Q' + (ox + JIG) + ',' + (oy + JIG) + ' ' + (ox + JIG - br) + ',' + (oy + JIG) + ' ';
+    d += jigEdge(ox + JIG - br, oy + JIG, ox + bl, oy + JIG, edges.bottom) + ' ';
+    if (bl) d += 'Q' + ox + ',' + (oy + JIG) + ' ' + ox + ',' + (oy + JIG - bl) + ' ';
+    d += jigEdge(ox, oy + JIG - bl, ox, oy + tl, edges.left) + ' ';
+    if (tl) d += 'Q' + ox + ',' + oy + ' ' + (ox + tl) + ',' + oy + ' ';
+    d += 'Z';
     return d;
   }
 
@@ -2107,7 +2150,8 @@
     const imgY = (-Number(c.y) * scale).toFixed(2);
     const imgSize = (100 * scale).toFixed(2);
     const edges = (rewardPuzzle && rewardPuzzle.edges) || PUZZLE_EDGES;
-    const outline = jigsawPathD(edges[cellIndex]);
+    const dims = (rewardPuzzle && rewardPuzzle.dims) || { cols: PUZZLE_COLS, rows: PUZZLE_ROWS };
+    const outline = jigsawPathD(edges[cellIndex], gridCornerFlags(cellIndex, dims.cols, dims.rows));
     // sheep-robot(레벨1 변신 영상 마지막 프레임)은 assets/emoji/*.svg 규칙 밖의 PNG라 별도 처리.
     const href = emoji === 'sheep-robot' ? 'assets/transform/sheep-final.png' : 'assets/emoji/' + emoji + '.svg';
     return '<svg viewBox="' + (-JIG_PAD) + ' ' + (-JIG_PAD) + ' ' + (JIG + JIG_PAD * 2) + ' ' + (JIG + JIG_PAD * 2) + '">' +
@@ -2131,13 +2175,7 @@
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const i = r * cols + c;
-        const cx = c * JIG, cy = r * JIG;
-        const e = edges[i];
-        let d = 'M' + cx + ',' + cy + ' ';
-        d += jigEdge(cx, cy, cx + JIG, cy, e.top) + ' ';
-        d += jigEdge(cx + JIG, cy, cx + JIG, cy + JIG, e.right) + ' ';
-        d += jigEdge(cx + JIG, cy + JIG, cx, cy + JIG, e.bottom) + ' ';
-        d += jigEdge(cx, cy + JIG, cx, cy, e.left) + ' Z';
+        const d = jigsawPathD(edges[i], gridCornerFlags(i, cols, rows), c * JIG, r * JIG);
         paths += '<path d="' + d + '" fill="#EDEBF9" stroke="#D8D0F5" stroke-width="1.5"/>';
       }
     }
@@ -2400,6 +2438,17 @@
     piece.style.transition = '';
     piece.classList.add('placed');
     if (rewardPuzzle) rewardPuzzle.solved.add(cellIndex);
+    // 2026-08-22: "박스 위/아래에 큰 빈 공간" 신고 — 한쪽 트레이(위/아래)의 조각이 먼저 전부
+    // 맞춰지면, 남은 조각이 하나도 안 보이는데도 reserveTrayHeight가 예약해둔 높이는 그대로
+    // 남아서 텅 빈 공간처럼 보였다. 그 트레이의 조각이 전부 맞춰졌으면 예약 높이를 접는다.
+    const parentTray = piece.parentElement;
+    if (parentTray && (parentTray === rewardPuzzleTrayTop || parentTray === rewardPuzzleTrayBottom)) {
+      const remaining = parentTray.querySelectorAll('.reward-puzzle-piece:not(.placed)').length;
+      if (remaining === 0) {
+        parentTray.style.transition = 'min-height 0.35s ease';
+        parentTray.style.minHeight = '0';
+      }
+    }
     playPuzzleCorrectSfx();
     if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) { /* 무시 */ } }
     if (rewardPuzzle) console.log('[퍼즐] 조각 배치: cell-' + cellIndex + ' (' + rewardPuzzle.solved.size + '/' + (rewardPuzzle.dims.cols * rewardPuzzle.dims.rows) + ')');
