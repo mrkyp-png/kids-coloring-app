@@ -1385,6 +1385,7 @@
     rewardPuzzleTrayBottom.classList.remove('reward-tray-anchor-bottom');
     levelRewardStage.style.transform = ''; // 레벨1 정면 확대 연출을 다른 레벨/재진입 시 원복.
     levelRewardStage.style.transition = '';
+    levelRewardStage.style.opacity = ''; // 확대+페이드 연출(zoomRewardToFullscreenAndAdvance) 원복.
     // 2026-08-22: "퍼즐이 3줄로 밀리고 박스가 안 돌아온다" 신고 — 변신 영상 재생 중(약 10초)에
     // 뒤로 갔다가 같은 레벨로 재진입하면, 예전 영상이 배경에서 계속 재생되다 나중에 끝나며
     // onended가 그 시점의(이미 새로 시작된) 화면 위에 뒤늦게 퍼즐을 다시 만들어버려 상태가
@@ -1967,9 +1968,11 @@
     // (#level-reward-praise)가 일반 flex 항목이라, 안 보이다가 나타나는 순간 레이아웃이
     // 밀리면서 이 박스 위치가 같이 흔들렸다. 소리만 내고 문구는 띄우지 않는다(true=skipVisual).
     playExcellent(true);
-    levelRewardStage.style.transition = 'transform 1.1s cubic-bezier(0.45, 0, 0.4, 1)';
+    // 2026-08-22: "커지면서 희미해지게" 요청 — 확대와 함께 서서히 투명해지다가 다음 레벨로 넘어감.
+    levelRewardStage.style.transition = 'transform 1.1s cubic-bezier(0.45, 0, 0.4, 1), opacity 1.1s ease-in';
     requestAnimationFrame(() => {
       levelRewardStage.style.transform = 'scale(' + scale.toFixed(2) + ')';
+      levelRewardStage.style.opacity = '0';
     });
     setTimeout(() => {
       if (currentLevel !== level) { console.log('[퍼즐] 확대 완료 시점에 레벨 불일치, 다음 레벨 이동 안 함'); return; }
@@ -2438,17 +2441,10 @@
     piece.style.transition = '';
     piece.classList.add('placed');
     if (rewardPuzzle) rewardPuzzle.solved.add(cellIndex);
-    // 2026-08-22: "박스 위/아래에 큰 빈 공간" 신고 — 한쪽 트레이(위/아래)의 조각이 먼저 전부
-    // 맞춰지면, 남은 조각이 하나도 안 보이는데도 reserveTrayHeight가 예약해둔 높이는 그대로
-    // 남아서 텅 빈 공간처럼 보였다. 그 트레이의 조각이 전부 맞춰졌으면 예약 높이를 접는다.
-    const parentTray = piece.parentElement;
-    if (parentTray && (parentTray === rewardPuzzleTrayTop || parentTray === rewardPuzzleTrayBottom)) {
-      const remaining = parentTray.querySelectorAll('.reward-puzzle-piece:not(.placed)').length;
-      if (remaining === 0) {
-        parentTray.style.transition = 'min-height 0.35s ease';
-        parentTray.style.minHeight = '0';
-      }
-    }
+    // 2026-08-22: 위 트레이가 먼저 비면 예약 높이를 접는 시도를 했었는데, 트레이 하나만
+    // 비대칭으로 줄어들면 트리오(트레이-박스-트레이) 전체 무게중심이 틀어져 박스 위치가
+    // 살짝 움직이는 부작용이 있었다("클로즈업 전 위치가 상부에 위치") — 박스는 절대 움직이면
+    // 안 되므로 되돌림(빈 트레이 공간보다 박스 위치 안정이 우선).
     playPuzzleCorrectSfx();
     if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) { /* 무시 */ } }
     if (rewardPuzzle) console.log('[퍼즐] 조각 배치: cell-' + cellIndex + ' (' + rewardPuzzle.solved.size + '/' + (rewardPuzzle.dims.cols * rewardPuzzle.dims.rows) + ')');
