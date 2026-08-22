@@ -1919,7 +1919,12 @@
         levelReward.style.transform = '';
         setTimeout(() => {
           levelReward.style.transition = '';
-          console.log('[퍼즐] moveRewardBoxToCenter 완료');
+          const trTop = rewardPuzzleTrayTop.getBoundingClientRect();
+          const lr = levelReward.getBoundingClientRect();
+          const gg = galleryGrid.getBoundingClientRect();
+          console.log('[퍼즐] rect 진단 — trayTop: top=' + trTop.top.toFixed(0) + ' bottom=' + trTop.bottom.toFixed(0) + ' h=' + trTop.height.toFixed(0) + ' minHeight=' + rewardPuzzleTrayTop.style.minHeight
+            + ' | levelReward: top=' + lr.top.toFixed(0) + ' h=' + lr.height.toFixed(0)
+            + ' | galleryGrid: display=' + getComputedStyle(galleryGrid).display + ' hidden=' + galleryGrid.hidden + ' h=' + gg.height.toFixed(0));
           onDone();
         }, 550);
       });
