@@ -842,6 +842,11 @@ button:active { transform: scale(0.94); }
      .level-reward-stage(고정 width)가 그냥 두면 왼쪽에 붙어버림 — 가운데로 정렬. */
   display: flex;
   justify-content: center;
+  /* 2026-08-22(2차): "위/아래 트레이 간격이 다르다" 신고 — align-items 기본값(stretch)에서는
+     고정 높이인 stage가 이 박스의 세로축 시작(위쪽)에 붙어, 박스 자체 높이가 stage보다
+     조금이라도 크면 그 여분이 전부 아래쪽에만 남아 위/아래 트레이 간격이 달라졌다.
+     center로 stage를 항상 세로 가운데 고정. */
+  align-items: center;
 }
 /* 2026-08-22(3차): "박스 위아래로 거대한 빈 공간" — 원인은 트레이 크기 계산이 아니라, 박스
    하나에만 margin:auto를 줬던 것 자체였다. 화면(창)이 트레이+박스를 합친 실제 필요 높이보다
