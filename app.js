@@ -1367,6 +1367,7 @@
 
   // ================= 레벨별 도안 갤러리 =================
   function openLevel(level) {
+    console.log('[퍼즐] openLevel(' + level + ') 진입');
     clearPendingCelebrationOverlays();
     currentBossMode = null;
     currentLevel = level;
@@ -1811,6 +1812,7 @@
     // 재진입 등) 이 가드로 바로 return해버리면 그 아래 숨김 로직을 다시 안 타서 계속 보였다.
     // 진행 중인 퍼즐이 있으면 여기서도 숨김을 다시 확인해준다.
     if (rewardPuzzle && rewardPuzzle.level === level) {
+      console.log('[퍼즐] maybeShowRewardPuzzle: 이미 진행 중(레벨' + level + '), galleryGrid 재숨김');
       galleryGrid.hidden = true;
       return; // 이미 진행 중
     }
@@ -1820,6 +1822,7 @@
     const scores = getScores();
     const doneCount = list.filter((t) => isMastered(t.id, scores)).length;
     if (doneCount < list.length) return; // 아직 다 안 깼음
+    console.log('[퍼즐] 16개 완료 확인, 레벨' + level + ' 퍼즐 초기화 시작');
     const dims = puzzleDimsForLevel(level);
     rewardPuzzle = {
       level: level,
@@ -1895,10 +1898,11 @@
   // 실제 좌표를 재서 역방향 위치에서 시작해 제자리로 트랜지션) — 퍼즐 조각이 트레이에서 튀어
   // 나오는 연출(explodeIntoPuzzle)과 같은 방식이라 좌표 계산 없이도 항상 정확하다.
   function moveRewardBoxToCenter(level, onDone) {
+    console.log('[퍼즐] moveRewardBoxToCenter 시작 — 박스를 중앙으로 이동');
     const before = levelReward.getBoundingClientRect();
     galleryGrid.classList.add('gallery-grid-hiding');
     setTimeout(() => {
-      if (currentLevel !== level) { onDone(); return; }
+      if (currentLevel !== level) { console.log('[퍼즐] moveRewardBoxToCenter: 그 사이 레벨 변경됨(' + currentLevel + '≠' + level + '), 중단'); onDone(); return; }
       galleryGrid.hidden = true;
       galleryGrid.classList.remove('gallery-grid-hiding');
       reserveTrayHeight(rewardPuzzle.dims); // 트레이가 나중에 채워져도 더는 안 흔들리게 지금 미리 자리를 예약
@@ -1915,6 +1919,7 @@
         levelReward.style.transform = '';
         setTimeout(() => {
           levelReward.style.transition = '';
+          console.log('[퍼즐] moveRewardBoxToCenter 완료');
           onDone();
         }, 550);
       });
@@ -1928,6 +1933,7 @@
   // 작은 검정 박스 밖으로 튀어나와 보임. 화면 크기에 안 맞는 고정 배율 대신, 실제 뷰포트
   // 기준으로 배율을 계산해서 어떤 화면에서도 확실히 화면을 덮게 한다.
   function zoomRewardToFullscreenAndAdvance(level) {
+    console.log('[퍼즐] zoomRewardToFullscreenAndAdvance 시작 — 화면 꽉 채우게 확대');
     const rect = levelRewardStage.getBoundingClientRect();
     const scale = (Math.max(window.innerWidth, window.innerHeight) / Math.min(rect.width, rect.height)) * 1.15;
     // 2026-08-22: "박스가 위로 올라갔다"(사용자 실측) — playExcellent()의 시각 문구
@@ -1939,11 +1945,13 @@
       levelRewardStage.style.transform = 'scale(' + scale.toFixed(2) + ')';
     });
     setTimeout(() => {
-      if (currentLevel !== level) return;
+      if (currentLevel !== level) { console.log('[퍼즐] 확대 완료 시점에 레벨 불일치, 다음 레벨 이동 안 함'); return; }
       const nextLevel = level + 1;
       if (nextLevel <= TOTAL_LEVELS && isLevelUnlocked(nextLevel)) {
+        console.log('[퍼즐] 다음 스테이지(' + nextLevel + ')로 이동');
         openLevel(nextLevel);
       } else {
+        console.log('[퍼즐] 다음 스테이지 없음/잠김 — 지도로 이동');
         goToMap();
       }
     }, 1100);
@@ -1964,8 +1972,10 @@
       levelRewardVideo.hidden = false;
       levelRewardVideo.currentTime = 0;
       levelRewardVideo.play();
+      console.log('[퍼즐] 변신 영상 재생 시작');
       levelRewardVideo.onended = () => {
-        if (currentLevel !== level) return;
+        console.log('[퍼즐] 영상 종료(onended) — currentLevel=' + currentLevel + ', 대상레벨=' + level);
+        if (currentLevel !== level) { console.log('[퍼즐] 레벨 불일치로 중단(이 영상은 무시됨)'); return; }
         // 마지막 프레임(변신 완료된 로봇양)에서 정지된 채로 잠깐 보여준다.
         setTimeout(() => {
           if (currentLevel !== level) return;
@@ -2130,7 +2140,9 @@
   }
 
   function explodeIntoPuzzle(level) {
-    if (currentLevel !== level) return; // 그 사이 다른 레벨로 이동했으면 건너뜀
+    console.log('[퍼즐] explodeIntoPuzzle 호출 — currentLevel=' + currentLevel + ', 대상레벨=' + level);
+    if (currentLevel !== level) { console.log('[퍼즐] 레벨 불일치로 중단'); return; } // 그 사이 다른 레벨로 이동했으면 건너뜀
+    console.log('[퍼즐] 조각 16개로 터짐 시작(트레이 생성)');
     const art = LEVEL_REWARD_ART[level];
     // 퍼즐 미리보기 버튼: 이 레벨의 완성 이미지를 썸네일/모달 소스로 채우고 보여준다.
     const puzzleEmoji = art.puzzleEmoji || art.emoji;
@@ -2213,6 +2225,7 @@
   // playExcellent/showLevelClearPraise 재활용)를 재생. "다음" 버튼은 애니메이션을 기다리지
   // 않고 즉시 열림(다른 레벨들과 동일).
   function finishRewardPuzzle(level) {
+    console.log('[퍼즐] finishRewardPuzzle 시작(레벨' + level + ') — 칸 선 사라짐 → 완성 이미지 크로스페이드');
     btnPuzzleMagnify.hidden = true; // 다 맞췄으니 미리보기 버튼은 필요 없음
     const art = LEVEL_REWARD_ART[level];
     const transformVideo = LEVEL_TRANSFORM_VIDEO[level];
@@ -2384,8 +2397,10 @@
     if (rewardPuzzle) rewardPuzzle.solved.add(cellIndex);
     playPuzzleCorrectSfx();
     if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) { /* 무시 */ } }
+    if (rewardPuzzle) console.log('[퍼즐] 조각 배치: cell-' + cellIndex + ' (' + rewardPuzzle.solved.size + '/' + (rewardPuzzle.dims.cols * rewardPuzzle.dims.rows) + ')');
     if (rewardPuzzle && rewardPuzzle.solved.size >= rewardPuzzle.dims.cols * rewardPuzzle.dims.rows) {
       const solvedLevel = rewardPuzzle.level;
+      console.log('[퍼즐] 16/16 완성 — finishRewardPuzzle 호출');
       rewardPuzzleSolvedLevels.add(solvedLevel);
       markRewardPuzzleSolvedPersisted(solvedLevel);
       rewardPuzzleTrayTop.hidden = true;
