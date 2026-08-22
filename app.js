@@ -1915,7 +1915,10 @@
   function zoomRewardToFullscreenAndAdvance(level) {
     const rect = levelRewardStage.getBoundingClientRect();
     const scale = (Math.max(window.innerWidth, window.innerHeight) / Math.min(rect.width, rect.height)) * 1.15;
-    playExcellent();
+    // 2026-08-22: "박스가 위로 올라갔다"(사용자 실측) — playExcellent()의 시각 문구
+    // (#level-reward-praise)가 일반 flex 항목이라, 안 보이다가 나타나는 순간 레이아웃이
+    // 밀리면서 이 박스 위치가 같이 흔들렸다. 소리만 내고 문구는 띄우지 않는다(true=skipVisual).
+    playExcellent(true);
     levelRewardStage.style.transition = 'transform 1.1s cubic-bezier(0.45, 0, 0.4, 1)';
     requestAnimationFrame(() => {
       levelRewardStage.style.transform = 'scale(' + scale.toFixed(2) + ')';
@@ -4314,9 +4317,9 @@
     } catch (e) { /* 음성합성 미지원 브라우저는 무시 */ }
   }
 
-  function playExcellent() {
+  function playExcellent(skipVisual) {
     const phrase = LEVEL_CLEAR_PRAISE[Math.floor(Math.random() * LEVEL_CLEAR_PRAISE.length)];
-    showLevelClearPraise(phrase);
+    if (!skipVisual) showLevelClearPraise(phrase);
     speakPraise(phrase, { pitch: 2, rate: 1.3, langPrefix: 'en' }); // 기본값보다도 더 빠르게 = 더 신난 느낌
   }
 

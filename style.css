@@ -910,8 +910,22 @@ button:active { transform: scale(0.94); }
      하나짜리 배경 SVG)과 달리 밋밋한 네모로 보였다 — "조각과 박스 크기가 안 맞다" 신고의
      실제 원인. 클리핑을 없애 조각 자체도 진짜 직소 돌출부 모양 그대로 보이게 함. */
   overflow: visible;
+  position: relative;
 }
-.reward-puzzle-tile svg { width: 100%; height: 100%; display: block; overflow: visible; }
+/* 2026-08-22(2차): svg를 100%/100%로 꽉 채우면 viewBox(-20 -20 140 140) 전체가 그 100%
+   안에 눌려 들어가서, 정작 몸통(JIG=100단위)은 칸의 100/140≈71%밖에 안 차 보였다(정답
+   박스 배경은 칸을 여백 없이 꽉 채워 그려서 서로 크기가 달라 보임). svg 자체를 140%로
+   키우고 -20%만큼 밀어 넣어서 몸통이 칸을 정확히 꽉 채우게 하고, 돌출부(나머지 20%)는
+   칸 밖으로 자연스럽게 넘치게(overflow:visible) 둔다. */
+.reward-puzzle-tile svg {
+  position: absolute;
+  top: -20%;
+  left: -20%;
+  width: 140%;
+  height: 140%;
+  display: block;
+  overflow: visible;
+}
 .reward-puzzle-tray {
   flex: 0 0 auto;
   display: flex;
