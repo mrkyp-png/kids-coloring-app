@@ -2704,6 +2704,7 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 #challenge-select-screen { position: relative; overflow: hidden; height: 100svh; background: var(--bg); }
 .challenge-tiers { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .challenge-tier-zone {
+  position: relative; /* 아래 .challenge-tier-reset(우측상단 절대배치)의 기준점 */
   flex: 1 1 0;
   min-height: 0;
   display: flex;
@@ -2711,6 +2712,14 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   align-items: center;
   justify-content: center;
   container-type: size; /* 아래 원 크기를 이 구역의 실제 폭/높이 중 더 빡빡한 쪽 기준으로 잡기 위함 */
+}
+/* 2026-08-24: "각 리그 우측상단에 리셋 버튼(모드별 리셋)" 요청 — 컬러링 모드 맵 화면의
+   #btn-reset-all과 같은 아이콘/스타일(icon-btn-sm), 구역 안에서 절대좌표로 우측상단 고정. */
+.challenge-tier-reset {
+  position: absolute;
+  top: 4px;
+  right: 12px;
+  z-index: 1;
 }
 /* 2026-08-24: "마이너/메이저/챔피언스리그로 이름 변경, 글자 3배로, 귀여운 글자체로" 요청 —
    크기는 0.8rem→2.4rem(3배), 글꼴은 다른 곳(레벨 원 숫자 등)과 같은 Fredoka(라틴 전용 가변

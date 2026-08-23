@@ -247,6 +247,22 @@
     return isNewRecord;
   }
 
+  // 2026-08-24: "챌린지 선택 화면에도 리그별 리셋 버튼(각 모드별 리셋)" 요청 — 컬러링 모드의
+  // resetModeProgress(app.js)와 같은 성격이지만, 챌린지는 진행 기록을 challengeBestScore
+  // 하나에만 저장하므로(레벨/클리어/보스 같은 별도 키가 없음) 그 난이도 칸만 지우면 된다.
+  function resetChallengeDifficulty(difficulty) {
+    const all = getAllBestScores();
+    delete all[difficulty];
+    localStorage.setItem(BEST_SCORE_KEY, JSON.stringify(all));
+  }
+
+  document.querySelectorAll('.challenge-tier-reset').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (!window.confirm(I18N.t('confirm.resetMode'))) return;
+      resetChallengeDifficulty(btn.dataset.diff);
+    });
+  });
+
   // ---- LEVEL 1 문제 루프 ----
   const hud = {
     root: document.getElementById('challenge-hud'),

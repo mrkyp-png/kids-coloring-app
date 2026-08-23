@@ -229,8 +229,9 @@
              유아용 모드 화면(이 맵 화면)에서는 진입 버튼만 숨긴다. -->
         <button id="btn-ranking" class="ranking-btn" data-i18n="ranking.btn" hidden>🏆 Ranking</button>
         <!-- 2026-08-16: "음악/소리 아이콘과 같은 모양으로" 요청 — 텍스트 알약(.ranking-btn) 대신
-             아이콘만 있는 작은 원형 버튼으로 변경(음악/소리와 동일한 icon-btn-sm). -->
-        <button id="btn-reset-all" class="icon-btn icon-btn-sm" hidden aria-label="Reset progress" data-i18n-aria-label="resetMode.btn">🔄</button>
+             아이콘만 있는 작은 원형 버튼으로 변경(음악/소리와 동일한 icon-btn-sm).
+             2026-08-24: "홈버튼과 크기 통일" 요청 — icon-btn-sm(36px) 대신 icon-btn(56px). -->
+        <button id="btn-reset-all" class="icon-btn" hidden aria-label="Reset progress" data-i18n-aria-label="resetMode.btn">🔄</button>
       </div>
     </div>
     <p id="stat-line" class="stat-line" hidden></p>
@@ -259,7 +260,11 @@
        보이고 구역마다 따로 좌우로 움직인다. 지도 화면의 원형+홀드링(.lv-circle 등)을 그대로
        재사용. -->
   <div class="challenge-tiers">
+    <!-- 2026-08-24: "구역마다 우측상단에 리셋 버튼(모드별 리셋)" 요청 — 컬러링 모드의
+         #btn-reset-all과 같은 아이콘/문구, 난이도별로 challengeBestScore[difficulty]만 지운다
+         (resetChallengeDifficulty, challenge.js). -->
     <div class="challenge-tier-zone" data-tier="easy">
+      <button class="icon-btn icon-btn-sm challenge-tier-reset" data-diff="easy" type="button" aria-label="Reset progress" data-i18n-aria-label="resetMode.btn">🔄</button>
       <p class="challenge-tier-label" data-i18n="challenge.difficulty.easy">MINOR LEAGUE</p>
       <div id="challenge-tier-carousel-easy" class="diff-node-wrap">
         <div class="lv-peek tier-peek-left"></div>
@@ -268,6 +273,7 @@
       </div>
     </div>
     <div class="challenge-tier-zone" data-tier="normal">
+      <button class="icon-btn icon-btn-sm challenge-tier-reset" data-diff="normal" type="button" aria-label="Reset progress" data-i18n-aria-label="resetMode.btn">🔄</button>
       <p class="challenge-tier-label" data-i18n="challenge.difficulty.normal">MAJOR LEAGUE</p>
       <div id="challenge-tier-carousel-normal" class="diff-node-wrap">
         <div class="lv-peek tier-peek-left"></div>
@@ -276,6 +282,7 @@
       </div>
     </div>
     <div class="challenge-tier-zone" data-tier="hard">
+      <button class="icon-btn icon-btn-sm challenge-tier-reset" data-diff="hard" type="button" aria-label="Reset progress" data-i18n-aria-label="resetMode.btn">🔄</button>
       <p class="challenge-tier-label" data-i18n="challenge.difficulty.hard">CHAMPIONS LEAGUE</p>
       <div id="challenge-tier-carousel-hard" class="diff-node-wrap">
         <div class="lv-peek tier-peek-left"></div>
