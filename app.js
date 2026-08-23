@@ -1411,6 +1411,7 @@
     galleryGrid.classList.remove('gallery-grid-hiding');
     btnPuzzleMagnify.hidden = true; // 퍼즐 미리보기 버튼도 새 레벨 진입 시 원복(explodeIntoPuzzle이 다시 켬).
     levelRewardStageBg.classList.remove('is-dark'); // 레벨1 변신 연출용 검정 배경을 다른 레벨/재진입 시 원복.
+    rewardPuzzleTargetGrid.classList.remove('reward-puzzle-done'); // 퍼즐 완성 시 붙는 배경도 재진입 시 원복.
     levelReward.classList.remove('reward-centered'); // 레벨1 중앙 이동 연출을 다른 레벨/재진입 시 원복.
     levelReward.style.transform = '';
     levelReward.style.transition = '';
@@ -2450,6 +2451,7 @@
     plog('finishRewardPuzzle 시작(레벨' + level + ') — 칸 선 사라짐 → 완성 이미지 크로스페이드');
     btnPuzzleMagnify.hidden = true; // 다 맞췄으니 미리보기 버튼은 필요 없음
     levelRewardStageBg.classList.remove('is-dark'); // 퍼즐 완료 시 검정 배경 원복(요청).
+    rewardPuzzleTargetGrid.classList.add('reward-puzzle-done'); // 완성 시 박스 배경을 게임 배경색으로.
     const art = LEVEL_REWARD_ART[level];
     const transformVideo = LEVEL_TRANSFORM_VIDEO[level];
     const total = getTemplatesForLevel(level).length;
@@ -4774,10 +4776,15 @@
     // 스캔한 실측값(top39.5~67.5%/left14~85.5%)에서 장식 반경만큼만 여유를 둔 값.
     const SAFE = { top: 41, bottom: 66, left: 16, right: 84 };
     const R = 2.5; // 장식 하나의 충돌 반경(%) — 실제 폭(5%)의 절반
-    // 2026-08-23(32): "아이콘이 커서 장식들이 갇힌다" 요청 — 충돌 반경을 실제 시각 반경(12)보다
-    // 훨씬 작게(3) 줄여서 장식들이 훨씬 가까이 접근 가능하게 함(사용자 확인: 이 값에서는 장식이
-    // 아이콘 그림 위에 시각적으로 얹히는 순간이 생길 수 있음을 알고 진행하기로 함).
+    // 2026-08-23(32): "아이콘이 커서 장식들이 갇힌다" 요청 — 장식과의 충돌 반경만 실제 시각
+    // 반경(12)보다 훨씬 작게(3) 줄여서 장식들이 훨씬 가까이 접근 가능하게 함(사용자 확인: 이
+    // 값에서는 장식이 아이콘 그림 위에 시각적으로 얹히는 순간이 생길 수 있음을 알고 진행).
+    // 2026-08-23(34): "아이콘이 칠판 밖으로 나간다" 버그 — 벽 튕김도 이 작은 반경(3)을 그대로
+    // 썼더니 아이콘 중심이 벽에서 3%까지만 떨어지면 튕겨서, 실제 그림(반경 12)의 대부분이
+    // 칠판 밖으로 삐져나갈 수 있었음. 벽 튕김 전용으로 실제 시각 반경(ICON_WALL_R)을 따로 둬서
+    // 화면(칠판) 밖으로는 절대 못 나가게 하고, 장식과의 충돌만 작은 반경(ICON_R)을 쓴다.
     const ICON_R = 3;
+    const ICON_WALL_R = 12;
     const SPEED = 0.09; // 초기 속도 크기(%/frame, 60fps 기준 대략 5.4%/초)
 
     // 2026-08-23(22): "이동 중에 서로 겹친다, 만나면 튕겨나가게" 요청 — 이전 버전(CSS
@@ -4808,7 +4815,7 @@
     icons.forEach((el, i) => {
       const pos = iconStarts[i] || { x: (SAFE.left + SAFE.right) / 2, y: (SAFE.top + SAFE.bottom) / 2 };
       const angle = Math.random() * Math.PI * 2;
-      balls.push({ el, x: pos.x, y: pos.y, vx: Math.cos(angle) * SPEED, vy: Math.sin(angle) * SPEED, r: ICON_R });
+      balls.push({ el, x: pos.x, y: pos.y, vx: Math.cos(angle) * SPEED, vy: Math.sin(angle) * SPEED, r: ICON_R, wallR: ICON_WALL_R });
     });
     const decoCells = cells.filter((cell) => balls.every((b) => Math.hypot(cell.x - b.x, cell.y - b.y) > b.r + R + 2));
     for (let i = decoCells.length - 1; i > 0; i--) {
@@ -4824,12 +4831,14 @@
     function tick() {
       // 1) 이동
       for (const b of balls) { b.x += b.vx; b.y += b.vy; }
-      // 2) 안전영역 벽에 튕김(자기 반지름만큼 안쪽에서 반사)
+      // 2) 안전영역 벽에 튕김 — 벽에서는 실제 그림 크기(wallR, 없으면 r)를 써서 진짜 시각적으로
+      // 칠판 밖을 못 나가게 한다(장식과의 충돌용 작은 반경 r과는 별개).
       for (const b of balls) {
-        if (b.x - b.r < SAFE.left) { b.x = SAFE.left + b.r; b.vx = Math.abs(b.vx); }
-        if (b.x + b.r > SAFE.right) { b.x = SAFE.right - b.r; b.vx = -Math.abs(b.vx); }
-        if (b.y - b.r < SAFE.top) { b.y = SAFE.top + b.r; b.vy = Math.abs(b.vy); }
-        if (b.y + b.r > SAFE.bottom) { b.y = SAFE.bottom - b.r; b.vy = -Math.abs(b.vy); }
+        const wr = b.wallR || b.r;
+        if (b.x - wr < SAFE.left) { b.x = SAFE.left + wr; b.vx = Math.abs(b.vx); }
+        if (b.x + wr > SAFE.right) { b.x = SAFE.right - wr; b.vx = -Math.abs(b.vx); }
+        if (b.y - wr < SAFE.top) { b.y = SAFE.top + wr; b.vy = Math.abs(b.vy); }
+        if (b.y + wr > SAFE.bottom) { b.y = SAFE.bottom - wr; b.vy = -Math.abs(b.vy); }
       }
       // 3) 서로 부딪히면(당구공 탄성충돌 근사, 반지름이 서로 다를 수 있음) 밀어내고 속도 반사
       for (let i = 0; i < balls.length; i++) {
@@ -4837,7 +4846,10 @@
           const a = balls[i], b = balls[j];
           const dx = b.x - a.x, dy = b.y - a.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
-          const minDist = a.r + b.r;
+          // 2026-08-23(35): "진입 아이콘끼리 중첩" 버그 — 아이콘끼리는 장식용 작은 반경(r=3) 대신
+          // 실제 시각 반경(wallR=12)으로 충돌시켜야 두 아이콘 그림이 서로 안 겹친다. 장식과의
+          // 충돌(아이콘-장식, 장식-장식)은 기존처럼 작은 반경을 그대로 쓴다.
+          const minDist = (a.wallR && b.wallR) ? (a.wallR + b.wallR) : (a.r + b.r);
           if (dist < minDist) {
             const nx = dx / dist, ny = dy / dist;
             const overlap = (minDist - dist) / 2;
@@ -4860,6 +4872,44 @@
     requestAnimationFrame(tick);
   }
   initChalkDecoRoaming();
+
+  // ================= 우주 테마 화면 — 별똥별 =================
+  // 2026-08-23(33): "별똥별 추가" 요청 — 우주 테마가 적용된 화면(표지+탭바 5개, 지도, 갤러리)
+  // 마다 별똥별 2개(style.css .shooting-star-0/1)를 심어둔다. CSS 애니메이션이 각자 다른
+  // 주기로 화면을 가로질러 날아가고 대부분은 숨어있다가 잠깐씩만 반짝인다.
+  // 2026-08-23(35): "한곳에서만 지나가지 말고 렌덤한 방향에서" 요청 — 시작 위치/이동 각도를
+  // 매번 새로 뽑아 CSS 변수로 꽂아준다(style.css가 --ss-top/--ss-left/--ss-dx/--ss-dy/--ss-angle로
+  // 읽음). 최초 주입 시 한 번, 이후 애니메이션이 한 바퀴 돌 때(animationiteration)마다 다시 뽑아서
+  // 매번 다른 방향으로 지나가게 한다.
+  function randomizeShootingStar(star) {
+    const goingRight = Math.random() < 0.5;
+    const goingDown = Math.random() < 0.5;
+    const angleDeg = 20 + Math.random() * 45; // 진행 방향(수평 기준 20~65도)
+    const rad = angleDeg * Math.PI / 180;
+    const dist = 120 + Math.random() * 30; // 이동 거리
+    let dx = Math.cos(rad) * dist;
+    let dy = Math.sin(rad) * dist * 0.72; // 화면 세로가 짧은 비율 보정(vh가 vw보다 작음)
+    if (!goingRight) dx = -dx;
+    if (!goingDown) dy = -dy;
+    const startLeft = goingRight ? -(15 + Math.random() * 10) : 105 + Math.random() * 10;
+    const startTop = goingDown ? -Math.random() * 15 : 100 + Math.random() * 15;
+    const tailAngle = Math.atan2(dy, dx) * 180 / Math.PI + 180; // 꼬리는 진행 반대 방향
+    star.style.setProperty('--ss-left', startLeft + '%');
+    star.style.setProperty('--ss-top', startTop + '%');
+    star.style.setProperty('--ss-dx', dx + 'vw');
+    star.style.setProperty('--ss-dy', dy + 'vh');
+    star.style.setProperty('--ss-angle', tailAngle + 'deg');
+  }
+  document.querySelectorAll('.hub-screen, #map-screen, #gallery-screen').forEach((screen) => {
+    for (let i = 0; i < 2; i++) {
+      const star = document.createElement('div');
+      star.className = 'shooting-star shooting-star-' + i;
+      star.setAttribute('aria-hidden', 'true');
+      randomizeShootingStar(star);
+      star.addEventListener('animationiteration', () => randomizeShootingStar(star));
+      screen.appendChild(star);
+    }
+  });
 
   // ================= 네비게이션 =================
   btnHome.addEventListener('click', goHomeToMap);

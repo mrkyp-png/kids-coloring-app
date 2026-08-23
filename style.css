@@ -561,11 +561,13 @@ button:active { transform: scale(0.94); }
 }
 /* 성운 — 흐릿한 색 뭉치 3개가 천천히 위치/크기를 바꾸며 일렁임. */
 .hub-screen::after {
+  /* 2026-08-23(33): "성운이 안 보인다, 더 진하고 뚜렷하게" 요청 — 투명도를 2배 가까이 올리고
+     블러도 22px→14px로 줄여서 색 뭉치 경계가 더 또렷하게 보이게 함. */
   background:
-    radial-gradient(circle at 20% 25%, rgba(139, 127, 255, 0.30), transparent 42%),
-    radial-gradient(circle at 82% 65%, rgba(255, 140, 200, 0.18), transparent 40%),
-    radial-gradient(circle at 45% 90%, rgba(100, 210, 220, 0.14), transparent 38%);
-  filter: blur(22px);
+    radial-gradient(circle at 20% 25%, rgba(139, 127, 255, 0.55), transparent 45%),
+    radial-gradient(circle at 82% 65%, rgba(255, 140, 200, 0.38), transparent 42%),
+    radial-gradient(circle at 45% 90%, rgba(100, 210, 220, 0.32), transparent 40%);
+  filter: blur(14px);
   animation: cosmic-nebula-drift 26s ease-in-out infinite alternate;
 }
 @keyframes cosmic-star-drift {
@@ -579,6 +581,55 @@ button:active { transform: scale(0.94); }
 @keyframes cosmic-nebula-drift {
   0% { transform: translate(0, 0) scale(1); }
   100% { transform: translate(-6%, 5%) scale(1.12); }
+}
+
+/* 2026-08-23(33): "별똥별 추가" 요청 — 별/성운은 ::before/::after 두 자리를 이미 다 써서,
+   실제 엘리먼트(app.js가 각 우주 테마 화면에 2개씩 주입)로 따로 만든다. 점(머리) + 꼬리
+   그라디언트를 대각선으로 길게 그린 뒤, 화면을 가로지르며 날아가고 대부분의 시간은
+   투명하게 숨어있다가 아주 잠깐만 반짝 지나가게(opacity 스파이크) 한다. */
+.shooting-star {
+  position: absolute;
+  /* 2026-08-23(35): "한곳에서만 지나가지 말고 랜덤한 방향에서" 요청 — 시작 위치/이동 방향을
+     고정값 대신 app.js가 매 회전마다 새로 뽑아 넣는 CSS 변수(--ss-top/--ss-left/--ss-dx/--ss-dy)
+     로 받는다. 변수가 아직 안 채워진 최초 순간을 위한 기본값만 여기 남겨둠. */
+  top: var(--ss-top, 8%);
+  left: var(--ss-left, -12%);
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 6px 2px rgba(255, 255, 255, 0.9);
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+.shooting-star::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 90px;
+  height: 1.5px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.95), transparent);
+  transform: translateY(-50%) rotate(var(--ss-angle, 180deg));
+  transform-origin: right center;
+}
+.shooting-star-0 { animation: shooting-fly-a 9s linear infinite; animation-delay: 1.5s; }
+.shooting-star-1 { animation: shooting-fly-b 13s linear infinite; animation-delay: 6s; }
+@keyframes shooting-fly-a {
+  0%, 55% { opacity: 0; transform: translate(0, 0); }
+  57% { opacity: 1; }
+  68% { opacity: 0; transform: translate(var(--ss-dx, 130vw), var(--ss-dy, 65vh)); }
+  100% { opacity: 0; transform: translate(var(--ss-dx, 130vw), var(--ss-dy, 65vh)); }
+}
+@keyframes shooting-fly-b {
+  0%, 30% { opacity: 0; transform: translate(0, 0); }
+  32% { opacity: 1; }
+  42% { opacity: 0; transform: translate(var(--ss-dx, 110vw), var(--ss-dy, 50vh)); }
+  100% { opacity: 0; transform: translate(var(--ss-dx, 110vw), var(--ss-dy, 50vh)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shooting-star { display: none; }
 }
 /* 실제 콘텐츠(제목/버튼/탭바 등)는 이미 z-index:1 이상이라 별/성운 레이어(z-index:0) 위에 그대로 뜬다. */
 
@@ -618,11 +669,13 @@ button:active { transform: scale(0.94); }
   animation: cosmic-star-drift 70s linear infinite, cosmic-star-twinkle 3.4s ease-in-out infinite;
 }
 #map-screen::after, #gallery-screen::after {
+  /* 2026-08-23(33): "성운이 안 보인다, 더 진하고 뚜렷하게" 요청 — 투명도를 2배 가까이 올리고
+     블러도 22px→14px로 줄여서 색 뭉치 경계가 더 또렷하게 보이게 함. */
   background:
-    radial-gradient(circle at 20% 25%, rgba(139, 127, 255, 0.30), transparent 42%),
-    radial-gradient(circle at 82% 65%, rgba(255, 140, 200, 0.18), transparent 40%),
-    radial-gradient(circle at 45% 90%, rgba(100, 210, 220, 0.14), transparent 38%);
-  filter: blur(22px);
+    radial-gradient(circle at 20% 25%, rgba(139, 127, 255, 0.55), transparent 45%),
+    radial-gradient(circle at 82% 65%, rgba(255, 140, 200, 0.38), transparent 42%),
+    radial-gradient(circle at 45% 90%, rgba(100, 210, 220, 0.32), transparent 40%);
+  filter: blur(14px);
   animation: cosmic-nebula-drift 26s ease-in-out infinite alternate;
 }
 /* map-screen/gallery-screen의 실제 콘텐츠(헤더/그리드/카드 등)는 이 두 화면 바로 아래 규칙에서
@@ -869,7 +922,10 @@ button:active { transform: scale(0.94); }
      살짝 비쳐 보이는 문제 발견 — 그리드 전체를 막으면 장식이 여백에서도 거의 안 보이게
      되므로, 박스 모서리가 각진 이 래퍼(.level-node 자체보다 한 겹 바깥, 각진 사각형)에만
      배경색을 깔아서 딱 박스 크기만큼만 막는다. 격자 사이 여백/화면 여백엔 장식이 그대로 보임. */
-  background: var(--bg);
+  /* 2026-08-23(35): "선택화면(레벨선택)에서 원 3개 빼고는 배경화면과 같이 처리" 요청 — 위 배경은
+     구 라이트테마 시절 장식이 원 모서리 틈으로 비치는 걸 막으려고 깐 불투명 판이었는데, 우주
+     테마에선 이게 오히려 별/성운(#map-screen::before/::after)을 가리는 네모난 "박스"로 보였다.
+     투명하게 바꿔 별/성운이 원 3개 주변까지 그대로 비치게 한다. */
   padding: 12px 0;
 }
 /* 2026-08-21: "위에는 이전 카테고리가 70% 크기로, 아래에는 다음 카테고리가 70% 크기로 살짝
@@ -1354,7 +1410,12 @@ button:active { transform: scale(0.94); }
   border-radius: 16px;
   overflow: hidden;
   position: relative;
+  transition: background-color 0.6s ease;
 }
+/* 2026-08-23(35): "완성되면 보상 이미지 박스 배경이 게임 배경화면과 같아지게" 요청 — 진행 중엔
+   기존 밝은 색(#EDEBF9)을 유지하고, 퍼즐을 다 맞춘 순간(app.js finishRewardPuzzle)에만 이
+   클래스가 붙어 우주 배경색으로 바뀐다. */
+.reward-puzzle-target-grid.reward-puzzle-done { background: var(--bg); }
 .reward-puzzle-target-grid .reward-puzzle-tile {
   /* 정답 칸은 그리드 셀을 그대로 채운다(위 1fr 열이 크기를 정함) — 트레이 조각만 아래에서
      별도로 px 크기를 받는다(explodeIntoPuzzle이 계산해서 인라인으로 넣음). */
