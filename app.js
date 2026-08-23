@@ -232,7 +232,6 @@
   const paletteRight = document.getElementById('palette-right');
   const cornerTR = document.getElementById('corner-tr');
   const cornerBL = document.getElementById('corner-bl');
-  const frameTop = document.getElementById('frame-top');
   const btnSkill1 = document.getElementById('btn-skill1');
   const btnSkill2 = document.getElementById('btn-skill2');
   const btnHome = document.getElementById('btn-home');
@@ -2908,7 +2907,6 @@
 
       // 정답색이 정해진 뒤에 팔레트 구성(그 도안에 실제 필요한 색이 반드시 포함되게)
       renderPalette();
-      syncRingGap();
 
       // 채우기 레이어 초기화 — 보기 전용이면 방금 그린 정답 이미지(goalCanvas)를 그대로 옮겨서
       // 처음부터 완성된 상태로 보여준다.
@@ -3859,22 +3857,12 @@
     document.documentElement.style.setProperty('--ring-square', size + 'px');
   }
 
-  // 2026-08-20: "상하좌우 버튼 간 거리가 다 똑같아야"(뒤로가기→첫 색, 색↔색, 마지막 색→완료 전부
-  // 포함) 요청 — 위/아래 줄(#frame-top)은 justify-content:space-between이라 렌더링된 실제 간격이
-  // CSS 고정값이 아니라 도안·화면 크기마다 다르다. 그 값을 직접 측정해 --ring-gap으로 반영하면
-  // 좌/우 열(.palette-col, style.css 참고)이 같은 값을 gap/padding에 그대로 써서 맞춘다.
-  function syncRingGap() {
-    const items = [...frameTop.querySelectorAll('.ring-circle, .color-swatch')]
-      .filter((el) => el.offsetParent !== null)
-      .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
-    if (items.length < 2) return;
-    const r0 = items[0].getBoundingClientRect();
-    const r1 = items[1].getBoundingClientRect();
-    const gap = Math.max(0, Math.round((r1.left - r0.right) * 10) / 10);
-    document.documentElement.style.setProperty('--ring-gap', gap + 'px');
-  }
+  // 2026-08-23(26): "모서리=정사각형, 변=긴 직사각형, flex:1로 빈틈 없이" 재구성으로 스와치
+  // 간격이 CSS gap 고정값 하나로 항상 동일해져서, 예전에 렌더링된 간격을 직접 측정해 다른 곳에
+  // 동기화해주던 syncRingGap()이 더 이상 필요 없어져 지움(같이 쓰던 --ring-gap도 실제로는 아무
+  // CSS도 안 읽고 있었음 — 이 함수가 유일한 소비처였는데 그마저 없어짐).
   window.addEventListener('resize', () => {
-    if (!coloringScreen.hidden) { syncRingSquareSize(); syncRingGap(); }
+    if (!coloringScreen.hidden) { syncRingSquareSize(); }
   });
 
   // 2026-08-20: "링 안 뒤로가기는 한 단계만" 요청 — 이 함수는 원래도 그 동작이었다(일반 레벨은
@@ -3959,16 +3947,28 @@
     const overflow = cols.slice(i); // required 병합으로 기본치보다 색이 많은 도안의 나머지(좌우에 번갈아)
     overflow.forEach((color, k) => plan.push([k % 2 === 0 ? paletteRight : paletteLeft, [color]]));
 
+    // 2026-08-23(26): "모서리는 정사각형, 변은 그 방향으로 긴 직사각형" 요청 — 어느 컨테이너로
+    // 들어가는 스와치인지에 따라 모양 클래스를 다르게 붙인다(위/아래 줄=가로로 긴 ring-edge-h,
+    // 좌/우 열=세로로 긴 ring-edge-v, 모서리 칸=정사각형 ring-corner).
+    function shapeClassFor(container) {
+      if (container === paletteTop || container === paletteBottom) return 'ring-edge-h';
+      if (container === paletteLeft || container === paletteRight) return 'ring-edge-v';
+      return 'ring-corner'; // cornerTR/cornerBL
+    }
+
     let globalIdx = 0;
     plan.forEach(([container, colors]) => {
       colors.forEach((color) => {
         const btn = document.createElement('button');
-        btn.className = 'ring-circle color-swatch' + (globalIdx === 0 ? ' active' : '');
+        btn.className = 'ring-circle color-swatch ' + shapeClassFor(container) + (globalIdx === 0 ? ' active' : '');
         btn.style.background = color;
         btn.setAttribute('role', 'listitem');
         btn.setAttribute('aria-label', 'Pick a color');
         btn.dataset.color = color;
         btn.addEventListener('click', () => {
+          // 2026-08-23(26): "눌렀는지 안 눌렀는지 모르겠다" 요청 — 짧은 진동으로 터치 피드백
+          // (기존 vibrate() 헬퍼 재사용 — 진동 설정 꺼져있으면 자동으로 무시됨).
+          vibrate(15);
           selectedColor = color;
           getPaletteSwatches().forEach((el) => el.classList.remove('active'));
           btn.classList.add('active');
@@ -4869,7 +4869,7 @@
 
   // ================= 네비게이션 =================
   btnHome.addEventListener('click', goHomeToMap);
-  btnBack.addEventListener('click', goHome);
+  btnBack.addEventListener('click', () => { vibrate(15); goHome(); });
 
   // ================= 표지 화면 =================
   function enterMapFromCover() {

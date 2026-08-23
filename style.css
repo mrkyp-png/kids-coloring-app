@@ -275,7 +275,8 @@ button:active { transform: scale(0.94); }
 .chalk-icon-btn {
   position: absolute;
   width: 24%;
-  animation: chalk-pulse 1.8s ease-in-out infinite, chalk-icon-glow 1.8s ease-in-out infinite;
+  /* 2026-08-23(27): "확대 애니메이션은 없애고 글로우는 유지" 요청 — chalk-pulse(커졌다작아졌다) 제거. */
+  animation: chalk-icon-glow 1.8s ease-in-out infinite;
   z-index: 1;
 }
 .chalk-icon-btn img { width: 100%; height: 100%; object-fit: contain; display: block; }
@@ -1932,48 +1933,37 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 
 .palette-col {
   /* 2026-08-20: 캔버스를 액자처럼 좌우로 둘러싸는 색상 열(예전 우측 단일 .palette를 좌/우로 분리).
-     2026-08-21: "버튼은 최소한으로, goal/캔버스 박스는 최대한 크게" 요청으로 스와치를 60px→44px로
-     축소하면서 이 열의 폭도 같이 줄임 — 너비 60px = 스와치 지름(44px, 테두리 3px 포함) + 선택
-     표시 링(::after, inset:-4px 이므로 양쪽 4px씩=8px) + 좌우 패딩 4px씩=8px. grid-template-columns의
-     60px 트랙과 맞춰져 있어야 함(양쪽 다 60이어야 함, 하드코딩된 곳들). 색 개수가 많은 챌린지모드에서
-     세로로 다 안 들어가면 세로 스크롤.
-     2026-08-20(2): "상하좌우 버튼 간 거리가 다 똑같아야"(뒤로가기→첫 색, 색↔색, 마지막 색→완료
-     전부 포함) 요청 — 위/아래 줄(.color-frame-row)은 space-between이라 실제 렌더링된 간격이
-     고정값이 아니라 도안/화면 크기마다 달라진다(예: 55.3px). 그 값을 app.js의 syncRingGap()이
-     매번 측정해 --ring-gap으로 반영하면, 여기서도 같은 값을 gap으로 쓰고, 위아래 패딩을
-     "간격 - (행높이-스와치지름)"으로 계산해 뒤로가기/완료와의 거리까지 정확히 같은 값으로 맞춘다. */
+     grid-template-columns의 60px 트랙과 맞춰져 있어야 함(양쪽 다 60이어야 함, 하드코딩된 곳들).
+     2026-08-23(26): "원이 작아서 터치 성공률이 낮다, 빈틈 없이 채워달라" 요청 — space-evenly로
+     고정폭(44px) 스와치 사이를 벌리던 방식을 버리고, .ring-edge-v가 flex:1로 이 열의 남는
+     세로 공간을 스와치 개수만큼 똑같이 나눠 채우게 바꿈(색이 몇 개든 빈 공간이 안 남고, flex라
+     서로 겹칠 수도 없다). 이제 스와치 자체가 열 높이를 꽉 채우므로 예전에 필요했던 -8px 마진
+     보정(60px 행의 여백만큼 밀어 넣던 것)도 필요 없어져 지움 — grid에 행 간격이 없어서
+     프레임 행의 모서리 버튼과 자연스럽게 이어붙음. 색 개수가 아주 많아 min-height(32px, 위
+     .ring-edge-v)보다 작아지려 하면 기존처럼 세로 스크롤. */
   width: 60px;
   display: flex;
   flex-direction: column;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 0;
-  /* 2026-08-20(3): 위/아래 줄의 모서리 버튼(뒤로가기·완료 등)은 60px 행 안에서 위아래로 8px씩
-     여백을 두고 가운데 있다((60-44)/2). 좌/우 열의 박스 자체는 캔버스 행(row5) 높이만큼이라
-     그 8px 여백 구간이 빠져 있는데, margin으로 8px씩 밀어 넣어 "뒤로가기 바로 밑 ~ 완료 바로
-     위"까지를 이 열의 실제 범위로 만든다(위/아래 원의 여백 구간은 애초에 비어 있어서 겹쳐도
-     클릭에 영향 없음). 그 범위 안에서 justify-content:space-evenly로 색상 앞뒤·사이 간격을
-     전부 동일하게 나눈다(색이 N개면 N+1개 간격이 다 같아짐). */
-  margin: -8px 0; /* (60-44)/2 — .ring-circle 지름이 바뀌면 이 여백도 같이 줄여야 함 */
+  gap: 8px;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0 4px;
-  justify-content: space-evenly;
+  padding: 4px 4px;
 }
 /* 2026-08-20: "뒤로가기/완료/스킬도 색칠버튼과 동일한 원형이어야 하고, 사각 링 배치 개수에
    포함된다" 요청 — 색상 스와치와 완전히 같은 크기/입체감을 공유하는 기반 클래스로 뺀다.
    배경색만 각자 다르게 주면 되므로(스와치는 인라인 style, 기능버튼은 아래 .ring-btn-* 클래스),
    임의의 색에도 공통으로 먹히는 인셋 하이라이트/그림자 레이어만으로 볼록한 캔디버튼 느낌을 낸다. */
-/* 2026-08-21: "버튼은 최소한으로 줄이고 goal/캔버스 박스는 최대한 키워달라" 요청 — 60px→44px로
-   축소(터치 타겟 최소 권장치 44px 유지). 테두리도 비율 맞춰 4px→3px. 이 크기를 바꾸면
-   .palette-col/.color-swatch.active::after/.ring-corner-slot 마진, app.js syncRingSquareSize()의
-   176(=88×2) 상수도 같이 맞춰야 함(위 #coloring-screen 주석 참고). */
+/* 2026-08-23(26): "원이 작아서 터치 성공률이 낮다 — 대각선(모서리)은 정사각형, 사이(변)는
+   그 방향으로 긴 직사각형으로, 버튼끼리 안 겹치게" 요청 — 원형(44px, 60px 트랙 안에 8px씩
+   여백)을 버리고, 모서리/변 모두 트랙(60px) 안을 꽉 채우는 52px 두께로 키우고 모양만
+   나눈다(.ring-corner=정사각형 고정크기, .ring-edge-h/.ring-edge-v=flex:1로 남는 공간을
+   똑같이 나눠 채우는 직사각형 — 화면·색 개수가 달라져도 항상 빈틈 없이 꽉 차고, flex라서
+   서로 겹칠 수도 없다). 공통 입체감(그림자/테두리)은 이 기반 클래스가 그대로 담당. */
 .ring-circle {
-  flex: 0 0 auto;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
   border: 3px solid #fff;
+  border-radius: 14px;
   box-shadow:
     0 3px 0 rgba(0, 0, 0, 0.22),
     0 5px 8px rgba(0, 0, 0, 0.16),
@@ -1994,11 +1984,17 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
     inset 0 2px 3px rgba(255, 255, 255, 0.55),
     inset 0 -3px 4px rgba(0, 0, 0, 0.22);
 }
+/* 모서리(대각선) — 정사각형, 링 트랙 두께(60px)에서 패딩(4px×2)을 뺀 52px 고정. */
+.ring-corner { flex: 0 0 auto; width: 52px; height: 52px; }
+/* 위/아래 변 — 세로는 트랙 두께에 맞춘 52px 고정, 가로는 flex:1로 그 변의 남은 폭을 똑같이 나눠 채움. */
+.ring-edge-h { flex: 1 1 0; min-width: 0; height: 52px; }
+/* 좌/우 변 — 가로는 52px 고정, 세로는 flex:1로 그 열의 남은 높이를 똑같이 나눠 채움. */
+.ring-edge-v { flex: 1 1 0; min-height: 32px; width: 52px; }
 .color-swatch.active::after {
   content: "";
   position: absolute;
-  inset: -4px; /* 2026-08-21: 버튼 축소(60→44px)에 맞춰 6px→4px, .palette-col 폭 계산과 맞물림 */
-  border-radius: 50%;
+  inset: -4px;
+  border-radius: 18px; /* 2026-08-23(26): 원형(50%)에서 사각/직사각 모양에 맞는 둥근 사각으로 */
   border: 2px solid var(--brand);
 }
 .ring-btn-back { background: #CFE3FF; }
@@ -2018,12 +2014,14 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
       결과적으로 간격은 여전히 서로 다 같음).
    3) 좌우 패딩은 0으로(2026-08-20(4)) — 모서리 버튼을 감싸는 .ring-corner-slot이 이제 88px로
       .palette-col과 폭이 같으므로, 이 줄 자체는 패딩 없이 딱 붙어야 두 88px 박스의 좌표가
-      정확히 일치한다(패딩을 주면 모서리 박스가 그만큼 안쪽으로 밀려 팔레트 열과 어긋남). */
+      정확히 일치한다(패딩을 주면 모서리 박스가 그만큼 안쪽으로 밀려 팔레트 열과 어긋남).
+   2026-08-23(26): 변 버튼(.ring-edge-h)이 flex:1로 남는 폭을 다 채우게 되면서 justify-content는
+   더 이상 할 일이 없어짐(빈 공간 자체가 없어짐) — 남겨둬도 무해하지만 의도를 명확히 flex-start로. */
 .color-frame-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-start;
+  gap: 8px;
   padding: 4px 0;
 }
 .palette-row {
@@ -2031,19 +2029,14 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 }
 /* 2026-08-20: 모서리 칸 — 챌린지 모드에선 스킬 버튼, 유아모드에선 renderPalette()가 색상
    스와치를 대신 넣는다. 뒤로가기·완료도 이 클래스로 감싼다.
-   2026-08-20(4): 뒤로가기가 줄 가장자리에 바싹 붙어(중심 34px) 팔레트 열 스와치(88px 안에서
-   중앙정렬, 중심 44px)와 10px 어긋났었다. 슬롯 폭을 88px로 키워 고쳐봤더니 이번엔 줄 안의
-   간격 계산이 슬롯 폭 때문에 밀려서 간격이 안 맞았다(모서리↔색 54.7 vs 색↔색 36.7 — 슬롯이
-   넓어진 만큼 안쪽 여백이 생겨서). 그래서 폭은 원래대로 두고(auto), 중심 방향으로 10px만
-   margin으로 밀어서(줄 안쪽으로) 정렬만 고치고 간격 계산엔 티끌만큼만 영향 주게 함. */
+   2026-08-23(26): 예전엔 44px 원을 88px 슬롯 중앙에 놓고 margin으로 미세 보정했는데, 이제
+   .ring-corner 자체가 슬롯을 꽉 채우는 52px 정사각형이라 그 보정이 필요 없어져 지움. */
 .ring-corner-slot {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.color-frame-row > .ring-corner-slot:first-child { margin-left: 8px; } /* (60-44)/2, 2026-08-21 축소 반영 */
-.color-frame-row > .ring-corner-slot:last-child { margin-right: 8px; }
 /* 2026-08-11: 다른 버튼들(Start, 레벨박스)과 같은 키캡 입체감을 툴바/모달 버튼에도 통일 적용. */
 .tool-btn {
   flex: 1;
