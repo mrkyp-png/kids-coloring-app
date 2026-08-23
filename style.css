@@ -275,13 +275,17 @@ button:active { transform: scale(0.94); }
 .chalk-icon-btn {
   position: absolute;
   width: 24%;
-  /* 2026-08-23(27): "확대 애니메이션은 없애고 글로우는 유지" 요청 — chalk-pulse(커졌다작아졌다) 제거. */
-  animation: chalk-icon-glow 1.8s ease-in-out infinite;
+  /* 2026-08-23(27): "확대 애니메이션은 없애고 글로우는 유지" 요청 — chalk-pulse(커졌다작아졌다) 제거.
+     2026-08-23(28): "장식 이미지들과 같은 애니메이션 효과" 요청 — 장식(.chalk-deco)이 쓰는
+     회전 흔들림(chalk-rotate-wobble)을 글로우와 같이 추가(위치는 고정 버튼이라 그대로 두고
+     회전만 맞춤). 둘이 완전히 같은 박자로 흔들리면 부자연스러워서 시간을 살짝 다르게 준다. */
+  animation: chalk-icon-glow 1.8s ease-in-out infinite, chalk-rotate-wobble 5s ease-in-out infinite;
   z-index: 1;
 }
 .chalk-icon-btn img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.chalk-icon-kids { top: 40%; left: 15%; }
-.chalk-icon-challenge { bottom: 35%; right: 13%; }
+/* 2026-08-23(29): "선택 아이콘도 장식처럼 돌아다니게" 요청 — 고정 top/left를 지움. 이제
+   app.js의 물리 시뮬레이션이 장식과 똑같이 이 둘의 left/top도 매 프레임 직접 갱신한다. */
+.chalk-icon-challenge { animation-duration: 1.8s, 6s; animation-direction: normal, reverse; }
 
 /* 2026-08-23(16): "액자 윗변 나무에 컬러풀하게 Coloring Fun" 요청 — 액자를 두껍게 하진 않고
    (요청대로) 그 얇은 윗변 띠 안에 들어가게, 한 글자씩 무지개색으로.
@@ -370,6 +374,12 @@ button:active { transform: scale(0.94); }
    "허브" 화면(표지 + 아래 3개 신규 화면)에서만 보이고, 실제 색칠/챌린지 플레이 중엔
    숨긴다(showTabBar/hideTabBar, app.js). ---------- */
 .tab-bar {
+  /* 2026-08-23(30): #tab-bar는 <section class="hub-screen">의 자식이 아니라 body 레벨 형제라
+     .hub-screen에서 재정의한 우주 테마 변수를 못 물려받는다 — 여기서 직접 같은 값으로. */
+  --card-bg: #241c47;
+  --muted: #A99FD6;
+  --brand: #8b7fff;
+  --brand-soft: #362a5e;
   position: fixed;
   left: 0;
   right: 0;
@@ -502,6 +512,75 @@ button:active { transform: scale(0.94); }
 
 /* 탭바가 떠 있는 허브 화면은 콘텐츠가 탭바 밑에 가려지지 않게 그만큼 아래 여백을 더 둔다. */
 .hub-screen { padding-bottom: calc(var(--safe-bottom) + 96px); }
+
+/* ---------- 2026-08-23(30): "신비한 우주에서 게임하는 느낌, 모든 페이지" 요청 — 1단계로
+   표지+탭바 5개 화면(.hub-screen)부터 어두운 밤하늘 테마로 전환. 전역 :root는 그대로 두고
+   (지도/갤러리/색칠 화면은 아직 밝은 테마 그대로라 손대면 안 됨) .hub-screen 안에서만 공용
+   변수(--bg/--card-bg/--ink 등)를 다시 정의 — 이 화면들은 이미 그 변수들로 배경/글자색을
+   그려서(예: .cover-screen 배경 그라디언트, .more-menu-item 카드) 이 재정의 하나로 대부분
+   자동으로 어두운 톤이 된다. 그 위에 별(twinkle+drift)·성운(drift) 두 겹을 ::before/::after로
+   얹어 "가만히 있지 않고" 자연스럽게 움직이는 배경을 만든다. */
+.hub-screen {
+  --bg: #0d0a24;
+  --card-bg: #241c47;
+  --ink: #EDE9FF;
+  --muted: #A99FD6;
+  --brand: #8b7fff;
+  --brand-soft: #362a5e;
+  --cover-mid: #1a1440;
+  --shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+/* 표지 화면(.cover-screen)은 자기 전용 그라디언트 배경이 있으니 그대로 두고, 나머지 4개
+   (스코어/일일/상점/더보기)는 .screen 기본값이 배경 없음(투명)이라 body의 밝은 크림색이
+   비쳐 보이는 문제가 있었음 — 불투명한 --bg로 확실히 덮는다. */
+.hub-screen:not(.cover-screen) { background: var(--bg); }
+.hub-screen::before,
+.hub-screen::after {
+  content: '';
+  position: absolute;
+  inset: -15%;
+  pointer-events: none;
+  z-index: 0;
+}
+/* 별 — 크기가 다른 점 5개를 흩뿌려 타일링, 반짝임(밝기)과 흘러가는 이동을 동시에. */
+.hub-screen::before {
+  background-image:
+    radial-gradient(1.6px 1.6px at 15% 25%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 55% 8%, #fff, transparent),
+    radial-gradient(2px 2px at 80% 40%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 30% 70%, #fff, transparent),
+    radial-gradient(1.6px 1.6px at 65% 85%, #fff, transparent),
+    radial-gradient(1px 1px at 90% 15%, #fff, transparent),
+    radial-gradient(1.4px 1.4px at 10% 90%, #fff, transparent);
+  background-repeat: repeat;
+  background-size: 220px 220px;
+  opacity: 0.75;
+  animation: cosmic-star-drift 70s linear infinite, cosmic-star-twinkle 3.4s ease-in-out infinite;
+}
+/* 성운 — 흐릿한 색 뭉치 3개가 천천히 위치/크기를 바꾸며 일렁임. */
+.hub-screen::after {
+  background:
+    radial-gradient(circle at 20% 25%, rgba(139, 127, 255, 0.30), transparent 42%),
+    radial-gradient(circle at 82% 65%, rgba(255, 140, 200, 0.18), transparent 40%),
+    radial-gradient(circle at 45% 90%, rgba(100, 210, 220, 0.14), transparent 38%);
+  filter: blur(22px);
+  animation: cosmic-nebula-drift 26s ease-in-out infinite alternate;
+}
+@keyframes cosmic-star-drift {
+  from { background-position: 0 0; }
+  to { background-position: -220px -220px; }
+}
+@keyframes cosmic-star-twinkle {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.95; }
+}
+@keyframes cosmic-nebula-drift {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-6%, 5%) scale(1.12); }
+}
+/* 실제 콘텐츠(제목/버튼/탭바 등)는 이미 z-index:1 이상이라 별/성운 레이어(z-index:0) 위에 그대로 뜬다. */
 
 /* ---------- 나의 스코어/일일/상점 — 아직 스펙 미정, 가운데 정렬 플레이스홀더 ---------- */
 .hub-placeholder {

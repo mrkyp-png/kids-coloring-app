@@ -4761,89 +4761,80 @@
   tabBarDailyDay.textContent = String(today.getDate());
 
   // ================= 표지 칠판 장식 렌덤 이동 =================
-  // 2026-08-23(18): "칠판 검은 부위 전체를 렌덤하게, 안 겹치게" 요청 — 장식 이모지(.chalk-deco)
-  // 16개가 각자 무작위 간격으로 칠판 안전영역 안의 새 지점을 뽑아 그쪽으로 부드럽게(CSS
-  // transition) 이동한다. 모드 선택 아이콘 버튼 2개(.chalk-icon-btn)는 요청대로 이 로밍에서
-  // 제외 — 고정 위치에서 펄스+글로우만 유지.
+  // 2026-08-23(18)(22)(29): "칠판 검은 부위 전체를 렌덤하게, 안 겹치게, 만나면 튕겨나가게"
+  // "선택 아이콘도 같이 돌아다니게" 요청 — 장식 이모지 20개 + 모드 선택 아이콘 버튼 2개까지
+  // 전부 같은 당구공 물리(매 프레임 위치 갱신, 벽/서로 부딪히면 반사)에 참여시킨다. 아이콘
+  // 버튼은 장식보다 훨씬 커서(24% vs 5%) 반지름을 따로 갖는 "이종 크기" 충돌로 확장했다 —
+  // 더 이상 아이콘을 피해야 할 고정 사각형(ICON_ZONES)으로 다루지 않고, 그 자신도 하나의 공.
   function initChalkDecoRoaming() {
     const decos = Array.from(document.querySelectorAll('.chalk-deco'));
+    const icons = Array.from(document.querySelectorAll('.chalk-icon-btn'));
     if (!decos.length) return;
     // 칠판 검은 면 안쪽 안전영역(%, wrap 기준) — chalkboard.png를 파이썬(Pillow)으로 픽셀
     // 스캔한 실측값(top39.5~67.5%/left14~85.5%)에서 장식 반경만큼만 여유를 둔 값.
     const SAFE = { top: 41, bottom: 66, left: 16, right: 84 };
-    // 모드 선택 아이콘 버튼 2개가 실제로 차지하는 영역(%) — 딱 그 크기만(과하게 넓히면 나머지
-    // 장식이 들어갈 자리가 없어짐).
-    const ICON_ZONES = [
-      { top: 39, bottom: 55, left: 14, right: 40 },  // kids(왼쪽위)
-      { top: 50, bottom: 66, left: 62, right: 88 },  // challenge(오른쪽아래)
-    ];
     const R = 2.5; // 장식 하나의 충돌 반경(%) — 실제 폭(5%)의 절반
+    const ICON_R = 12; // 아이콘 버튼 충돌 반경(%) — 실제 폭(24%)의 절반
     const SPEED = 0.09; // 초기 속도 크기(%/frame, 60fps 기준 대략 5.4%/초)
 
     // 2026-08-23(22): "이동 중에 서로 겹친다, 만나면 튕겨나가게" 요청 — 이전 버전(CSS
     // transition으로 목적지만 주기적으로 새로 뽑음)은 도착 지점끼리만 안 겹치게 보장했을 뿐,
     // 그 사이 지나가는 경로까지는 신경 안 써서 서로 스쳐 지나가며 겹쳐 보였다. 이번엔 진짜
-    // 당구공처럼 매 프레임(requestAnimationFrame) 위치를 갱신하고, 벽/아이콘존/서로 부딪히면
-    // 그 순간 반사(튕김)하는 실시간 물리 시뮬레이션으로 바꿨다 — 항상 움직이고, 항상 안 겹침.
+    // 당구공처럼 매 프레임(requestAnimationFrame) 위치를 갱신하고, 벽/서로 부딪히면 그 순간
+    // 반사(튕김)하는 실시간 물리 시뮬레이션으로 바꿨다 — 항상 움직이고, 항상 안 겹침.
     // 초기 위치만 격자로 흩뿌려서 시작부터 겹치지 않게 하고, 이후는 물리 루프가 알아서 유지한다.
+    // 아이콘(반지름 12)은 격자 칸(5.5) 하나보다 훨씬 커서, 격자 칸을 4개(2x2)씩 묶어 그 중심에
+    // 배치하고 그 칸 4개는 장식용 후보에서 뺀다.
     const CELL = 5.5;
     const cols = Math.floor((SAFE.right - SAFE.left) / CELL);
     const rows = Math.floor((SAFE.bottom - SAFE.top) / CELL);
     const cells = [];
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        const cx = SAFE.left + CELL * (c + 0.5);
-        const cy = SAFE.top + CELL * (r + 0.5);
-        const inIconZone = ICON_ZONES.some((z) => (
-          cx + R > z.left && cx - R < z.right && cy + R > z.top && cy - R < z.bottom
-        ));
-        if (!inIconZone) cells.push({ x: cx, y: cy });
+        cells.push({ x: SAFE.left + CELL * (c + 0.5), y: SAFE.top + CELL * (r + 0.5) });
       }
     }
-    for (let i = cells.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [cells[i], cells[j]] = [cells[j], cells[i]];
-    }
 
-    const balls = decos.map((el, i) => {
-      const cell = cells[i % cells.length];
+    const balls = [];
+    // 아이콘 버튼 먼저 배치(기존 자리 근처에서 시작 — 왼쪽위/오른쪽아래) + 그 근방 칸은
+    // 장식 후보에서 제외.
+    const iconStarts = [
+      { x: SAFE.left + (SAFE.right - SAFE.left) * 0.3, y: SAFE.top + (SAFE.bottom - SAFE.top) * 0.32 },
+      { x: SAFE.left + (SAFE.right - SAFE.left) * 0.7, y: SAFE.top + (SAFE.bottom - SAFE.top) * 0.68 },
+    ];
+    icons.forEach((el, i) => {
+      const pos = iconStarts[i] || { x: (SAFE.left + SAFE.right) / 2, y: (SAFE.top + SAFE.bottom) / 2 };
       const angle = Math.random() * Math.PI * 2;
-      return { el, x: cell.x, y: cell.y, vx: Math.cos(angle) * SPEED, vy: Math.sin(angle) * SPEED };
+      balls.push({ el, x: pos.x, y: pos.y, vx: Math.cos(angle) * SPEED, vy: Math.sin(angle) * SPEED, r: ICON_R });
+    });
+    const decoCells = cells.filter((cell) => balls.every((b) => Math.hypot(cell.x - b.x, cell.y - b.y) > b.r + R + 2));
+    for (let i = decoCells.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [decoCells[i], decoCells[j]] = [decoCells[j], decoCells[i]];
+    }
+    decos.forEach((el, i) => {
+      const cell = decoCells[i % decoCells.length];
+      const angle = Math.random() * Math.PI * 2;
+      balls.push({ el, x: cell.x, y: cell.y, vx: Math.cos(angle) * SPEED, vy: Math.sin(angle) * SPEED, r: R });
     });
 
     function tick() {
       // 1) 이동
       for (const b of balls) { b.x += b.vx; b.y += b.vy; }
-      // 2) 안전영역 벽에 튕김
+      // 2) 안전영역 벽에 튕김(자기 반지름만큼 안쪽에서 반사)
       for (const b of balls) {
-        if (b.x - R < SAFE.left) { b.x = SAFE.left + R; b.vx = Math.abs(b.vx); }
-        if (b.x + R > SAFE.right) { b.x = SAFE.right - R; b.vx = -Math.abs(b.vx); }
-        if (b.y - R < SAFE.top) { b.y = SAFE.top + R; b.vy = Math.abs(b.vy); }
-        if (b.y + R > SAFE.bottom) { b.y = SAFE.bottom - R; b.vy = -Math.abs(b.vy); }
+        if (b.x - b.r < SAFE.left) { b.x = SAFE.left + b.r; b.vx = Math.abs(b.vx); }
+        if (b.x + b.r > SAFE.right) { b.x = SAFE.right - b.r; b.vx = -Math.abs(b.vx); }
+        if (b.y - b.r < SAFE.top) { b.y = SAFE.top + b.r; b.vy = Math.abs(b.vy); }
+        if (b.y + b.r > SAFE.bottom) { b.y = SAFE.bottom - b.r; b.vy = -Math.abs(b.vy); }
       }
-      // 3) 아이콘 버튼 영역(사각형)에 부딪히면 침투가 가장 얕은 쪽으로 밀어내고 그 축으로 튕김
-      for (const b of balls) {
-        for (const z of ICON_ZONES) {
-          if (b.x + R > z.left && b.x - R < z.right && b.y + R > z.top && b.y - R < z.bottom) {
-            const pushLeft = (b.x + R) - z.left;
-            const pushRight = z.right - (b.x - R);
-            const pushTop = (b.y + R) - z.top;
-            const pushBottom = z.bottom - (b.y - R);
-            const min = Math.min(pushLeft, pushRight, pushTop, pushBottom);
-            if (min === pushLeft) { b.x = z.left - R; b.vx = -Math.abs(b.vx); }
-            else if (min === pushRight) { b.x = z.right + R; b.vx = Math.abs(b.vx); }
-            else if (min === pushTop) { b.y = z.top - R; b.vy = -Math.abs(b.vy); }
-            else { b.y = z.bottom + R; b.vy = Math.abs(b.vy); }
-          }
-        }
-      }
-      // 4) 장식끼리 부딪히면(당구공 탄성충돌 근사) 서로 밀어내고 속도를 반사
+      // 3) 서로 부딪히면(당구공 탄성충돌 근사, 반지름이 서로 다를 수 있음) 밀어내고 속도 반사
       for (let i = 0; i < balls.length; i++) {
         for (let j = i + 1; j < balls.length; j++) {
           const a = balls[i], b = balls[j];
           const dx = b.x - a.x, dy = b.y - a.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
-          const minDist = R * 2;
+          const minDist = a.r + b.r;
           if (dist < minDist) {
             const nx = dx / dist, ny = dy / dist;
             const overlap = (minDist - dist) / 2;
@@ -4856,7 +4847,7 @@
           }
         }
       }
-      // 5) 화면 반영(transition 없이 매 프레임 직접 갱신 — 회전 흔들림은 별도 CSS 애니메이션)
+      // 4) 화면 반영(transition 없이 매 프레임 직접 갱신 — 회전 흔들림은 별도 CSS 애니메이션)
       for (const b of balls) {
         b.el.style.left = b.x + '%';
         b.el.style.top = b.y + '%';
