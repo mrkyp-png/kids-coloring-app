@@ -180,6 +180,17 @@
   const levelRewardStage = document.getElementById('level-reward-stage');
   const levelRewardStageBg = document.getElementById('level-reward-stage-bg');
   const levelRewardVideo = document.getElementById('level-reward-video');
+  // 2026-08-24: 레벨 클리어 완료 후 캐릭터를 탭하면 뜨는 "보상 카드"(상자 열림 + 3D 플립 + 다운로드).
+  const rewardCardModal = document.getElementById('reward-card-modal');
+  const rewardCardConfetti = document.getElementById('reward-card-confetti');
+  const rewardCardLightSweep = document.getElementById('reward-card-light-sweep');
+  const rewardCardClose = document.getElementById('reward-card-close');
+  const rewardCardBox = document.getElementById('reward-card-box');
+  const rewardCard = document.getElementById('reward-card');
+  const rewardCardInner = document.getElementById('reward-card-inner');
+  const rewardCardHolo = document.getElementById('reward-card-holo');
+  const rewardCardImg = document.getElementById('reward-card-img');
+  const rewardCardDownloadBtn = document.getElementById('reward-card-download');
   const btnMapBack = document.getElementById('btn-map-back');
   const btnPuzzleMagnify = document.getElementById('btn-puzzle-magnify');
   const btnPuzzleMagnifyImg = document.getElementById('btn-puzzle-magnify-img');
@@ -1415,7 +1426,12 @@
     galleryGrid.classList.remove('gallery-grid-hiding');
     btnPuzzleMagnify.hidden = true; // 퍼즐 미리보기 버튼도 새 레벨 진입 시 원복(explodeIntoPuzzle이 다시 켬).
     levelRewardStageBg.classList.remove('is-dark'); // 레벨1 변신 연출용 검정 배경을 다른 레벨/재진입 시 원복.
-    levelRewardStageBg.classList.remove('is-transparent'); // 위와 동일한 이유로 투명 상태도 원복.
+    // 2026-08-24: 이미 클리어를 마친 레벨은 완성 그림이 계속 투명 박스 위에 떠 있는 상태로
+    // 남아야 한다("클리어 완료된 이미지는 투명한 상태여야함") — 재진입/뒤로가기로 다시 봐도
+    // 흰 박스로 안 돌아오게, 진입 시점에 클리어 여부로 바로 결정한다. 아직 진행 중인 레벨은
+    // 평소대로 흰 박스.
+    const alreadySolvedEntry = rewardPuzzleSolvedLevels.has(level) || isRewardPuzzleSolvedPersisted(level);
+    levelRewardStageBg.classList.toggle('is-transparent', alreadySolvedEntry);
     // 2026-08-24: "영상 재생 도중 뒤로가기하면 검은 화면이 뜨고 레벨2까지 그대로 남는다" 버그 —
     // playLevelTransform()이 영상 재생 시작 시 이 그림(#level-reward-art, 레벨마다 새로 안
     // 만들고 공유 재사용)을 hidden 처리하는데, 그 hidden은 원래 영상이 끝까지 재생돼 onended가
@@ -1728,6 +1744,12 @@
     10: { emoji: 'scooter', flyDirection: 'left' },     // 시계
   };
 
+  // 2026-08-24: 클리어 완료 후 탭하면 "보상 카드"(상자 열림+3D 플립+다운로드)가 뜨는 레벨 목록 —
+  // 지금은 레벨1(3D 렌더링된 로봇양)만 있고, 나머지 레벨은 이미지가 준비되는 대로 여기 추가하면 됨.
+  const REWARD_CARD_IMAGE = {
+    1: 'assets/transform/sheep-final-transparent.png',
+  };
+
   // 2026-08-16: 흡수되는 순간 짧은 "휙" 효과음(별도 음원 파일 없이 WebAudio로 직접 합성) +
   // 진동. 효과음은 기존 배경음악 음소거 설정(🎵/🔇)을 그대로 따른다.
   let sfxCtx = null;
@@ -1818,6 +1840,8 @@
       // reward-puzzle-clean: launched와 별개로 칸 사이 흰 구분선만 지워서, 정지된 완성본이
       // 격자무늬가 아니라 깔끔한 그림 한 장으로 보이게 한다(퍼즐 미니게임이 이미 쓰던 것과 같은 클래스).
       levelRewardArt.classList.toggle('reward-puzzle-clean', clearedCount >= total && alreadySolved);
+      // 2026-08-24: 클리어 완료 + 보상 카드가 준비된 레벨(REWARD_CARD_IMAGE)만 탭 가능하게.
+      levelRewardArt.classList.toggle('reward-card-tappable', clearedCount >= total && alreadySolved && !!REWARD_CARD_IMAGE[level]);
     }
   }
 
@@ -2554,6 +2578,179 @@
       }, 600);
     }, 400);
   }
+
+  // ================= 보상 카드(레벨 클리어 완료 캐릭터를 탭하면 뜸) =================
+  // 2026-08-24: 상자가 흔들리다 빛과 함께 터지고, 그 자리에서 카드가 3D로 뒤집혀 나타난 뒤
+  // 색종이+빛반사+효과음, 카드는 손가락으로 기울이면 홀로그램이 따라 움직임, 다운로드는
+  // 공유시트(Web Share API) 우선 시도 후 안 되면 링크 다운로드로 폴백.
+  levelRewardArt.addEventListener('click', () => {
+    if (!levelRewardArt.classList.contains('reward-card-tappable')) return;
+    openRewardCard(currentLevel);
+  });
+
+  function openRewardCard(level) {
+    const src = REWARD_CARD_IMAGE[level];
+    if (!src) return;
+    rewardCardImg.src = src;
+    rewardCardModal.hidden = false;
+    rewardCardConfetti.innerHTML = '';
+    rewardCardLightSweep.classList.remove('sweep-play');
+    rewardCardDownloadBtn.hidden = true;
+    rewardCardDownloadBtn.classList.remove('show');
+    rewardCard.classList.remove('card-reveal');
+    rewardCardInner.style.transform = '';
+    rewardCardBox.hidden = false;
+    rewardCardBox.className = 'reward-card-box';
+    vibrate(20);
+    requestAnimationFrame(() => rewardCardBox.classList.add('box-wobble'));
+    setTimeout(() => {
+      rewardCardBox.classList.remove('box-wobble');
+      rewardCardBox.classList.add('box-burst');
+      vibrate([30, 40, 60]);
+      setTimeout(() => {
+        rewardCardBox.hidden = true;
+        rewardCard.classList.add('card-reveal');
+        rewardCardLightSweep.classList.add('sweep-play');
+        spawnConfetti(rewardCardConfetti);
+        playRewardAcquireSfx();
+        setTimeout(() => {
+          rewardCardDownloadBtn.hidden = false;
+          requestAnimationFrame(() => rewardCardDownloadBtn.classList.add('show'));
+        }, 700);
+      }, 350);
+    }, 1000); // box-wobble(0.5s x 2회)이 끝난 뒤
+  }
+
+  function closeRewardCard() {
+    rewardCardModal.hidden = true;
+  }
+  rewardCardClose.addEventListener('click', closeRewardCard);
+
+  // 카드를 손가락으로 누른 채 움직이면(드래그) CSS 3D perspective로 살짝 기울고, 그 방향으로
+  // 홀로그램 광택이 따라 움직인다 — 진짜 3D 모델은 아니지만(캐릭터가 평면 이미지라 불가능,
+  // 브레인스토밍 때 사용자에게 설명함) 카드를 만지는 듯한 입체감은 준다. 드래그 중엔 홀로의
+  // idle 애니메이션을 잠깐 멈춰서(안 그러면 애니메이션이 인라인 스타일을 계속 덮어씀) 손가락
+  // 위치가 그대로 반영되게 한다.
+  (function wireRewardCardTilt() {
+    let dragging = false;
+    rewardCard.addEventListener('pointerdown', (e) => {
+      if (!rewardCard.classList.contains('card-reveal')) return;
+      dragging = true;
+      rewardCardHolo.style.animationPlayState = 'paused';
+      rewardCard.setPointerCapture(e.pointerId);
+    });
+    rewardCard.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const rect = rewardCard.getBoundingClientRect();
+      const px = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+      const py = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+      const rx = (0.5 - py) * 24;
+      const ry = (px - 0.5) * 24;
+      rewardCardInner.style.transform = 'rotateX(' + rx.toFixed(1) + 'deg) rotateY(' + (180 + ry).toFixed(1) + 'deg)';
+      rewardCardHolo.style.backgroundPosition = (px * 100).toFixed(0) + '% ' + (py * 100).toFixed(0) + '%';
+    });
+    const endDrag = () => {
+      if (!dragging) return;
+      dragging = false;
+      rewardCardInner.style.transform = '';
+      rewardCardHolo.style.animationPlayState = '';
+      rewardCardHolo.style.backgroundPosition = '';
+    };
+    rewardCard.addEventListener('pointerup', endDrag);
+    rewardCard.addEventListener('pointercancel', endDrag);
+  })();
+
+  // 획득 순간 효과음 — 반짝이는 상승 아르페지오(별도 음원 없이 WebAudio로 합성, playPuzzleCorrectSfx와 같은 방식).
+  let rewardCardSfxCtx = null;
+  function playRewardAcquireSfx() {
+    if (!isMusicOn()) return;
+    try {
+      if (!rewardCardSfxCtx) rewardCardSfxCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (rewardCardSfxCtx.state === 'suspended') rewardCardSfxCtx.resume();
+      const ctx = rewardCardSfxCtx;
+      const t0 = ctx.currentTime;
+      [880, 1108, 1320, 1760].forEach((freq, i) => { // A5,C#6,E6,A6 상승 아르페지오
+        const start = t0 + i * 0.08;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(0.22, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.35);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + 0.4);
+      });
+    } catch (e) { /* 효과음은 부가 기능이라 실패해도 무시 */ }
+  }
+
+  // 화면에 보이는 카드(금테+배지+캐릭터)를 캔버스에 그대로 합성해서 PNG로 저장/공유.
+  function roundRectPath(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  function loadImageAsync(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+  }
+  rewardCardDownloadBtn.addEventListener('click', async () => {
+    try {
+      const size = 800;
+      const canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const bg = ctx.createLinearGradient(0, 0, size, size);
+      bg.addColorStop(0, '#241c47');
+      bg.addColorStop(1, '#0d0a24');
+      ctx.fillStyle = bg;
+      roundRectPath(ctx, 0, 0, size, size, 40);
+      ctx.fill();
+      const border = ctx.createLinearGradient(0, 0, size, size);
+      border.addColorStop(0, '#fff6d6');
+      border.addColorStop(0.5, '#d4af37');
+      border.addColorStop(1, '#ffe9a8');
+      ctx.lineWidth = 14;
+      ctx.strokeStyle = border;
+      roundRectPath(ctx, 7, 7, size - 14, size - 14, 36);
+      ctx.stroke();
+      ctx.fillStyle = '#ffe9a8';
+      ctx.font = '700 28px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(I18N.t('rewardCard.badge'), size / 2, 60);
+      const img = await loadImageAsync(rewardCardImg.src);
+      const imgSize = size * 0.72;
+      ctx.drawImage(img, (size - imgSize) / 2, (size - imgSize) / 2 + 20, imgSize, imgSize);
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+        const file = new File([blob], 'special-reward.png', { type: 'image/png' });
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file] });
+            return;
+          } catch (e) { /* 취소했거나 실패 — 아래 폴백으로 계속 진행 */ }
+        }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'special-reward.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      }, 'image/png');
+    } catch (e) { /* 다운로드는 부가 기능이라 실패해도 앱 흐름엔 영향 없음 */ }
+  });
 
   // 조각을 손가락/마우스로 끌어서 정답 칸 위에 놓으면 붙고(소리+짧은 진동), 아니면
   // 튕겨 돌아간다(긴 진동, 안 붙음).
@@ -4401,8 +4598,11 @@
   // ================= 파이널 보스 축하(팡파레 + 컨페티 + 프린트 선물) =================
   const CONFETTI_COLORS = ['#FF5B5B', '#FFD166', '#8BD17C', '#4D96FF', '#8C7AE6', '#F368E0', '#F1C40F'];
 
-  function spawnConfetti() {
-    confettiLayer.innerHTML = '';
+  // 2026-08-24: 레벨1 보상 카드(openRewardCard)에서도 같은 색종이를 재사용하려고 대상 레이어를
+  // 인자로 받게 함(생략하면 기존 파이널 보스용 confettiLayer 그대로).
+  function spawnConfetti(layer) {
+    const target = layer || confettiLayer;
+    target.innerHTML = '';
     for (let i = 0; i < 30; i++) {
       const el = document.createElement('span');
       el.className = 'confetti-piece';
@@ -4410,7 +4610,7 @@
       el.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
       el.style.animationDelay = (Math.random() * 0.6) + 's';
       el.style.animationDuration = (1.6 + Math.random() * 1.2) + 's';
-      confettiLayer.appendChild(el);
+      target.appendChild(el);
     }
   }
 

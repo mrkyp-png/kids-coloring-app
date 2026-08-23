@@ -2364,6 +2364,180 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   font-weight: 600;
 }
 
+/* ---------- 보상 카드(레벨 클리어 완료 캐릭터 탭 시) — 2026-08-24 ---------- */
+.reward-card-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 6, 30, 0.86);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  z-index: 70; /* goal-zoom-modal(60)보다 위 — 갤러리 화면 안에서 열리므로 겹칠 일은 없지만 안전하게 */
+}
+.reward-card-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.reward-card-light-sweep {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.65) 48%, rgba(255, 255, 255, 0.65) 52%, transparent 70%);
+  background-size: 250% 250%;
+  background-position: -50% -50%;
+}
+.reward-card-light-sweep.sweep-play { animation: reward-light-sweep 0.9s ease-out; }
+@keyframes reward-light-sweep {
+  0% { opacity: 0; background-position: -80% -80%; }
+  15% { opacity: 1; }
+  60% { opacity: 0.6; }
+  100% { opacity: 0; background-position: 80% 80%; }
+}
+
+.reward-card-stage {
+  position: relative;
+  width: min(70vw, 300px);
+  height: min(70vw, 300px);
+  perspective: 1000px;
+}
+.reward-card-box {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.reward-card-box img { width: 55%; height: 55%; filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4)); }
+.reward-card-box.box-wobble { animation: reward-box-wobble 0.5s ease-in-out 2; }
+@keyframes reward-box-wobble {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(-8deg) scale(1.03); }
+  75% { transform: rotate(8deg) scale(1.03); }
+}
+.reward-card-box.box-burst { animation: reward-box-burst 0.35s ease-in forwards; }
+@keyframes reward-box-burst {
+  0% { transform: scale(1); opacity: 1; filter: brightness(1) drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4)); }
+  60% { transform: scale(1.3); opacity: 1; filter: brightness(3) drop-shadow(0 0 30px #fff); }
+  100% { transform: scale(1.5); opacity: 0; filter: brightness(3); }
+}
+
+/* 상자가 열리며 그 자리에서 카드가 3D로 뒤집혀 나타남(뒷면 -> 앞면). */
+.reward-card {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  opacity: 0;
+  transform: scale(0.3) rotateY(180deg);
+}
+.reward-card.card-reveal { animation: reward-card-flip-in 0.9s cubic-bezier(0.34, 1.1, 0.4, 1) forwards; }
+@keyframes reward-card-flip-in {
+  0% { opacity: 0; transform: scale(0.3) rotateY(180deg); }
+  40% { opacity: 1; }
+  100% { opacity: 1; transform: scale(1) rotateY(0deg); }
+}
+.reward-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.1s ease-out; /* 손가락으로 기울일 때(app.js) 부드럽게 따라오게 */
+}
+.reward-card-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  border-radius: 20px;
+  overflow: hidden;
+}
+/* .reward-card(바깥)가 rotateY(180deg)->0deg로 도는 동안 어느 쪽이 보이는지는 이 두 면의
+   기본 회전값이 결정한다 — back에 180deg를 줘야 바깥이 180deg(초기값)일 때 back의 실제
+   회전이 180+180=360(=0, 정면)이 되어 보이고, 바깥이 0deg(플립 끝)일 때는 back이
+   180(뒤쪽, 안 보임)/front가 0(정면, 보임)으로 뒤바뀐다. */
+.reward-card-back { transform: rotateY(180deg); background: linear-gradient(135deg, #2a2255, #4b3c8c); border: 4px solid #d4af37; }
+.reward-card-front {
+  background: linear-gradient(160deg, #241c47, #0d0a24);
+  border: 4px solid;
+  border-image: linear-gradient(135deg, #fff6d6, #d4af37, #a97c1a, #ffe9a8) 1;
+  box-shadow: 0 0 30px rgba(212, 175, 55, 0.5), inset 0 0 20px rgba(212, 175, 55, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* 홀로그램 광택 — 평소엔 천천히 idle로 흐르다가, 카드를 손가락으로 잡고 기울이는 동안(app.js)엔
+   이 애니메이션을 멈추고 손가락 위치를 따라 광택 위치를 직접 옮긴다. */
+.reward-card-holo {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 20%, rgba(255, 105, 180, 0.35) 32%, rgba(120, 200, 255, 0.35) 40%, rgba(255, 230, 120, 0.35) 48%, transparent 60%);
+  mix-blend-mode: screen;
+  background-size: 200% 200%;
+  animation: reward-holo-idle 3.5s ease-in-out infinite;
+}
+@keyframes reward-holo-idle {
+  0%, 100% { background-position: 0% 0%; }
+  50% { background-position: 100% 100%; }
+}
+.reward-card-badge {
+  position: absolute;
+  top: 14px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #ffe9a8;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+.reward-card-img {
+  width: 78%;
+  height: 78%;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.5));
+}
+
+.reward-card-download-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 24px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ffe9a8, #d4af37);
+  color: #3a2a00;
+  font-weight: 800;
+  font-size: 0.95rem;
+  box-shadow: 0 6px 16px rgba(212, 175, 55, 0.4);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.reward-card-download-btn.show { opacity: 1; transform: translateY(0); }
+/* REWARD_CARD_IMAGE(app.js)에 등록된 레벨의 클리어 완료 그림에만 붙어서 탭 가능함을 알려줌. */
+.level-reward-art.reward-card-tappable { cursor: pointer; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reward-card-box.box-wobble, .reward-card-box.box-burst { animation: none; }
+  .reward-card.card-reveal { animation: none; opacity: 1; transform: scale(1) rotateY(0deg); }
+  .reward-card-holo { animation: none; }
+  .reward-card-light-sweep.sweep-play { animation: none; opacity: 0; }
+}
+
 /* ---------- 최초 실행 온보딩(보호자 확인 게이트 + 이용 안내) ---------- */
 .onboarding-gate-question {
   font-size: 2rem;

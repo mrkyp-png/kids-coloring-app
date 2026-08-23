@@ -531,6 +531,31 @@
   <p class="goal-zoom-hint" data-i18n="goalZoom.hint">Tap anywhere to close</p>
 </div>
 
+<!-- ===================== 보상 카드 모달(레벨 클리어 완료 캐릭터를 탭하면 뜸) — 2026-08-24
+     상자가 열리며 카드가 3D로 뒤집혀 나오는 연출 + 다운로드/공유. app.js의 openRewardCard 등이
+     담당(REWARD_CARD_IMAGE에 등록된 레벨에서만 캐릭터가 탭 가능해짐). ===================== -->
+<div id="reward-card-modal" class="reward-card-modal" hidden>
+  <div id="reward-card-confetti" class="confetti-layer" aria-hidden="true"></div>
+  <div id="reward-card-light-sweep" class="reward-card-light-sweep" aria-hidden="true"></div>
+  <button id="reward-card-close" class="reward-card-close" type="button" aria-label="Close" data-i18n-aria-label="rewardCard.close">✕</button>
+  <div id="reward-card-stage" class="reward-card-stage">
+    <div id="reward-card-box" class="reward-card-box"><img src="assets/emoji/giftbox.svg" alt=""></div>
+    <div id="reward-card" class="reward-card">
+      <div id="reward-card-inner" class="reward-card-inner">
+        <div class="reward-card-face reward-card-back"></div>
+        <div class="reward-card-face reward-card-front">
+          <div id="reward-card-holo" class="reward-card-holo" aria-hidden="true"></div>
+          <p class="reward-card-badge" data-i18n="rewardCard.badge">✨ SPECIAL REWARD</p>
+          <img id="reward-card-img" class="reward-card-img" src="" alt="">
+        </div>
+      </div>
+    </div>
+  </div>
+  <button id="reward-card-download" class="reward-card-download-btn" type="button" hidden>
+    <span data-i18n="rewardCard.download">⬇ Save</span>
+  </button>
+</div>
+
 <script src="challenge-config.js"></script>
 <script src="i18n.js"></script>
 <script src="templates.js"></script>
