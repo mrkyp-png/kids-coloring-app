@@ -1804,7 +1804,12 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   position: relative; /* 아래 별/성운 레이어(::before/::after)가 이 화면 폭(PC에서는 596px로 제한) 기준으로 자리잡게 함 */
   overflow: hidden; /* 레이어가 -15% 밖으로 새어나가 스크롤이 생기지 않게 */
   display: grid;
-  height: 100dvh;
+  /* 2026-08-23(36-2): "색칠 페이지 아래쪽이 일부는 검정, 일부는 흰색" 신고 — 100dvh는 모바일
+     주소창이 나타났다 사라졌다 하면서 시점마다 값이 달라져(#gallery-screen이 이미 겪은 문제,
+     위 참고) 화면이 실제 뷰포트보다 짧아지는 순간 그 아래로 body 배경(밝은 크림)이 비쳤다 —
+     예전엔 이 화면이 다크 테마가 아니어서 안 보이던 틈이 이제는 검정/흰색 경계로 드러남.
+     100svh(주소창이 항상 떠 있다고 가정하는 가장 작은 값)로 바꿔 항상 화면을 다 채우게 함. */
+  height: 100svh;
   /* 2026-08-20: PC/넓은 화면 캡처에서 캔버스(최대 420px 정사각형)만 가운데 뜨고 좌우 팔레트 열은
      화면 맨 끝에 붙어서 큰 빈 간격이 생기는 문제 — 가운데 열이 1fr라 화면 폭만큼 무한정 늘어나던
      게 원인. 그리드 자체 폭을 팔레트 두 열(88×2)+캔버스 최대치(420)=596px로 캡하고 가운데 정렬해서
@@ -2013,15 +2018,10 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 
 .canvas-wrap {
   /* 2026-08-10: "캔버스를 지우고 물체만 나오게" 요청으로 흰 배경 카드 완전히 제거(wrap도,
-     #fill-canvas 자체도) — 안 칠한 영역은 페이지 배경(크림색)이 그대로 비쳐 보임.
-     2026-08-23(36): #coloring-screen이 우주 다크 테마로 바뀌어도 "색칠 이미지 박스는 지금
-     그대로 유지" 요청이 있어서, 여기서 예전 배경(2026-08-20, 크림+옅은 별/성운)을 var() 대신
-     고정값으로 직접 박아 화면 테마와 무관하게 항상 이 모습 그대로 보이게 한다. */
-  background:
-    radial-gradient(circle at 90% 8%, rgba(108, 92, 231, 0.10), transparent 40%),
-    radial-gradient(circle at 6% 85%, rgba(255, 159, 67, 0.08), transparent 35%),
-    radial-gradient(rgba(108, 92, 231, 0.16) 1px, transparent 1.5px) 0 0 / 46px 46px,
-    #FFF8ED;
+     #fill-canvas 자체도) — 안 칠한 영역은 페이지 배경이 그대로 비쳐 보임.
+     2026-08-23(36-3): "색칠창은 검은색이 좋아보이니 통일" 요청 — 고정 크림색 대신 다시
+     var(--bg)를 써서 #coloring-screen 자체 배경(다크)을 그대로 따라가게 함. */
+  background: var(--bg);
   position: relative;
   display: flex;
   align-items: center;
@@ -2675,7 +2675,7 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
    좌우 캐러셀로 스테이지 1~10을 넘긴다" — 난이도 하나를 먼저 고르는 버전(직전 커밋)을 대체.
    .screen의 min-height(바닥값)만으론 3구역이 화면을 정확히 3등분 못 하고 페이지가 그냥
    늘어나므로(예전 #coloring-screen 때와 같은 이유), 이 화면만 실제 height를 준다. */
-#challenge-select-screen { position: relative; overflow: hidden; height: 100dvh; background: var(--bg); }
+#challenge-select-screen { position: relative; overflow: hidden; height: 100svh; background: var(--bg); }
 .challenge-tiers { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .challenge-tier-zone {
   flex: 1 1 0;
