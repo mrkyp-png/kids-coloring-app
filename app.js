@@ -4893,7 +4893,11 @@
     if (!goingDown) dy = -dy;
     const startLeft = goingRight ? -(15 + Math.random() * 10) : 105 + Math.random() * 10;
     const startTop = goingDown ? -Math.random() * 15 : 100 + Math.random() * 15;
-    const tailAngle = Math.atan2(dy, dx) * 180 / Math.PI + 180; // 꼬리는 진행 반대 방향
+    // 2026-08-23(35-2): "별똥별이 거꾸로(꼬리가 앞으로) 가는 것 같다" 신고 — 꼬리 막대(::before)는
+    // 회전 0도일 때 이미 왼쪽(뒤쪽)을 가리키게 그려져 있어서, 여기에 +180을 더하면 오히려 진행
+    // 방향과 같은 쪽(앞쪽)을 가리키게 됐다(각도 대칭성 때문에 대부분 각도에서는 눈에 잘 안 띄다가
+    // 이번처럼 각도가 뚜렷하면 티가 남). +180 없이 진행각 그대로 써야 꼬리가 진행 반대(뒤)를 향한다.
+    const tailAngle = Math.atan2(dy, dx) * 180 / Math.PI; // 꼬리는 진행 반대 방향
     star.style.setProperty('--ss-left', startLeft + '%');
     star.style.setProperty('--ss-top', startTop + '%');
     star.style.setProperty('--ss-dx', dx + 'vw');

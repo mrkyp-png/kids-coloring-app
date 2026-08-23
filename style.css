@@ -634,9 +634,11 @@ button:active { transform: scale(0.94); }
 /* 실제 콘텐츠(제목/버튼/탭바 등)는 이미 z-index:1 이상이라 별/성운 레이어(z-index:0) 위에 그대로 뜬다. */
 
 /* ---------- 2026-08-23(31): "모든 페이지" 요청 2단계 — 지도/레벨갤러리 화면도 같은 우주 테마.
-   방식은 표지/탭바와 동일(변수 재정의 + 불투명 배경 + 별/성운 레이어), #coloring-screen은
-   "goal/캔버스 박스는 지금 그대로 유지" 요청이 있어서 이번 2단계에서는 제외. ---------- */
-#map-screen, #gallery-screen {
+   방식은 표지/탭바와 동일(변수 재정의 + 불투명 배경 + 별/성운 레이어).
+   2026-08-23(36): 3단계 — 챌린지 선택 화면/색칠 화면도 포함. #coloring-screen은 "goal 이미지
+   박스와 색칠 이미지 박스는 지금 그대로 유지" 요청이 있어서 그 두 박스(.goal-panel/.canvas-wrap)
+   만 아래에서 따로 원래 색을 고정해 제외한다. ---------- */
+#map-screen, #gallery-screen, #challenge-select-screen, #coloring-screen {
   --bg: #0d0a24;
   --card-bg: #241c47;
   --ink: #EDE9FF;
@@ -647,14 +649,17 @@ button:active { transform: scale(0.94); }
   background: var(--bg);
 }
 #map-screen::before, #map-screen::after,
-#gallery-screen::before, #gallery-screen::after {
+#gallery-screen::before, #gallery-screen::after,
+#challenge-select-screen::before, #challenge-select-screen::after,
+#coloring-screen::before, #coloring-screen::after {
   content: '';
   position: absolute;
   inset: -15%;
   pointer-events: none;
   z-index: 0;
 }
-#map-screen::before, #gallery-screen::before {
+#map-screen::before, #gallery-screen::before,
+#challenge-select-screen::before, #coloring-screen::before {
   background-image:
     radial-gradient(1.6px 1.6px at 15% 25%, #fff, transparent),
     radial-gradient(1.2px 1.2px at 55% 8%, #fff, transparent),
@@ -682,7 +687,9 @@ button:active { transform: scale(0.94); }
    보듯 대부분 position:static/relative에 z-index 없음 — 별/성운(z-index:0)보다 위에 확실히
    뜨도록 감싸는 컨테이너에 최소한만 지정한다. */
 .map-top-bar, .map-grid, #stat-line, #levels-left-line, .gallery-header, .level-reward,
-#boss-grid { position: relative; z-index: 1; }
+#boss-grid, .challenge-select-header, .challenge-tiers,
+.challenge-hud, .coloring-header, .goal-panel, #frame-top, #palette-left, #canvas-wrap,
+#palette-right, #frame-bottom { position: relative; z-index: 1; }
 
 /* ---------- 나의 스코어/일일/상점 — 아직 스펙 미정, 가운데 정렬 플레이스홀더 ---------- */
 .hub-placeholder {
@@ -1410,12 +1417,14 @@ button:active { transform: scale(0.94); }
   border-radius: 16px;
   overflow: hidden;
   position: relative;
-  transition: background-color 0.6s ease;
 }
 /* 2026-08-23(35): "완성되면 보상 이미지 박스 배경이 게임 배경화면과 같아지게" 요청 — 진행 중엔
    기존 밝은 색(#EDEBF9)을 유지하고, 퍼즐을 다 맞춘 순간(app.js finishRewardPuzzle)에만 이
-   클래스가 붙어 우주 배경색으로 바뀐다. */
-.reward-puzzle-target-grid.reward-puzzle-done { background: var(--bg); }
+   클래스가 붙어 우주 배경색으로 바뀐다.
+   2026-08-23(35-2): "안 바뀌고 그대로 남아있다" 신고 — finishRewardPuzzle이 이 클래스를 붙인 지
+   400ms 뒤에 박스를 페이드아웃(opacity, 0.35s)시켜서 배경색이 원래 전환(0.6s) 다 끝나기도 전에
+   같이 투명해져버려 눈에 안 띄었다. 전환을 0.25s로 줄여 페이드아웃 시작 전에 완전히 어두워지게 함. */
+.reward-puzzle-target-grid.reward-puzzle-done { background: var(--bg); transition: background-color 0.25s ease; }
 .reward-puzzle-target-grid .reward-puzzle-tile {
   /* 정답 칸은 그리드 셀을 그대로 채운다(위 1fr 열이 크기를 정함) — 트레이 조각만 아래에서
      별도로 px 크기를 받는다(explodeIntoPuzzle이 계산해서 인라인으로 넣음). */
@@ -1792,6 +1801,8 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
       goal-panel과 canvas-wrap이 다시 같은 열 폭을 그냥 자연히 공유해서 2번의 118px 패딩 땜빵이
       더 이상 필요 없어짐(삭제함) — 훨씬 깔끔한 해법이라 이 방식을 기본으로 유지할 것. */
 #coloring-screen {
+  position: relative; /* 아래 별/성운 레이어(::before/::after)가 이 화면 폭(PC에서는 596px로 제한) 기준으로 자리잡게 함 */
+  overflow: hidden; /* 레이어가 -15% 밖으로 새어나가 스크롤이 생기지 않게 */
   display: grid;
   height: 100dvh;
   /* 2026-08-20: PC/넓은 화면 캡처에서 캔버스(최대 420px 정사각형)만 가운데 뜨고 좌우 팔레트 열은
@@ -1822,14 +1833,11 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
      팔레트 열은 이 고정 행 높이에 맞춰 stretch되고, 넘치는 스와치는 기존 overflow-y:auto로
      스크롤된다. */
   grid-template-rows: auto auto var(--ring-square, 280px) 60px var(--ring-square, 280px) 60px;
-  /* 2026-08-20: "바탕화면을 게임 느낌 나게, 은은한 우주 패턴" 요청 — 크림 배경(--bg) 위에 아주
-     연한 별 점(radial-gradient 반복)과 구석의 흐릿한 성운색 뭉치를 얹는다. 채도/투명도를 낮게
-     잡아서 색칠버튼·캔버스 등 핵심 요소 가독성에는 영향 없게 함. */
-  background:
-    radial-gradient(circle at 90% 8%, rgba(108, 92, 231, 0.10), transparent 40%),
-    radial-gradient(circle at 6% 85%, rgba(255, 159, 67, 0.08), transparent 35%),
-    radial-gradient(rgba(108, 92, 231, 0.16) 1px, transparent 1.5px) 0 0 / 46px 46px,
-    var(--bg);
+  /* 2026-08-23(36): "챌린지 색칠페이지도 우주 배경과 동일하게" 요청 — 위 크림 배경 위 옅은 별/성운
+     자체 표현(2026-08-20)은 다른 화면들이 쓰는 진짜 우주 테마(::before/::after 레이어)로
+     대체한다. 예전 옅은 패턴은 .canvas-wrap이 그대로 물려받아 유지(아래 참고, "박스는 지금 그대로
+     유지" 요청). */
+  background: var(--bg);
 }
 .challenge-hud { grid-column: 1 / -1; grid-row: 1; }
 .coloring-header { grid-column: 1 / -1; grid-row: 2; }
@@ -2005,7 +2013,15 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 
 .canvas-wrap {
   /* 2026-08-10: "캔버스를 지우고 물체만 나오게" 요청으로 흰 배경 카드 완전히 제거(wrap도,
-     #fill-canvas 자체도) — 안 칠한 영역은 페이지 배경(크림색)이 그대로 비쳐 보임. */
+     #fill-canvas 자체도) — 안 칠한 영역은 페이지 배경(크림색)이 그대로 비쳐 보임.
+     2026-08-23(36): #coloring-screen이 우주 다크 테마로 바뀌어도 "색칠 이미지 박스는 지금
+     그대로 유지" 요청이 있어서, 여기서 예전 배경(2026-08-20, 크림+옅은 별/성운)을 var() 대신
+     고정값으로 직접 박아 화면 테마와 무관하게 항상 이 모습 그대로 보이게 한다. */
+  background:
+    radial-gradient(circle at 90% 8%, rgba(108, 92, 231, 0.10), transparent 40%),
+    radial-gradient(circle at 6% 85%, rgba(255, 159, 67, 0.08), transparent 35%),
+    radial-gradient(rgba(108, 92, 231, 0.16) 1px, transparent 1.5px) 0 0 / 46px 46px,
+    #FFF8ED;
   position: relative;
   display: flex;
   align-items: center;
@@ -2659,7 +2675,7 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
    좌우 캐러셀로 스테이지 1~10을 넘긴다" — 난이도 하나를 먼저 고르는 버전(직전 커밋)을 대체.
    .screen의 min-height(바닥값)만으론 3구역이 화면을 정확히 3등분 못 하고 페이지가 그냥
    늘어나므로(예전 #coloring-screen 때와 같은 이유), 이 화면만 실제 height를 준다. */
-#challenge-select-screen { height: 100dvh; }
+#challenge-select-screen { position: relative; overflow: hidden; height: 100dvh; background: var(--bg); }
 .challenge-tiers { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .challenge-tier-zone {
   flex: 1 1 0;
@@ -2696,7 +2712,9 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 .challenge-hud {
   display: flex; justify-content: space-between; gap: 8px;
   padding: 8px 12px; font-weight: 700; font-size: 0.9rem;
-  background: #fff8f0; border-bottom: 2px solid #ffd8a8;
+  /* 2026-08-23(36): "챌린지 색칠페이지도 우주 배경과 동일하게" — 고정 크림색 대신 화면 테마 변수를
+     따라가게 바꿔서, #coloring-screen이 다크로 스코프되면 이 HUD도 같이 어두워진다. */
+  background: var(--card-bg); border-bottom: 2px solid var(--brand-soft); color: var(--ink);
 }
 .challenge-goal-mask {
   clip-path: circle(90px at 50% 50%); /* JS가 매 이동마다 style.clipPath로 좌표 갱신 */
@@ -2707,7 +2725,9 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 .challenge-goal-occluder {
   position: absolute;
   border-radius: 50%;
-  background: var(--bg);
+  /* 2026-08-23(36): goal 이미지 박스 안에 있는 요소라 "goal 박스는 그대로 유지" 대상 — var(--bg)를
+     쓰면 #coloring-screen이 다크로 바뀔 때 같이 어두워져 버려서, 원래 크림색을 고정값으로 둔다. */
+  background: #FFF8ED;
   z-index: 2;
   pointer-events: none;
 }
