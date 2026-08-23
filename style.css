@@ -582,6 +582,55 @@ button:active { transform: scale(0.94); }
 }
 /* 실제 콘텐츠(제목/버튼/탭바 등)는 이미 z-index:1 이상이라 별/성운 레이어(z-index:0) 위에 그대로 뜬다. */
 
+/* ---------- 2026-08-23(31): "모든 페이지" 요청 2단계 — 지도/레벨갤러리 화면도 같은 우주 테마.
+   방식은 표지/탭바와 동일(변수 재정의 + 불투명 배경 + 별/성운 레이어), #coloring-screen은
+   "goal/캔버스 박스는 지금 그대로 유지" 요청이 있어서 이번 2단계에서는 제외. ---------- */
+#map-screen, #gallery-screen {
+  --bg: #0d0a24;
+  --card-bg: #241c47;
+  --ink: #EDE9FF;
+  --muted: #A99FD6;
+  --brand: #8b7fff;
+  --brand-soft: #362a5e;
+  --shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  background: var(--bg);
+}
+#map-screen::before, #map-screen::after,
+#gallery-screen::before, #gallery-screen::after {
+  content: '';
+  position: absolute;
+  inset: -15%;
+  pointer-events: none;
+  z-index: 0;
+}
+#map-screen::before, #gallery-screen::before {
+  background-image:
+    radial-gradient(1.6px 1.6px at 15% 25%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 55% 8%, #fff, transparent),
+    radial-gradient(2px 2px at 80% 40%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 30% 70%, #fff, transparent),
+    radial-gradient(1.6px 1.6px at 65% 85%, #fff, transparent),
+    radial-gradient(1px 1px at 90% 15%, #fff, transparent),
+    radial-gradient(1.4px 1.4px at 10% 90%, #fff, transparent);
+  background-repeat: repeat;
+  background-size: 220px 220px;
+  opacity: 0.75;
+  animation: cosmic-star-drift 70s linear infinite, cosmic-star-twinkle 3.4s ease-in-out infinite;
+}
+#map-screen::after, #gallery-screen::after {
+  background:
+    radial-gradient(circle at 20% 25%, rgba(139, 127, 255, 0.30), transparent 42%),
+    radial-gradient(circle at 82% 65%, rgba(255, 140, 200, 0.18), transparent 40%),
+    radial-gradient(circle at 45% 90%, rgba(100, 210, 220, 0.14), transparent 38%);
+  filter: blur(22px);
+  animation: cosmic-nebula-drift 26s ease-in-out infinite alternate;
+}
+/* map-screen/gallery-screen의 실제 콘텐츠(헤더/그리드/카드 등)는 이 두 화면 바로 아래 규칙에서
+   보듯 대부분 position:static/relative에 z-index 없음 — 별/성운(z-index:0)보다 위에 확실히
+   뜨도록 감싸는 컨테이너에 최소한만 지정한다. */
+.map-top-bar, .map-grid, #stat-line, #levels-left-line, .gallery-header, .level-reward,
+#boss-grid { position: relative; z-index: 1; }
+
 /* ---------- 나의 스코어/일일/상점 — 아직 스펙 미정, 가운데 정렬 플레이스홀더 ---------- */
 .hub-placeholder {
   flex: 1;
