@@ -1,4 +1,4 @@
-const CACHE_NAME = 'coloring-app-v304';
+const CACHE_NAME = 'coloring-app-v306';
 // 2026-08-11: cache.addAll()은 원자적이라 목록 중 하나라도 못 받아오면 설치 전체가 실패한다.
 // boss-battle 배경음악(6.8MB, 다른 음악의 10배 이상 큼)이 이 목록에 있으면 네트워크가 조금만
 // 불안정해도 그 파일 하나 때문에 서비스워커 설치 자체가 실패해서 앱 전체가 계속 낡은 캐시에
@@ -81,6 +81,7 @@ const EXTRA_ASSETS = [
   './assets/emoji/kite.svg',
   './assets/emoji/ladybug.svg',
   './assets/emoji/leaf.svg',
+  './assets/emoji/leftarrow.svg',
   './assets/emoji/lemon.svg',
   './assets/emoji/lion.svg',
   './assets/emoji/lobster.svg',
@@ -101,9 +102,11 @@ const EXTRA_ASSETS = [
   './assets/emoji/pig.svg',
   './assets/emoji/pineapple.svg',
   './assets/emoji/pizza.svg',
+  './assets/emoji/playbutton.svg',
   './assets/emoji/pretzel.svg',
   './assets/emoji/rabbit.svg',
   './assets/emoji/rainbow.svg',
+  './assets/emoji/rightarrowcurvingleft.svg',
   './assets/emoji/robot.svg',
   './assets/emoji/rocket.svg',
   './assets/emoji/rooster.svg',

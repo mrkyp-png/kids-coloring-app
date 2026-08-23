@@ -912,21 +912,20 @@
   });
 
   // 2026-08-14: "챌린지 모드에서 첫화면으로 돌아가는 버튼 필요" 요청 — 예전엔 챌린지 중 🏠을
-  // 눌러도 challenge run만 정리하고 app.js의 goHome()/goHomeToMap()(Child용, 갤러리/맵 화면으로
-  // 이동)이 그대로 이어져서 챌린지 도중에 엉뚱한 Child 화면으로 튀는 버그가 있었다. 이제 여기서
-  // 전파를 막고 챌린지 선택 화면으로 직접 돌려보낸다.
-  // 2026-08-20: 헤더의 #btn-home(끝까지)과 링의 #btn-back(한 단계만)이 별도 버튼으로 분리됐지만,
-  // 챌린지 선택 화면 말고는 돌아갈 "한 단계"가 따로 없으므로 챌린지 중에는 둘 다 동일하게 처리한다.
-  ['btn-home', 'btn-back'].forEach((id) => {
-    document.getElementById(id).addEventListener('click', (e) => {
-      if (!hud.root.hidden) {
-        e.stopImmediatePropagation();
-        endRun();
-        coloringScreen.hidden = true;
-        selectScreen.hidden = false;
-      }
-    }, true);
-  });
+  // 눌러도 challenge run만 정리하고 app.js의 goHome()(Child용, 갤러리/맵 화면으로 이동)이 그대로
+  // 이어져서 챌린지 도중에 엉뚱한 Child 화면으로 튀는 버그가 있었다. 이제 여기서 전파를 막고
+  // 챌린지 선택 화면으로 직접 돌려보낸다.
+  // 2026-08-24: 링의 #btn-back이 되돌리기(undo)로 바뀌면서, 여기서 가로챌 버튼은 헤더의
+  // #btn-home(뒤로가기) 하나뿐 — 되돌리기는 챌린지 중에도 그냥 undoLastFill()이 정상 동작해야
+  // 하므로 더 이상 가로채지 않는다.
+  document.getElementById('btn-home').addEventListener('click', (e) => {
+    if (!hud.root.hidden) {
+      e.stopImmediatePropagation();
+      endRun();
+      coloringScreen.hidden = true;
+      selectScreen.hidden = false;
+    }
+  }, true);
 
   // C2: 챌린지 진행 중에는 돋보기 확대(app.js:goalZoomModal)가 LEVEL1 암기/LEVEL2 마스크
   // 메커닉을 완전히 무력화하므로, 진행 중일 때만 클릭을 가로채 무효화한다(Phase 1 최소 조치 —

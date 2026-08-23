@@ -187,7 +187,6 @@
   const levelProgress = document.getElementById('level-progress');
   const levelNextText = document.getElementById('level-next-text');
   const btnLevelNext = document.getElementById('btn-level-next');
-  const btnLevelBack = document.getElementById('btn-level-back');
   const btnResetAll = document.getElementById('btn-reset-all');
   const modeButtons = Array.from(document.querySelectorAll('.mode-btn'));
   const coloringTimerText = document.getElementById('coloring-timer-text');
@@ -304,6 +303,10 @@
   let wallMask = null; // Uint8Array WORK_SIZE*WORK_SIZE, 1 = 벽(선), 0 = 칠할 수 있음
   let currentLabelMap = null; // Int32Array WORK_SIZE*WORK_SIZE, 픽셀 -> 영역 라벨(없으면 -1)
   let currentGradableRegions = []; // [{seed, size, label}] 채점 대상 영역(배경 제외)
+  // 2026-08-24: "링 버튼이 뒤로가기가 아니라 되돌리기(undo)여야" 요청 — 탭 채우기 직전 그
+  // 지점의 색(비어있으면 null)을 순서대로 쌓아둔다. 되돌리기는 마지막 항목을 꺼내 그 지점부터
+  // 다시 flood-fill해서 원래 색으로 되돌린다. 새 도안을 열 때(openTemplate) 비운다.
+  let fillUndoStack = []; // [{x, y, prevColorHex}]
   let lastRegionStageShown = 0; // 지금 도안에서 마지막으로 보여준 구역별 칭찬 단계(openTemplate에서 리셋)
   let currentGradableLabelSet = new Set(); // currentGradableRegions의 label만 모아둔 Set(탭 보정용 빠른 조회)
   let currentLabelToColor = null; // Map<label, hex> 영역별 정답색(컬러바이넘버)
@@ -1225,7 +1228,13 @@
     renderMap();
   }
 
-  btnMapBack.addEventListener('click', goToMap);
+  // 2026-08-24: "스테이지2에서 눌렀는데 스테이지 선택 화면이 나온다" 버그 — 예전엔 무조건
+  // goToMap()이었다. 오른쪽 네비 그룹에 있던 #btn-level-back(제대로 이전 스테이지로 이동하던
+  // 버튼, 이제 삭제됨)과 같은 로직으로 교체 — 스테이지1에서만 갈 곳이 없으니 맵으로 폴백.
+  btnMapBack.addEventListener('click', () => {
+    if (currentLevel > 1) openLevel(currentLevel - 1);
+    else goToMap();
+  });
 
   // 2026-08-21(4): "캐러셀/슬라이드 애니메이션 방식같다" — 참고 영상을 다시 보니 브라우저
   // 네이티브 스크롤(관성으로 여러 칸 훅 넘어갈 수 있음)이 아니라, 한 번의 드래그에 정확히
@@ -1385,11 +1394,6 @@
     } else {
       goToMap();
     }
-  });
-
-  btnLevelBack.addEventListener('click', () => {
-    playPop();
-    if (currentLevel > 1) openLevel(currentLevel - 1);
   });
 
   // 2026-08-22: "왜 오래 걸리는지 모르겠다" — 콘솔에 시간 정보가 없어서 어디서 지연되는지
@@ -2704,8 +2708,6 @@
     levelProgress.textContent = I18N.t('level.progress', { done: doneCount, total: list.length });
 
     const isClear = doneCount >= list.length;
-    const hasBack = currentLevel > 1;
-    btnLevelBack.hidden = !hasBack;
     if (isClear) {
       // 아직 지우기 전, 진행 중이던 타임어택이 있었으면 그 시작 시각 기준으로 걸린 시간을 기록해둔다
       // (완전히 클리어할 때까지 걸린 시간 — 메인 화면 레벨 블록 아래에 표시됨).
@@ -2718,7 +2720,8 @@
       // 배너 텍스트 없이 아이콘만(레벨10 클리어시엔 지도로 돌아가는 의미라 🗺️로 구분).
       // 2026-08-21(21): "화살표로 통일" 요청 — 마지막 레벨(지도로 돌아가는 경우)도 🗺️ 대신
       // 이전(◀)이랑 같은 화살표 계열로 통일.
-      btnLevelNext.textContent = '▶';
+      // 2026-08-24: 아이콘을 Twemoji <img>로 바꾸면서 이제 index.html에 고정돼 있음 — 여기서
+      // textContent를 계속 덮어쓰면 그 <img>가 통째로 지워지므로 라벨만 갱신한다.
       btnLevelNext.setAttribute('aria-label', hasNext ? 'Next level' : 'Back to map');
       // 2026-08-16: 실험 기능 — 조각 맞추기 미니게임이 아직 안 끝났으면 "다음"을 계속 숨겨둔다.
       btnLevelNext.hidden = isRewardPuzzleBlocking(currentLevel);
@@ -2830,9 +2833,9 @@
     currentIsChallenge = !!opts.challenge;
     // 2026-08-17: 이미 클리어한 그림을 다시 열면 채색은 막고 정답 완성본만 보여준다(보기 전용).
     currentIsViewOnly = !opts.challenge && !tpl.isBoss && isMastered(tpl.id, getScores());
-    // 2026-08-20: #frame-top 안에 #btn-back(뒤로가기)이 있다 — frame-top/bottom 전체를 hidden
-    // 처리하면 보기전용 모드에서 탈출구인 뒤로가기까지 같이 사라지므로, 각 자식을 개별적으로
-    // 숨긴다(btn-back·헤더의 btn-home은 절대 안 숨김).
+    // 2026-08-20: #frame-top 안에 #btn-back(2026-08-24부터 되돌리기)이 있다 — frame-top/bottom
+    // 전체를 hidden 처리하면 헤더의 탈출구(뒤로가기, #btn-home)와 별개로 이 버튼까지 같이
+    // 사라지므로, 각 자식을 개별적으로 숨긴다(btn-back·헤더의 btn-home은 절대 안 숨김).
     paletteTop.hidden = currentIsViewOnly;
     paletteBottom.hidden = currentIsViewOnly;
     paletteLeft.hidden = currentIsViewOnly;
@@ -2914,6 +2917,7 @@
       // 처음부터 완성된 상태로 보여준다.
       fillCtx.clearRect(0, 0, WORK_SIZE, WORK_SIZE);
       if (currentIsViewOnly) fillCtx.drawImage(goalCanvas, 0, 0);
+      fillUndoStack = []; // 새 도안이니 이전 도안의 되돌리기 기록은 무의미
 
       if (onReady) onReady();
     });
@@ -3867,8 +3871,11 @@
     if (!coloringScreen.hidden) { syncRingSquareSize(); }
   });
 
-  // 2026-08-20: "링 안 뒤로가기는 한 단계만" 요청 — 이 함수는 원래도 그 동작이었다(일반 레벨은
-  // 갤러리로, 보스전은 지도로 한 단계만 물러남). #btn-back(링)에 그대로 연결.
+  // 2026-08-20: "링 안 뒤로가기는 한 단계만" 요청 — 일반 레벨은 갤러리로, 보스전은 지도로 한
+  // 단계만 물러난다.
+  // 2026-08-24: "헤더 홈버튼을 뒤로가기로" 요청 — 예전엔 헤더 #btn-home이 지도까지 곧장 나가는
+  // goHomeToMap()에 연결돼 있었는데, 그 버튼이 뒤로가기로 바뀌면서 이 함수(한 단계만) 하나로
+  // 통합됐다. #btn-home(헤더)에 연결(ring의 #btn-back은 이제 되돌리기 — undoLastFill 참고).
   function goHome() {
     coloringScreen.hidden = true;
     if (currentBossMode) {
@@ -3882,18 +3889,6 @@
       galleryScreen.hidden = false;
       renderLevelGallery();
     }
-  }
-
-  // 2026-08-20: "헤더 홈버튼은 goal 이미지 좌상단, 끝까지(지도까지) 한번에" 요청 — goHome()과
-  // 달리 갤러리를 안 거치고 항상 지도 화면으로 바로 나간다. #btn-home(헤더)에 연결.
-  function goHomeToMap() {
-    coloringScreen.hidden = true;
-    stopLevelTimer();
-    currentBossMode = null;
-    setBgmTrack(MUSIC_SRC);
-    galleryScreen.hidden = true;
-    mapScreen.hidden = false;
-    renderMap();
   }
 
   // ================= 팔레트 =================
@@ -4142,10 +4137,26 @@
   function floodFill(startX, startY, hexColor) {
     if (startX < 0 || startY < 0 || startX >= WORK_SIZE || startY >= WORK_SIZE) return;
     const startIdx = startY * WORK_SIZE + startX;
+    // 2026-08-24: 칠하기 전 색을 되돌리기용으로 기록(region은 항상 단색이라 시작점 픽셀
+    // 하나만 봐도 그 영역 전체의 이전 색을 대표할 수 있음).
+    const before = fillCtx.getImageData(startX, startY, 1, 1).data;
+    const prevColorHex = before[3] === 0 ? null : rgbToHex(before[0], before[1], before[2]);
     if (!fillRegionPixels(startIdx, hexColor)) return;
+    fillUndoStack.push({ x: startX, y: startY, prevColorHex });
     playPop();
     const label = currentLabelMap ? currentLabelMap[startIdx] : null;
     if (isCorrectColorForLabel(label, hexColor)) maybeShowRegionStagePraise(label);
+  }
+
+  // 2026-08-24: 링 버튼(구 #btn-back, 이제 되돌리기)에 연결 — 마지막으로 칠한 영역 하나를
+  // 그 전 색(또는 미채색)으로 되돌린다. paintRegionPixels는 이미 있는 벽 경계 채우기 함수를
+  // 그대로 재사용(seed는 좌표만 있으면 되므로 x,y를 인덱스로 변환해서 넘김).
+  function undoLastFill() {
+    const last = fillUndoStack.pop();
+    if (!last) return;
+    const seed = last.y * WORK_SIZE + last.x;
+    paintRegionPixels(seed, last.prevColorHex);
+    playPop();
   }
 
   // Task2(챌린지 Phase2): floodFill과 같은 벽(wallMask) 경계 연결 채우기지만, 시스템이 자동으로
@@ -4904,7 +4915,7 @@
     star.style.setProperty('--ss-dy', dy + 'vh');
     star.style.setProperty('--ss-angle', tailAngle + 'deg');
   }
-  document.querySelectorAll('.hub-screen, #map-screen, #gallery-screen').forEach((screen) => {
+  document.querySelectorAll('.hub-screen, #map-screen, #gallery-screen, #challenge-select-screen, #coloring-screen').forEach((screen) => {
     for (let i = 0; i < 2; i++) {
       const star = document.createElement('div');
       star.className = 'shooting-star shooting-star-' + i;
@@ -4916,8 +4927,10 @@
   });
 
   // ================= 네비게이션 =================
-  btnHome.addEventListener('click', goHomeToMap);
-  btnBack.addEventListener('click', () => { vibrate(15); goHome(); });
+  // 2026-08-24: "헤더 홈버튼은 뒤로가기로, 링 버튼은 되돌리기(undo)로" 요청 — 아이콘도 index.html
+  // 에서 함께 교체(🏠→⬅️, ⬅️→↩️).
+  btnHome.addEventListener('click', goHome);
+  btnBack.addEventListener('click', () => { vibrate(15); undoLastFill(); });
 
   // ================= 표지 화면 =================
   function enterMapFromCover() {

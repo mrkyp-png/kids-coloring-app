@@ -463,17 +463,31 @@ button:active { transform: scale(0.94); }
   height: 51px;
   object-fit: contain;
   transition: transform 0.18s ease;
+  /* 2026-08-23(38): "탭바 아이콘 입체감" 요청 — 배지 없이 아이콘 자체에만 깊이를 준다.
+     드롭섀도우 2겹(선명한 2px 턱 + 부드러운 확산 그림자)으로 다른 곳의 키캡 그림자 턱과
+     같은 느낌을 아이콘 실루엣에 그대로 입힘(box-shadow와 달리 drop-shadow는 투명 배경을
+     따라가서 사각형이 아니라 아이콘 모양대로 그림자가 진다). */
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.22)) drop-shadow(0 4px 5px rgba(0, 0, 0, 0.25));
 }
 /* "더보기"만 매칭되는 Twemoji가 없어 이모지(⋯) 유지 — 위 .tab-bar-icon의 width/height는
    <img> 전용이라 이 텍스트 아이콘엔 안 먹으니 font-size로 같은 시각 크기를 맞춘다. */
-.tab-bar-icon-emoji { font-size: 2.85rem; width: auto; height: auto; }
+.tab-bar-icon-emoji {
+  font-size: 2.85rem;
+  width: auto;
+  height: auto;
+  /* 2026-08-23(38): 위 .tab-bar-icon과 같은 입체감 — 이미지가 아니라 텍스트 글리프라
+     drop-shadow 대신 text-shadow로 동일한 2겹 레시피 적용. */
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.22), 0 4px 5px rgba(0, 0, 0, 0.25);
+}
 /* "일일" 탭 전용 — 오늘 날짜를 보여주는 미니 달력 카드(월 약자는 app.js가 채움). */
 .tab-bar-calendar-icon {
   display: flex;
   flex-direction: column;
   border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  /* 2026-08-23(38): "그림자만 키캡화" 요청 — 카드 모양/배경은 그대로 두고, 옅은 그림자 한 겹을
+     다른 키캡 버튼과 같은 레시피(선명한 색 턱 + 부드러운 확산 그림자 + 안쪽 하이라이트)로 교체. */
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.28), 0 5px 8px rgba(0, 0, 0, 0.22), inset 0 1.5px 1.5px rgba(255, 255, 255, 0.9);
   background: #fff;
 }
 .tab-bar-calendar-month {
@@ -673,7 +687,8 @@ button:active { transform: scale(0.94); }
   opacity: 0.75;
   animation: cosmic-star-drift 70s linear infinite, cosmic-star-twinkle 3.4s ease-in-out infinite;
 }
-#map-screen::after, #gallery-screen::after {
+#map-screen::after, #gallery-screen::after,
+#challenge-select-screen::after, #coloring-screen::after {
   /* 2026-08-23(33): "성운이 안 보인다, 더 진하고 뚜렷하게" 요청 — 투명도를 2배 가까이 올리고
      블러도 22px→14px로 줄여서 색 뭉치 경계가 더 또렷하게 보이게 함. */
   background:
@@ -1896,6 +1911,11 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   width: 36px;
   height: 36px;
 }
+/* 2026-08-24: 뒤로가기/다음/홈 버튼을 유니코드 이모지 글자 대신 Twemoji SVG(<img>)로 교체 —
+   font-size로는 이미지 크기를 못 정하므로 명시적 크기를 준다(기존 글자 크기와 비슷한 비율). */
+.icon-btn img { width: 30px; height: 30px; }
+.icon-btn-sm img { width: 20px; height: 20px; }
+.ring-circle img { width: 20px; height: 20px; }
 
 .panel-label {
   margin: 2px 0;
@@ -1988,8 +2008,8 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
      padding(2px×위아래)이 flex-start 기준점을 아래로 2px 밀어 넣는 만큼 그대로 여유가 줄어드니,
      17px가 아니라 19px를 빼야 실측 아래쪽 여유가 정확히 17px(도로선9+간격8)로 나온다(헤드리스
      브라우저로 실측 확인, .canvas-square도 동일 공식 — "같은 크기" 불변식 유지).
-     2026-08-23(36-5): "음각/볼록 박스만 흰색" 요청 — .canvas-square와 짝을 맞춰 이 박스도 고정
-     흰색/크림 배경을 준다(바깥 .goal-panel은 화면과 같은 검은색 그대로 둠). */
+     2026-08-23(39): "goal 박스도 흰색으로" 요청 — .canvas-square와 같은 고정 흰색/크림 배경을
+     다시 준다(바깥 .goal-panel은 투명한 채로 유지). */
   background: #FFF8ED;
   width: min(calc(var(--ring-square, 280px) - 19px), 420px);
   aspect-ratio: 1;
@@ -2022,10 +2042,9 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 .canvas-wrap {
   /* 2026-08-10: "캔버스를 지우고 물체만 나오게" 요청으로 흰 배경 카드 완전히 제거(wrap도,
      #fill-canvas 자체도) — 안 칠한 영역은 페이지 배경이 그대로 비쳐 보임.
-     2026-08-23(36-5): "음각으로 들어간 부분(.canvas-square)만 흰색, 나머지(이 바깥 여백)는
-     검은색" 요청 — 여기는 var(--bg)로 화면과 같은 어두운 색을 쓰고, 흰색은 아래 .canvas-square
-     에만 따로 준다. */
-  background: var(--bg);
+     2026-08-23(37): "나머지(이 바깥 여백)는 goal 박스처럼 투명하게" 요청 — var(--bg) 고정 색을
+     쓰면 뒤 #coloring-screen의 별/성운 애니메이션(::before/::after)을 그 색으로 덮어버려서
+     "그냥 검은 블록"으로 보였음. .goal-panel처럼 배경을 아예 없애 애니메이션이 비쳐 보이게 함. */
   position: relative;
   display: flex;
   align-items: center;
