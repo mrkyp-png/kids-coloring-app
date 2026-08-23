@@ -1415,6 +1415,12 @@
     galleryGrid.classList.remove('gallery-grid-hiding');
     btnPuzzleMagnify.hidden = true; // 퍼즐 미리보기 버튼도 새 레벨 진입 시 원복(explodeIntoPuzzle이 다시 켬).
     levelRewardStageBg.classList.remove('is-dark'); // 레벨1 변신 연출용 검정 배경을 다른 레벨/재진입 시 원복.
+    // 2026-08-24: "영상 재생 도중 뒤로가기하면 검은 화면이 뜨고 레벨2까지 그대로 남는다" 버그 —
+    // playLevelTransform()이 영상 재생 시작 시 이 그림(#level-reward-art, 레벨마다 새로 안
+    // 만들고 공유 재사용)을 hidden 처리하는데, 그 hidden은 원래 영상이 끝까지 재생돼 onended가
+    // 불릴 때만 제거된다. 영상 도중 나가면 onended가 영영 안 불려서 hidden이 계속 남고, 이후
+    // 어느 레벨에 들어가도(같은 엘리먼트를 재사용하므로) 그림이 안 보이는 빈 검정 박스만 남았다.
+    levelRewardArt.removeAttribute('hidden');
     rewardPuzzleTargetGrid.classList.remove('reward-puzzle-done'); // 퍼즐 완성 시 붙는 배경도 재진입 시 원복.
     levelReward.classList.remove('reward-centered'); // 레벨1 중앙 이동 연출을 다른 레벨/재진입 시 원복.
     levelReward.style.transform = '';
