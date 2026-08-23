@@ -2712,7 +2712,15 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   justify-content: center;
   container-type: size; /* 아래 원 크기를 이 구역의 실제 폭/높이 중 더 빡빡한 쪽 기준으로 잡기 위함 */
 }
-.challenge-tier-label { margin: 0 0 2px; font-weight: 800; font-size: 0.8rem; }
+/* 2026-08-24: "마이너/메이저/챔피언스리그로 이름 변경, 글자 3배로, 귀여운 글자체로" 요청 —
+   크기는 0.8rem→2.4rem(3배), 글꼴은 다른 곳(레벨 원 숫자 등)과 같은 Fredoka(라틴 전용 가변
+   폰트)+한글 대체 스택을 재사용(위 :root의 body font-family와 같은 조합, 새 폰트 안 들여옴). */
+.challenge-tier-label {
+  margin: 0 0 2px;
+  font-weight: 800;
+  font-size: 2.4rem;
+  font-family: 'Fredoka', "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+}
 .challenge-tier-zone[data-tier="easy"] .challenge-tier-label { color: #2f9e44; }
 .challenge-tier-zone[data-tier="normal"] .challenge-tier-label { color: #e8590c; }
 .challenge-tier-zone[data-tier="hard"] .challenge-tier-label { color: #e03131; }
