@@ -1415,6 +1415,7 @@
     galleryGrid.classList.remove('gallery-grid-hiding');
     btnPuzzleMagnify.hidden = true; // 퍼즐 미리보기 버튼도 새 레벨 진입 시 원복(explodeIntoPuzzle이 다시 켬).
     levelRewardStageBg.classList.remove('is-dark'); // 레벨1 변신 연출용 검정 배경을 다른 레벨/재진입 시 원복.
+    levelRewardStageBg.classList.remove('is-transparent'); // 위와 동일한 이유로 투명 상태도 원복.
     // 2026-08-24: "영상 재생 도중 뒤로가기하면 검은 화면이 뜨고 레벨2까지 그대로 남는다" 버그 —
     // playLevelTransform()이 영상 재생 시작 시 이 그림(#level-reward-art, 레벨마다 새로 안
     // 만들고 공유 재사용)을 hidden 처리하는데, 그 hidden은 원래 영상이 끝까지 재생돼 onended가
@@ -1989,7 +1990,11 @@
     // levelRewardArt의 class 속성을 통째로 새로 지정해버려서, 여기서 바로 클래스를 붙이면
     // 그 뒤에 지워진다 — 다음 틱으로 미룬다.
     setTimeout(() => levelRewardArt.classList.add('reward-puzzle-clean'), 0);
-    const preSpinDelayMs = 500;
+    // 2026-08-24: 회전하며 사라지는 애니메이션 전에 박스를 투명하게 바꾼다 — 그림만 우주
+    // 배경 위에 떠 있는 것처럼 보이게. 전환(0.6s, style.css)이 끝난 뒤에야 애니메이션을
+    // 시작해야 해서, 기존 0.5초 대기 요구사항을 이 0.6초 안에 포함시킨다(650=0.6s+여유).
+    levelRewardStageBg.classList.add('is-transparent');
+    const preSpinDelayMs = 650;
     const scatterSettleMs = preSpinDelayMs + 1100; // scatterMosaicIn 자체 트랜지션(1.1s) 끝난 뒤
     setTimeout(() => {
       scatterMosaicIn(levelRewardArt);
@@ -2150,6 +2155,7 @@
   // 위치·크기가 흔들리지 않는다.
   function playLevelTransform(level, videoSrc) {
     if (currentLevel !== level) return;
+    levelRewardStageBg.classList.remove('is-transparent'); // 되돌아오는 구간의 투명 상태를 검정으로 교체
     levelRewardStageBg.classList.add('is-dark');
     setTimeout(() => {
       if (currentLevel !== level) return;
@@ -2374,6 +2380,9 @@
   function explodeIntoPuzzle(level) {
     plog('explodeIntoPuzzle 호출 — currentLevel=' + currentLevel + ', 대상레벨=' + level);
     if (currentLevel !== level) { plog('레벨 불일치로 중단'); return; } // 그 사이 다른 레벨로 이동했으면 건너뜀
+    // 2026-08-24: 회전 애니메이션 구간에만 투명했던 박스를 퍼즐 조각이 나오기 전에 원복
+    // (조각 사이 빈 공간이 우주 배경으로 비쳐 보이는 걸 막음).
+    levelRewardStageBg.classList.remove('is-transparent');
     plog('조각 16개로 터짐 시작(트레이 생성)');
     const art = LEVEL_REWARD_ART[level];
     // 퍼즐 미리보기 버튼: 이 레벨의 완성 이미지를 썸네일/모달 소스로 채우고 보여준다.
@@ -2518,7 +2527,10 @@
         if (transformVideo) {
           // 레벨1: 바운스(축소→확대) 없이 그 자리에서 화면을 꽉 채우도록 확대된 뒤
           // 다음 레벨로 자동 이동한다.
-          zoomRewardToFullscreenAndAdvance(level);
+          // 2026-08-24: 확대 전에 박스를 투명하게 바꿔서 그림만 우주 배경 위에 뜬 채로
+          // 클로즈업되게 함 — 전환(0.6s, style.css)이 끝난 뒤에 확대를 시작한다.
+          levelRewardStageBg.classList.add('is-transparent');
+          setTimeout(() => zoomRewardToFullscreenAndAdvance(level), 650);
           return;
         }
 

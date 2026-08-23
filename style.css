@@ -1303,11 +1303,17 @@ button:active { transform: scale(0.94); }
   grid-area: 1 / 1;
   width: 100%;
   height: 100%;
-  background: var(--bg);
+  /* 2026-08-24: 우주 다크테마가 #gallery-screen까지 확장되며 var(--bg)가 어두운 색으로
+     바뀌어 이 박스도 같이 어두워졌었음 — goal/캔버스 박스와 같은 패턴으로 고정 흰색 복원. */
+  background: #FFF8ED;
   border-radius: 16px; /* 퍼즐 박스(.reward-puzzle-target-grid)와 모서리 둥글기 통일 */
   transition: background-color 0.6s ease;
 }
 .level-reward-stage-bg.is-dark { background: #000; }
+/* 2026-08-24: 16개 완료 후 회전하며 사라졌다 돌아오는 구간, 퍼즐 완성 후 클로즈업 확대되는
+   구간에서 박스 자체가 안 보이고 그림만 우주 배경 위에 떠 있는 것처럼 보이게 함(app.js
+   maybeShowRewardPuzzle/finishRewardPuzzle 참고 — 전환(0.6s)이 끝난 뒤에야 다음 애니메이션을 시작). */
+.level-reward-stage-bg.is-transparent { background: transparent; }
 /* 2026-08-22: "박스가 나타나는" 연출(회전+확대, 위아래로만 커지기 등 여러 시도)이 느린
    기기에서 전부 순간이동처럼 보여 포기 — 대신 방금 사라졌던 양 그림이 같은 자리로 되돌아오는
    걸로 대체한다(사용자 확인: "1번"). 사라지는 쪽(scatterMosaicIn)은 이 기기에서도 문제없이
