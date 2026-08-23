@@ -2704,7 +2704,6 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 #challenge-select-screen { position: relative; overflow: hidden; height: 100svh; background: var(--bg); }
 .challenge-tiers { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .challenge-tier-zone {
-  position: relative; /* 아래 .challenge-tier-reset(우측상단 절대배치)의 기준점 */
   flex: 1 1 0;
   min-height: 0;
   display: flex;
@@ -2713,13 +2712,26 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   justify-content: center;
   container-type: size; /* 아래 원 크기를 이 구역의 실제 폭/높이 중 더 빡빡한 쪽 기준으로 잡기 위함 */
 }
-/* 2026-08-24: "각 리그 우측상단에 리셋 버튼(모드별 리셋)" 요청 — 컬러링 모드 맵 화면의
-   #btn-reset-all과 같은 아이콘/스타일(icon-btn-sm), 구역 안에서 절대좌표로 우측상단 고정. */
+/* 2026-08-24: "각 리그 우측상단에 리셋 버튼(모드별 리셋)" 요청 — 리셋 버튼과 라벨을 한 줄(flex)로
+   묶어서 vertical-align 대신 align-items:center로 정확히 높이를 맞춘다("버튼이 라벨보다 위에 떠
+   있다" 지적으로 구조 변경 — 구역 전체 기준 절대좌표는 라벨 높이를 몰라서 안 맞았음). */
+.challenge-tier-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
 .challenge-tier-reset {
   position: absolute;
-  top: 4px;
-  right: 12px;
-  z-index: 1;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+/* .icon-btn:active의 translateY(2px)가 위 -50% 중앙정렬을 그대로 덮어써서 눌렀을 때 버튼이
+   위로 튀어보였다 — 두 오프셋을 합쳐서 눌러도 제자리에서만 눌리게. */
+.challenge-tier-reset:active {
+  transform: translateY(calc(-50% + 2px));
 }
 /* 2026-08-24: "마이너/메이저/챔피언스리그로 이름 변경, 글자 3배로, 귀여운 글자체로" 요청 —
    크기는 0.8rem→2.4rem(3배), 글꼴은 다른 곳(레벨 원 숫자 등)과 같은 Fredoka(라틴 전용 가변

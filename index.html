@@ -264,8 +264,10 @@
          #btn-reset-all과 같은 아이콘/문구, 난이도별로 challengeBestScore[difficulty]만 지운다
          (resetChallengeDifficulty, challenge.js). -->
     <div class="challenge-tier-zone" data-tier="easy">
-      <button class="icon-btn icon-btn-sm challenge-tier-reset" data-diff="easy" type="button" aria-label="Reset progress" data-i18n-aria-label="resetMode.btn">🔄</button>
-      <p class="challenge-tier-label" data-i18n="challenge.difficulty.easy">MINOR LEAGUE</p>
+      <div class="challenge-tier-head">
+        <button class="icon-btn challenge-tier-reset" data-diff="easy" type="button" aria-label="Reset progress" data-i18n-aria-label="resetMode.btn">🔄</button>
+        <p class="challenge-tier-label" data-i18n="challenge.difficulty.easy">MINOR LEAGUE</p>
+      </div>
       <div id="challenge-tier-carousel-easy" class="diff-node-wrap">
         <div class="lv-peek tier-peek-left"></div>
         <div class="lv-circle-stage"></div>
@@ -273,8 +275,10 @@
       </div>
     </div>
     <div class="challenge-tier-zone" data-tier="normal">
-      <button class="icon-btn icon-btn-sm challenge-tier-reset" data-diff="normal" type="button" aria-label="Reset progress" data-i18n-aria-label="resetMode.btn">🔄</button>
-      <p class="challenge-tier-label" data-i18n="challenge.difficulty.normal">MAJOR LEAGUE</p>
+      <div class="challenge-tier-head">
+        <button class="icon-btn challenge-tier-reset" data-diff="normal" type="button" aria-label="Reset progress" data-i18n-aria-label="resetMode.btn">🔄</button>
+        <p class="challenge-tier-label" data-i18n="challenge.difficulty.normal">MAJOR LEAGUE</p>
+      </div>
       <div id="challenge-tier-carousel-normal" class="diff-node-wrap">
         <div class="lv-peek tier-peek-left"></div>
         <div class="lv-circle-stage"></div>
@@ -282,8 +286,10 @@
       </div>
     </div>
     <div class="challenge-tier-zone" data-tier="hard">
-      <button class="icon-btn icon-btn-sm challenge-tier-reset" data-diff="hard" type="button" aria-label="Reset progress" data-i18n-aria-label="resetMode.btn">🔄</button>
-      <p class="challenge-tier-label" data-i18n="challenge.difficulty.hard">CHAMPIONS LEAGUE</p>
+      <div class="challenge-tier-head">
+        <button class="icon-btn challenge-tier-reset" data-diff="hard" type="button" aria-label="Reset progress" data-i18n-aria-label="resetMode.btn">🔄</button>
+        <p class="challenge-tier-label" data-i18n="challenge.difficulty.hard">CHAMPIONS LEAGUE</p>
+      </div>
       <div id="challenge-tier-carousel-hard" class="diff-node-wrap">
         <div class="lv-peek tier-peek-left"></div>
         <div class="lv-circle-stage"></div>
