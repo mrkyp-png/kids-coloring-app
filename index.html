@@ -50,9 +50,12 @@
 </div>
 
 <!-- ===================== Cover screen (title/start) ===================== -->
-<section id="cover-screen" class="screen cover-screen">
+<section id="cover-screen" class="screen cover-screen hub-screen">
   <!-- 2026-08-11: 다국어 지원 추가 — 표지 화면 우상단 🌐 버튼으로 언어 전환(i18n.js가 처리). -->
   <button id="btn-lang" class="lang-btn" aria-label="Change language">🌐</button>
+  <!-- 2026-08-23: 맵 화면에 있던 음악/소리 버튼을 여기로 이동 + 진동 설정 신규 추가 — 언어 버튼
+       옆에 톱니바퀴로 열어서 모아둔다. -->
+  <button id="btn-settings" class="lang-btn settings-btn" aria-label="Settings">⚙️</button>
   <div id="lang-menu" class="lang-menu" hidden>
     <button type="button" data-lang="ko">한국어</button>
     <button type="button" data-lang="en">English</button>
@@ -60,15 +63,149 @@
     <button type="button" data-lang="zh">中文</button>
     <button type="button" data-lang="es">Español</button>
   </div>
+  <!-- 2026-08-23(12): 원본 사진은 배경(책장 등)이 같이 찍혀서 지저분하다는 피드백 → 사용자가
+       AI(Gemini)로 배경 없는 빈 칠판만 새로 만들어 제공(assets/cover/chalkboard.png, 크로마키로
+       초록 배경 제거). 원본 사진 속 말린 꽃/분필 낙서 느낌은 이 앱이 이미 쓰는 실제 Twemoji
+       (꽃/별/하트)를 직접 배치해서 재현 — 글자 두 자리(왼쪽위/오른쪽아래)는 피해서 놓는다. -->
   <div class="cover-content">
-    <h1 class="cover-title">🎨 Coloring Fun</h1>
-    <div id="cover-bosses" class="cover-bosses" aria-hidden="true"></div>
-    <div class="cover-mode-row">
-      <button id="btn-cover-start" class="cover-start-btn" data-i18n="cover.startKids">🎨 Kids Mode</button>
-      <button id="btn-cover-start-challenge" class="cover-start-btn cover-start-btn-challenge" type="button" data-i18n="cover.startChallenge">🎮 Challenge Mode</button>
+    <div class="cover-chalkboard-wrap">
+      <img class="cover-chalkboard-img" src="assets/cover/chalkboard.png" alt="">
+      <!-- 2026-08-23(16): "제목을 액자 윗변 나무에, 컬러풀하게" 요청 — 표지 밖에 따로 있던
+           제목을 액자 위쪽 나무 띠 위로 옮기고, 글자 하나씩 다른 색(레인보우)으로. h1은 이
+           래퍼가 그대로 맡고, 실제 글자는 장식용 span이라 스크린리더용 텍스트는 aria-label로. -->
+      <h1 class="chalk-board-title" aria-label="Coloring Fun">
+        <span aria-hidden="true">C</span><span aria-hidden="true">o</span><span aria-hidden="true">l</span><span aria-hidden="true">o</span><span aria-hidden="true">r</span><span aria-hidden="true">i</span><span aria-hidden="true">n</span><span aria-hidden="true">g</span> <span aria-hidden="true">F</span><span aria-hidden="true">u</span><span aria-hidden="true">n</span>
+      </h1>
+      <!-- 2026-08-23(15)(17)(18): "칠판이 휑하다, 다양한 이미지 많이" → 3→10→16개. 위치는 이제
+           고정 좌표가 아니라 app.js의 initChalkDecoRoaming()이 JS로 관리(전체 렌덤 이동 요청) —
+           wobble-a/b/c는 순수 회전용, 서로 다르게 돌아가라고 셋을 돌아가며 붙임. -->
+      <img class="chalk-deco chalk-deco-wobble-a" src="assets/emoji/glowingstar.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-b" src="assets/emoji/sparklingheart.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-c" src="assets/emoji/sparkles.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-a" src="assets/emoji/butterfly.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-b" src="assets/emoji/fourleafclover.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-c" src="assets/emoji/rainbow.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-a" src="assets/emoji/rose.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-b" src="assets/emoji/sun.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-c" src="assets/emoji/tulip.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-a" src="assets/emoji/star.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-b" src="assets/emoji/ladybug.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-c" src="assets/emoji/bee.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-a" src="assets/emoji/balloon.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-b" src="assets/emoji/cherry.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-c" src="assets/emoji/cloud.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-a" src="assets/emoji/strawberry.svg" alt="" aria-hidden="true">
+      <!-- 2026-08-23(19): "시작/이동 후에도 빈 공간 많다" 요청 — 16 → 20개로 더 늘림. -->
+      <img class="chalk-deco chalk-deco-wobble-b" src="assets/emoji/dog.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-c" src="assets/emoji/cat.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-a" src="assets/emoji/panda.svg" alt="" aria-hidden="true">
+      <img class="chalk-deco chalk-deco-wobble-b" src="assets/emoji/snail.svg" alt="" aria-hidden="true">
+      <!-- 2026-08-23(16): "아래쪽엔 여러 색깔 분필" 요청 — 액자 아래 트레이 위에 색색 분필.
+           이모지에 없는 소품이라 CSS로 직접 막대 모양을 그림(색은 style.css에서 순서대로 지정). -->
+      <div class="chalk-tray" aria-hidden="true">
+        <span class="chalk-stick"></span><span class="chalk-stick"></span><span class="chalk-stick"></span>
+        <span class="chalk-stick"></span><span class="chalk-stick"></span>
+      </div>
+      <!-- 2026-08-23(13): "글자 빼고 아이콘만 크게" 요청 — 텍스트 라벨 대신 큰 아이콘 버튼으로.
+           스크린리더용 설명은 aria-label로 유지(기존 i18n 키 재사용). -->
+      <button id="btn-cover-start" class="chalk-icon-btn chalk-icon-kids" data-i18n-aria-label="cover.startKids" aria-label="Kids Mode">
+        <img src="assets/emoji/artistpalette.svg" alt="">
+      </button>
+      <button id="btn-cover-start-challenge" class="chalk-icon-btn chalk-icon-challenge" type="button" data-i18n-aria-label="cover.startChallenge" aria-label="Challenge Mode">
+        <img src="assets/emoji/videogame.svg" alt="">
+      </button>
     </div>
   </div>
 </section>
+
+<!-- ===================== 하단 탭바 화면 3개(스코어/일일/상점) — 2026-08-23 신규.
+     아직 스펙(스코어 산정 방식/상점 아이템)이 안 정해져서 "준비 중" 플레이스홀더만 둔다. ===================== -->
+<section id="score-screen" class="screen hub-screen" hidden>
+  <div class="hub-placeholder">
+    <p class="hub-placeholder-emoji">🏆</p>
+    <h1 class="hub-placeholder-title" data-i18n="score.title">My Score</h1>
+    <p class="hub-placeholder-sub" data-i18n="hub.comingSoon">Coming soon!</p>
+  </div>
+</section>
+
+<section id="daily-screen" class="screen hub-screen" hidden>
+  <div class="hub-placeholder">
+    <p class="hub-placeholder-emoji">📅</p>
+    <h1 class="hub-placeholder-title" data-i18n="daily.title">Daily</h1>
+    <p class="hub-placeholder-sub" data-i18n="hub.comingSoon">Coming soon!</p>
+  </div>
+</section>
+
+<section id="shop-screen" class="screen hub-screen" hidden>
+  <div class="hub-placeholder">
+    <p class="hub-placeholder-emoji">🛍️</p>
+    <h1 class="hub-placeholder-title" data-i18n="shop.title">Shop</h1>
+    <p class="hub-placeholder-sub" data-i18n="hub.comingSoon">Coming soon!</p>
+  </div>
+</section>
+
+<!-- ===================== 더보기 화면 — 설정/개인정보/문의를 모아둠 ===================== -->
+<section id="more-screen" class="screen hub-screen" hidden>
+  <div class="hub-placeholder hub-placeholder-top">
+    <p class="hub-placeholder-emoji">⋯</p>
+    <h1 class="hub-placeholder-title" data-i18n="more.title">More</h1>
+  </div>
+  <div class="more-menu">
+    <button id="more-item-settings" class="more-menu-item" type="button">
+      <span class="more-menu-icon">⚙️</span>
+      <span data-i18n="more.settings">Settings</span>
+    </button>
+    <a class="more-menu-item" href="privacy.html" target="_blank" rel="noopener">
+      <span class="more-menu-icon">🔒</span>
+      <span data-i18n="more.privacy">Privacy Policy &amp; Credits</span>
+    </a>
+    <a class="more-menu-item" href="mailto:mrkyp@hanmail.net">
+      <span class="more-menu-icon">✉️</span>
+      <span data-i18n="more.contact">Contact Us</span>
+    </a>
+  </div>
+</section>
+
+<!-- ===================== 하단 탭바 — 나의 스코어/일일/Home/상점/더보기. 위 5개 "허브" 화면에서만
+     보이고, 실제 색칠/챌린지 플레이 중엔 숨긴다(showTabBar/hideTabBar, app.js).
+     2026-08-23(7): Lucide 라인 아이콘 시도 → "더 허접하다" 피드백으로 이모지로 되돌림.
+     2026-08-23(8): 참고 영상 재확인 결과, 영상 아이콘은 기기 기본 이모지 폰트도 라인 아이콘도
+     아니라 색깔 있는 "일러스트형" 아이콘(예: 일일 탭 = 실제 달력 카드를 축소해놓은 모양)이었음.
+     기기마다 다르게 그려지는 이모지 폰트 대신, 이 앱이 도안에 이미 쓰는 실제 Twemoji SVG 파일
+     (assets/emoji/*.svg — trophy/calendar/house/shoppingbags)을 그대로 아이콘으로 재사용 —
+     항상 똑같이 그려지고, 색도 진하고 또렷해서 참고 영상 쪽에 제일 가깝다. "더보기"만 매칭되는
+     Twemoji가 없어서 이모지(⋯) 유지. -->
+<nav id="tab-bar" class="tab-bar">
+  <!-- 2026-08-23(3): "터치 애니메이션도 있으면" 요청 — 탭 위쪽에 슬라이딩 인디케이터. 폭을 탭
+       하나와 똑같이(100%/5) 잡아두면 translateX(N * 100%)가 항상 정확히 N칸 이동이라 픽셀
+       계산 없이 CSS만으로 어느 화면 크기에서도 정확히 그 탭 위에 선다. -->
+  <div id="tab-bar-indicator" class="tab-bar-indicator" aria-hidden="true"></div>
+  <button class="tab-bar-btn" type="button" data-tab="score">
+    <span class="tab-bar-icon-wrap"><img class="tab-bar-icon" src="assets/emoji/trophy.svg" alt=""></span>
+    <span class="tab-bar-label" data-i18n="tabBar.score">Score</span>
+  </button>
+  <button class="tab-bar-btn" type="button" data-tab="daily">
+    <!-- 2026-08-23(9): "일일 아이콘 숫자가 실시간 반영되냐" 질문 → 정적 Twemoji 대신, 오늘
+         날짜를 JS로 채워 넣는 달력 카드로 교체(월 약자는 I18N.lang 기준 로케일 표기). -->
+    <span class="tab-bar-icon-wrap"><span class="tab-bar-icon tab-bar-calendar-icon">
+      <span id="tab-bar-daily-month" class="tab-bar-calendar-month"></span>
+      <span id="tab-bar-daily-day" class="tab-bar-calendar-day"></span>
+    </span></span>
+    <span class="tab-bar-label" data-i18n="tabBar.daily">Daily</span>
+  </button>
+  <button class="tab-bar-btn is-active" type="button" data-tab="home">
+    <span class="tab-bar-icon-wrap"><img class="tab-bar-icon" src="assets/emoji/house.svg" alt=""></span>
+    <span class="tab-bar-label" data-i18n="tabBar.home">Home</span>
+  </button>
+  <button class="tab-bar-btn" type="button" data-tab="shop">
+    <span class="tab-bar-icon-wrap"><img class="tab-bar-icon" src="assets/emoji/shoppingbags.svg" alt=""></span>
+    <span class="tab-bar-label" data-i18n="tabBar.shop">Shop</span>
+  </button>
+  <button class="tab-bar-btn" type="button" data-tab="more">
+    <span class="tab-bar-icon-wrap"><span class="tab-bar-icon tab-bar-icon-emoji">⋯</span></span>
+    <span class="tab-bar-label" data-i18n="tabBar.more">More</span>
+  </button>
+</nav>
 
 <!-- ===================== Map screen (home) ===================== -->
 <section id="map-screen" class="screen" hidden>
@@ -89,18 +226,13 @@
         <!-- 2026-08-16: "음악/소리 아이콘과 같은 모양으로" 요청 — 텍스트 알약(.ranking-btn) 대신
              아이콘만 있는 작은 원형 버튼으로 변경(음악/소리와 동일한 icon-btn-sm). -->
         <button id="btn-reset-all" class="icon-btn icon-btn-sm" hidden aria-label="Reset progress" data-i18n-aria-label="resetMode.btn">🔄</button>
-        <div class="map-header-sound-group">
-          <button id="btn-music" class="icon-btn icon-btn-sm" aria-label="Toggle background music">🎵</button>
-          <button id="btn-sound" class="icon-btn icon-btn-sm" aria-label="Turn sound on or off">🔊</button>
-        </div>
       </div>
     </div>
     <p id="stat-line" class="stat-line" hidden></p>
     <p id="levels-left-line" class="levels-left-line" hidden></p>
   </header>
   <div id="map-grid" class="map-grid" role="list" aria-label="Level map"></div>
-  <!-- 2026-08-14: "유아용 모드는 보스도 없게" 요청 — 보스 도전 섹션 자체를 숨긴다.
-       표지 화면의 장식용 보스 4종 로우(cover-bosses)는 순수 장식이라 그대로 둔다. -->
+  <!-- 2026-08-14: "유아용 모드는 보스도 없게" 요청 — 보스 도전 섹션 자체를 숨긴다. -->
   <div id="boss-section" class="boss-section" hidden>
     <h2 class="boss-section-title" data-i18n="boss.sectionTitle">👑 Final Boss</h2>
     <p class="boss-section-sub" data-i18n="boss.sectionSub">Clear all 10 levels in one mode to challenge that mode's boss!</p>
@@ -347,6 +479,20 @@
     <div id="ranking-tabs" class="ranking-tabs" role="tablist"></div>
     <div id="ranking-list" class="ranking-list"></div>
     <button id="ranking-board-close" class="text-link-btn" data-i18n="rankingBoard.close">Close</button>
+  </div>
+</div>
+
+<!-- ===================== 설정 모달(음악/진동/소리) — 2026-08-23, 맵 화면에 있던
+     음악/소리 버튼을 표지 화면 톱니바퀴 안으로 이동 + 진동 켜기/끄기 신규 추가. ===================== -->
+<div id="settings-modal" class="modal-overlay" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <h2 id="settings-title" data-i18n="settings.title">⚙️ Settings</h2>
+    <div class="settings-icon-row">
+      <button id="btn-music" class="icon-btn" aria-label="Toggle background music">🎵</button>
+      <button id="btn-vibration" class="icon-btn" aria-label="Toggle vibration">📳</button>
+      <button id="btn-sound" class="icon-btn" aria-label="Turn sound on or off">🔊</button>
+    </div>
+    <button id="settings-close" class="text-link-btn" data-i18n="settings.close">Close</button>
   </div>
 </div>
 

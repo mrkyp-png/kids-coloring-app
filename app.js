@@ -138,9 +138,27 @@
   const onboardingGateRetry = document.getElementById('onboarding-gate-retry');
   const onboardingConsentAgree = document.getElementById('onboarding-consent-agree');
   const coverScreen = document.getElementById('cover-screen');
-  const coverBosses = document.getElementById('cover-bosses');
+  const btnSettings = document.getElementById('btn-settings');
+  const settingsModal = document.getElementById('settings-modal');
+  const settingsClose = document.getElementById('settings-close');
+  const btnVibration = document.getElementById('btn-vibration');
   const btnCoverStart = document.getElementById('btn-cover-start');
   const btnCoverStartChallenge = document.getElementById('btn-cover-start-challenge');
+
+  // 2026-08-23: 하단 탭바(나의 스코어/일일/Home/상점/더보기). 표지 화면(=Home)을 포함해
+  // "허브" 화면끼리는 이 5개를 서로 전환하고, 실제 색칠/챌린지 플레이로 들어가면 숨긴다.
+  const tabBar = document.getElementById('tab-bar');
+  const tabBarIndicator = document.getElementById('tab-bar-indicator');
+  const tabBarButtons = Array.from(document.querySelectorAll('.tab-bar-btn'));
+  const HUB_SCREENS = {
+    score: document.getElementById('score-screen'),
+    daily: document.getElementById('daily-screen'),
+    home: coverScreen,
+    shop: document.getElementById('shop-screen'),
+    more: document.getElementById('more-screen'),
+  };
+  const TAB_ORDER = Object.keys(HUB_SCREENS); // 인디케이터 슬라이드 위치 계산용(왼쪽부터 순서)
+  const moreItemSettings = document.getElementById('more-item-settings');
   const playerEntryModal = document.getElementById('player-entry-modal');
   const playerInputName = document.getElementById('player-input-name');
   const playerInputFlag = document.getElementById('player-input-flag');
@@ -1232,7 +1250,7 @@
       // 다 찼다 — 진입 성공. 완성 임팩트로 짧고 강한 진동 한 번, 링/펄스 정리 후 실제로 입장.
       const circle = holdCircle;
       cancelHoldVisuals();
-      if (navigator.vibrate) { try { navigator.vibrate([0, 60]); } catch (err) { /* 무시 */ } }
+      vibrate([0, 60]);
       circle.click();
     }
     function cancelHoldVisuals() {
@@ -1250,15 +1268,13 @@
       holdRing = ring;
       ring.addEventListener('transitionend', onHoldFillTransitionEnd);
       stage.classList.add('lv-charging'); // CSS 트랜지션(700ms linear)이 링을 채움
-      if (navigator.vibrate) {
-        // 초반엔 느슨하게, 완성 직전엔 촘촘하게 — 700ms 안에 대략 맞춰지는 고정 패턴.
-        try { navigator.vibrate([40, 60, 40, 55, 45, 45, 45, 35, 50, 25, 55, 15, 60]); } catch (err) { /* 무시 */ }
-      }
+      // 초반엔 느슨하게, 완성 직전엔 촘촘하게 — 700ms 안에 대략 맞춰지는 고정 패턴.
+      vibrate([40, 60, 40, 55, 45, 45, 45, 35, 50, 25, 55, 15, 60]);
     }
     function cancelHold() {
       if (!holdCircle) return;
       cancelHoldVisuals();
-      if (navigator.vibrate) { try { navigator.vibrate(0); } catch (err) { /* 무시 */ } }
+      vibrate(0);
     }
     mapGrid.addEventListener('pointerdown', (e) => {
       if (!e.target.closest('.lv-circle-stage')) return;
@@ -1351,7 +1367,8 @@
   // 2026-08-14: "유아모드에서 첫화면으로 돌아가는 버튼 필요" 요청
   btnMapToCover.addEventListener('click', () => {
     mapScreen.hidden = true;
-    coverScreen.hidden = false;
+    showHubScreen('home');
+    showTabBar();
   });
 
   btnResetAll.addEventListener('click', () => {
@@ -1721,9 +1738,7 @@
       osc.start(t0);
       osc.stop(t0 + 0.25);
     } catch (e) { /* 효과음은 부가 기능이라 실패해도 무시 */ }
-    if (navigator.vibrate) {
-      try { navigator.vibrate(35); } catch (e) { /* 무시 */ }
-    }
+    vibrate(35);
   }
 
   // 2026-08-16: "완료한 그림이 보상 이미지로 흡수되는" 연출 — 완료된 줄의 이모지 복제본이
@@ -2619,7 +2634,7 @@
     // 살짝 움직이는 부작용이 있었다("클로즈업 전 위치가 상부에 위치") — 박스는 절대 움직이면
     // 안 되므로 되돌림(빈 트레이 공간보다 박스 위치 안정이 우선).
     playPuzzleCorrectSfx();
-    if (navigator.vibrate) { try { navigator.vibrate(40); } catch (e) { /* 무시 */ } }
+    vibrate(40);
     if (rewardPuzzle) plog('조각 배치: cell-' + cellIndex + ' (' + rewardPuzzle.solved.size + '/' + (rewardPuzzle.dims.cols * rewardPuzzle.dims.rows) + ')');
     if (rewardPuzzle && rewardPuzzle.solved.size >= rewardPuzzle.dims.cols * rewardPuzzle.dims.rows) {
       const solvedLevel = rewardPuzzle.level;
@@ -2640,7 +2655,7 @@
   function rejectPuzzlePiece(piece) {
     piece.classList.add('reward-puzzle-reject');
     setTimeout(() => piece.classList.remove('reward-puzzle-reject'), 400);
-    if (navigator.vibrate) { try { navigator.vibrate(400); } catch (e) { /* 무시 */ } }
+    vibrate(400);
   }
 
   // 정답 배치 효과음 — playAbsorbSfx와 같은 방식(별도 음원 없이 WebAudio로 합성), 더 밝은 2음 딩.
@@ -3998,7 +4013,7 @@
     regionStagePraise.classList.add('show');
     // 진동 세기도 단계별로 키운다 — 기존 코드의 35~40ms(가벼운 반응)~400ms(보스 큰 승리) 범위를
     // 그대로 따라감. iOS(Safari/홈화면 PWA)는 Vibration API 자체가 없어서 조용히 무시됨.
-    if (navigator.vibrate) { try { navigator.vibrate(tier >= 7 ? 400 : 20 + tier * 20); } catch (e) { /* 무시 */ } }
+    vibrate(tier >= 7 ? 400 : 20 + tier * 20);
     regionStageTimer = setTimeout(() => {
       regionStageTimer = null;
       regionStagePraise.hidden = true;
@@ -4608,7 +4623,7 @@
     pictureCompletePraise.classList.remove('show');
     void pictureCompletePraise.offsetWidth; // 리플로우 강제 — 연달아 떠도 팝인이 다시 재생되게 함
     pictureCompletePraise.classList.add('show');
-    if (navigator.vibrate) { try { navigator.vibrate(400); } catch (e) { /* 무시 */ } } // 기존 보스 큰 승리와 동일한 세기
+    vibrate(400); // 기존 보스 큰 승리와 동일한 세기
     speakPraise(phrase, { pitch: 2, rate: 1.25, langPrefix: 'en' });
     goHome();
     pictureCompleteTimer = setTimeout(() => {
@@ -4679,48 +4694,187 @@
 
   updateMusicButton();
 
+  // ================= 진동 =================
+  // 2026-08-23: 음악/소리와 같은 패턴(localStorage 키 + 아이콘 토글)으로 신규 추가. 기존에도
+  // 색칠 탭/레벨클리어/보스승리 등 곳곳에서 navigator.vibrate를 직접 불렀는데 끌 방법이
+  // 없었음 — 그 호출들을 전부 아래 vibrate() 헬퍼로 바꿔서 이 설정을 따르게 한다.
+  const VIBRATION_KEY = 'vibrationOn';
+
+  function isVibrationOn() {
+    const v = localStorage.getItem(VIBRATION_KEY);
+    return v === null ? true : v === '1'; // 기본값: 켜짐
+  }
+
+  function updateVibrationButton() {
+    btnVibration.textContent = isVibrationOn() ? '📳' : '🔕';
+  }
+
+  function vibrate(pattern) {
+    if (!isVibrationOn() || !navigator.vibrate) return;
+    try { navigator.vibrate(pattern); } catch (e) { /* 무시 */ }
+  }
+
+  btnVibration.addEventListener('click', () => {
+    const next = !isVibrationOn();
+    try { localStorage.setItem(VIBRATION_KEY, next ? '1' : '0'); } catch (e) { /* 무시 */ }
+    updateVibrationButton();
+  });
+
+  updateVibrationButton();
+
+  // ================= 설정 모달 =================
+  // 2026-08-23: 표지 화면 톱니바퀴 — 음악/진동/소리를 모아둔 모달을 연다/닫는다.
+  btnSettings.addEventListener('click', () => { settingsModal.hidden = false; });
+  settingsClose.addEventListener('click', () => { settingsModal.hidden = true; });
+  // 더보기 화면에서도 같은 모달을 연다.
+  moreItemSettings.addEventListener('click', () => { settingsModal.hidden = false; });
+
+  // ================= 하단 탭바 =================
+  // 나의 스코어/일일/Home/상점/더보기 5개 "허브" 화면끼리 전환한다. 실제 색칠/챌린지 플레이로
+  // 들어갈 땐 hideTabBar(), 표지(Home)로 돌아올 땐 showTabBar()를 그 전환 지점에서 직접 부른다
+  // (이 앱엔 화면 전환을 한 곳에서 관리하는 라우터가 없어서, 기존 코드 스타일대로 전환 지점마다
+  // 명시적으로 호출).
+  function showTabBar() { tabBar.hidden = false; }
+  function hideTabBar() { tabBar.hidden = true; }
+
+  function showHubScreen(name) {
+    Object.entries(HUB_SCREENS).forEach(([key, el]) => { el.hidden = key !== name; });
+    tabBarButtons.forEach((btn) => { btn.classList.toggle('is-active', btn.dataset.tab === name); });
+    tabBarIndicator.style.transform = 'translateX(' + TAB_ORDER.indexOf(name) * 100 + '%)';
+  }
+
+  tabBarButtons.forEach((btn) => {
+    btn.addEventListener('click', () => showHubScreen(btn.dataset.tab));
+  });
+
+  // challenge.js는 별도 IIFE라 이 스코프의 함수를 직접 못 부른다 — window.Challenge와 같은
+  // 방식으로 노출(app.js가 challenge.js보다 먼저 로드되므로 challenge.js 최상단에서 바로 써도 됨).
+  window.TabBar = { show: showTabBar, hide: hideTabBar };
+
+  // "일일" 탭 아이콘 — 오늘 날짜를 실시간 반영(월 약자는 언어 설정 로케일로 표기). 언어를
+  // 바꾸면 I18N.setLang()이 location.reload()로 페이지를 통째로 다시 그리므로 여기선 최초
+  // 1회만 채우면 된다.
+  const tabBarDailyMonth = document.getElementById('tab-bar-daily-month');
+  const tabBarDailyDay = document.getElementById('tab-bar-daily-day');
+  const today = new Date();
+  tabBarDailyMonth.textContent = new Intl.DateTimeFormat(I18N.lang, { month: 'short' }).format(today);
+  tabBarDailyDay.textContent = String(today.getDate());
+
+  // ================= 표지 칠판 장식 렌덤 이동 =================
+  // 2026-08-23(18): "칠판 검은 부위 전체를 렌덤하게, 안 겹치게" 요청 — 장식 이모지(.chalk-deco)
+  // 16개가 각자 무작위 간격으로 칠판 안전영역 안의 새 지점을 뽑아 그쪽으로 부드럽게(CSS
+  // transition) 이동한다. 모드 선택 아이콘 버튼 2개(.chalk-icon-btn)는 요청대로 이 로밍에서
+  // 제외 — 고정 위치에서 펄스+글로우만 유지.
+  function initChalkDecoRoaming() {
+    const decos = Array.from(document.querySelectorAll('.chalk-deco'));
+    if (!decos.length) return;
+    // 칠판 검은 면 안쪽 안전영역(%, wrap 기준) — chalkboard.png를 파이썬(Pillow)으로 픽셀
+    // 스캔한 실측값(top39.5~67.5%/left14~85.5%)에서 장식 반경만큼만 여유를 둔 값.
+    const SAFE = { top: 41, bottom: 66, left: 16, right: 84 };
+    // 모드 선택 아이콘 버튼 2개가 실제로 차지하는 영역(%) — 딱 그 크기만(과하게 넓히면 나머지
+    // 장식이 들어갈 자리가 없어짐).
+    const ICON_ZONES = [
+      { top: 39, bottom: 55, left: 14, right: 40 },  // kids(왼쪽위)
+      { top: 50, bottom: 66, left: 62, right: 88 },  // challenge(오른쪽아래)
+    ];
+    const R = 2.5; // 장식 하나의 충돌 반경(%) — 실제 폭(5%)의 절반
+    const SPEED = 0.09; // 초기 속도 크기(%/frame, 60fps 기준 대략 5.4%/초)
+
+    // 2026-08-23(22): "이동 중에 서로 겹친다, 만나면 튕겨나가게" 요청 — 이전 버전(CSS
+    // transition으로 목적지만 주기적으로 새로 뽑음)은 도착 지점끼리만 안 겹치게 보장했을 뿐,
+    // 그 사이 지나가는 경로까지는 신경 안 써서 서로 스쳐 지나가며 겹쳐 보였다. 이번엔 진짜
+    // 당구공처럼 매 프레임(requestAnimationFrame) 위치를 갱신하고, 벽/아이콘존/서로 부딪히면
+    // 그 순간 반사(튕김)하는 실시간 물리 시뮬레이션으로 바꿨다 — 항상 움직이고, 항상 안 겹침.
+    // 초기 위치만 격자로 흩뿌려서 시작부터 겹치지 않게 하고, 이후는 물리 루프가 알아서 유지한다.
+    const CELL = 5.5;
+    const cols = Math.floor((SAFE.right - SAFE.left) / CELL);
+    const rows = Math.floor((SAFE.bottom - SAFE.top) / CELL);
+    const cells = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const cx = SAFE.left + CELL * (c + 0.5);
+        const cy = SAFE.top + CELL * (r + 0.5);
+        const inIconZone = ICON_ZONES.some((z) => (
+          cx + R > z.left && cx - R < z.right && cy + R > z.top && cy - R < z.bottom
+        ));
+        if (!inIconZone) cells.push({ x: cx, y: cy });
+      }
+    }
+    for (let i = cells.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [cells[i], cells[j]] = [cells[j], cells[i]];
+    }
+
+    const balls = decos.map((el, i) => {
+      const cell = cells[i % cells.length];
+      const angle = Math.random() * Math.PI * 2;
+      return { el, x: cell.x, y: cell.y, vx: Math.cos(angle) * SPEED, vy: Math.sin(angle) * SPEED };
+    });
+
+    function tick() {
+      // 1) 이동
+      for (const b of balls) { b.x += b.vx; b.y += b.vy; }
+      // 2) 안전영역 벽에 튕김
+      for (const b of balls) {
+        if (b.x - R < SAFE.left) { b.x = SAFE.left + R; b.vx = Math.abs(b.vx); }
+        if (b.x + R > SAFE.right) { b.x = SAFE.right - R; b.vx = -Math.abs(b.vx); }
+        if (b.y - R < SAFE.top) { b.y = SAFE.top + R; b.vy = Math.abs(b.vy); }
+        if (b.y + R > SAFE.bottom) { b.y = SAFE.bottom - R; b.vy = -Math.abs(b.vy); }
+      }
+      // 3) 아이콘 버튼 영역(사각형)에 부딪히면 침투가 가장 얕은 쪽으로 밀어내고 그 축으로 튕김
+      for (const b of balls) {
+        for (const z of ICON_ZONES) {
+          if (b.x + R > z.left && b.x - R < z.right && b.y + R > z.top && b.y - R < z.bottom) {
+            const pushLeft = (b.x + R) - z.left;
+            const pushRight = z.right - (b.x - R);
+            const pushTop = (b.y + R) - z.top;
+            const pushBottom = z.bottom - (b.y - R);
+            const min = Math.min(pushLeft, pushRight, pushTop, pushBottom);
+            if (min === pushLeft) { b.x = z.left - R; b.vx = -Math.abs(b.vx); }
+            else if (min === pushRight) { b.x = z.right + R; b.vx = Math.abs(b.vx); }
+            else if (min === pushTop) { b.y = z.top - R; b.vy = -Math.abs(b.vy); }
+            else { b.y = z.bottom + R; b.vy = Math.abs(b.vy); }
+          }
+        }
+      }
+      // 4) 장식끼리 부딪히면(당구공 탄성충돌 근사) 서로 밀어내고 속도를 반사
+      for (let i = 0; i < balls.length; i++) {
+        for (let j = i + 1; j < balls.length; j++) {
+          const a = balls[i], b = balls[j];
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
+          const minDist = R * 2;
+          if (dist < minDist) {
+            const nx = dx / dist, ny = dy / dist;
+            const overlap = (minDist - dist) / 2;
+            a.x -= nx * overlap; a.y -= ny * overlap;
+            b.x += nx * overlap; b.y += ny * overlap;
+            const avn = a.vx * nx + a.vy * ny;
+            const bvn = b.vx * nx + b.vy * ny;
+            a.vx += (bvn - avn) * nx; a.vy += (bvn - avn) * ny;
+            b.vx += (avn - bvn) * nx; b.vy += (avn - bvn) * ny;
+          }
+        }
+      }
+      // 5) 화면 반영(transition 없이 매 프레임 직접 갱신 — 회전 흔들림은 별도 CSS 애니메이션)
+      for (const b of balls) {
+        b.el.style.left = b.x + '%';
+        b.el.style.top = b.y + '%';
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+  initChalkDecoRoaming();
+
   // ================= 네비게이션 =================
   btnHome.addEventListener('click', goHomeToMap);
   btnBack.addEventListener('click', goHome);
 
   // ================= 표지 화면 =================
-  // 2026-08-10: 보스가 손그림(svgArt, 이미 완성된 정답색이 마크업에 그대로 박혀있던 방식)에서
-  // 다른 도안들과 같은 Twemoji 파일(assets/emoji/<id>.svg) 기반으로 바뀌면서, 표지 얼굴 아이콘도
-  // 인라인 마크업 대신 그 파일을 <img>로 직접 불러오는 방식으로 바꿈 — 캐릭터 전체가 이미
-  // 36x36 안에 알맞게 그려져 있어서(Twemoji 특유의 반신 구도) 예전처럼 얼굴만 잘라낼 필요가 없다.
-  function renderCoverBosses() {
-    coverBosses.innerHTML = '';
-    MODE_ORDER.forEach((mode) => {
-      const tpl = getBossTemplate(mode);
-      if (!tpl) return;
-      const item = document.createElement('div');
-      // 모드별로 다른 CSS 애니메이션(요정=날개 퍼덕임, 인어=꼬리 흔들기, 마법사=지팡이 흔들기+
-      // 반짝임)을 걸기 위한 클래스 — SVG 내부는 안 건드리고 컨테이너 transform + 오버레이 이펙트로
-      // 흉내만 낸다(2026-08-11, "10분 안에 되는 방법" 요청). 히어로걸(veryhard)의 좌우 광선은
-      // 요청으로 삭제(2026-08-11).
-      item.className = 'cover-boss-item cover-boss-' + mode;
-      const img = document.createElement('img');
-      // 시작 화면은 소품(반짝이/조개 등) 없이 캐릭터만 있는 깔끔한 아이콘을 그대로 유지
-      // (실제 색칠 화면의 boss-<id>.svg는 영역 수를 늘리려고 소품이 붙어서 따로 둠).
-      img.src = 'assets/emoji/' + tpl.id + '-icon.svg';
-      img.alt = I18N.templateName(tpl);
-      item.appendChild(img);
-      if (mode === 'hard') {
-        const sparkle1 = document.createElement('span');
-        sparkle1.className = 'boss-sparkle boss-sparkle-a';
-        sparkle1.textContent = '✨';
-        const sparkle2 = document.createElement('span');
-        sparkle2.className = 'boss-sparkle boss-sparkle-b';
-        sparkle2.textContent = '✨';
-        item.appendChild(sparkle1);
-        item.appendChild(sparkle2);
-      }
-      coverBosses.appendChild(item);
-    });
-  }
-
   function enterMapFromCover() {
     coverScreen.hidden = true;
+    hideTabBar();
     mapScreen.hidden = false;
     renderMap();
     // 2026-08-11: "스타트 화면에서 스타트 버튼 외 다른 곳 눌러도 음악 나옴" 제보 — 이전엔 화면
@@ -4866,7 +5020,6 @@
   }
 
   // ================= 초기화 =================
-  renderCoverBosses();
   renderMap();
   renderPalette();
 

@@ -60,8 +60,10 @@
   --lv-hue-1: 350; --lv-hue-2: 22; --lv-hue-3: 42; --lv-hue-4: 100; --lv-hue-5: 152;
   --lv-hue-6: 188; --lv-hue-7: 212; --lv-hue-8: 248; --lv-hue-9: 278; --lv-hue-10: 318;
   /* 2026-08-11: "투명처럼 보이니깐 밋밋하다" 피드백으로 파스텔(88%)에서 훨씬 쨍한 원색 느낌
-     (72%)으로 명도 내리고 채도도 올림 — 숫자(--brand, 진보라)는 여전히 잘 읽힘. */
-  --lv-sat: 85%; --lv-light: 72%; --lv-bezel-light: 52%;
+     (72%)으로 명도 내리고 채도도 올림 — 숫자(--brand, 진보라)는 여전히 잘 읽힘.
+     2026-08-23: "색깔이 선명하지 않다" 피드백으로 원색(hsl L50%)에 더 가깝게 한 번 더 내림.
+     --lv-bezel-light도 같은 폭(20p)만큼 같이 내려서 배경 대비 테두리 입체감 유지. */
+  --lv-sat: 90%; --lv-light: 50%; --lv-bezel-light: 32%;
   --cover-mid: #FFE8E0;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -172,6 +174,10 @@ button:active { transform: scale(0.94); }
   justify-content: center;
   box-shadow: var(--shadow);
 }
+/* 2026-08-23: 언어 버튼 왼쪽에 나란히 — 톱니바퀴로 설정 모달(음악/진동/소리)을 연다. */
+.settings-btn {
+  right: 64px;
+}
 .lang-menu {
   position: absolute;
   top: 60px;
@@ -211,117 +217,306 @@ button:active { transform: scale(0.94); }
   width: 100%;
   z-index: 1;
 }
-.cover-title {
-  margin: 0;
-  font-size: clamp(2rem, 9vw, 2.8rem);
-  color: var(--brand);
+/* ---------- 2026-08-23(11)~(13): 표지 칠판(배경 제거된 PNG, assets/cover/chalkboard.png,
+   460x816) + 그 안의 큰 아이콘 버튼 2개(글자 없이) + 장식 이모지 ----------
+   PNG 실제 비율로 wrap을 고정하고, 버튼/장식은 칠판 검은 면 안에 %로 앉힌다 — 화면 크기가
+   달라져도 항상 칠판 안쪽에 위치.
+   2026-08-23(13): "휴대폰에서 꽉차게" 요청으로 폭을 74vw→94vw로 확대, "글자 빼고 아이콘만
+   크게" 요청으로 텍스트 라벨(.chalk-label) 대신 이미지 아이콘 버튼(.chalk-icon-btn)으로 교체. */
+.cover-chalkboard-wrap {
+  position: relative;
+  width: min(460px, 94vw);
+  aspect-ratio: 460 / 816;
+  margin: 0 auto;
 }
-.cover-bosses {
-  display: flex;
-  justify-content: center;
-  gap: clamp(10px, 4vw, 18px);
-}
-.cover-boss-item {
-  position: relative; /* 반짝이/광선 오버레이가 원 밖으로 삐져나오게 하려고 클리핑은 img 쪽으로 옮김 */
-  width: clamp(56px, 16vw, 82px);
-  height: clamp(56px, 16vw, 82px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-.cover-boss-item img {
-  /* 2026-08-11: "표지 보스 4개도 3D" 요청 — 다른 아이콘들과 같은 키캡 스타일(그라디언트 테두리 +
-     아래쪽 그림자 턱)을 원형 프레임에 적용. */
+/* 2026-08-23(21): "외곽선 + 글로우" 요청 — 칠판 PNG가 투명배경 위 액자+다리 모양(사각형이
+   아님)이라 일반 border는 못 씀. drop-shadow를 상하좌우로 겹쳐서(0 블러) 실루엣을 따라가는
+   테두리 선을 만들고, 큰 블러의 drop-shadow 하나를 더 얹어 그 밖으로 은은하게 번지는 빛을
+   더한다(둘 다 같은 filter 체인 안에 이어 붙임, 기존 그림자는 맨 앞에 그대로 유지).
+   2026-08-23(22): "외곽선이 안 보인다 + 우주 밤하늘 색으로" 요청 — 옅은 크림색은 밝은 배경과
+   대비가 약해 거의 안 보였음. 진한 남보라(우주 밤하늘 톤)로 바꾸고 두께도 살짝 키움. 글로우도
+   같은 톤으로 2겹(안쪽 선명한 보라 + 바깥쪽 넓게 퍼지는 남색)으로 밤하늘 느낌을 냄. */
+.cover-chalkboard-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  background: linear-gradient(155deg, #fff 0%, var(--card-bg) 55%, #F3EFFF 100%);
-  border-radius: 50%;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.16), 0 6px 10px rgba(0, 0, 0, 0.22), inset 0 2px 2px rgba(255, 255, 255, 0.9);
+  object-fit: contain;
+  filter:
+    drop-shadow(0 10px 18px rgba(0, 0, 0, 0.25))
+    drop-shadow(2px 0 0 #2D1B69)
+    drop-shadow(-2px 0 0 #2D1B69)
+    drop-shadow(0 2px 0 #2D1B69)
+    drop-shadow(0 -2px 0 #2D1B69)
+    drop-shadow(0 0 14px rgba(108, 92, 231, 0.8))
+    drop-shadow(0 0 30px rgba(45, 27, 105, 0.6));
 }
-
-/* 캐릭터별 애니메이션 — SVG 내부는 그대로 두고 이미지 전체에 트랜스폼만 걸어서 흉내 낸다
-   (2026-08-11, 스타트 화면 보스 4개가 움직이는 느낌을 주기 위한 요청). */
-.cover-boss-easy img {
-  animation: boss-fairy-hover 2.2s ease-in-out infinite;
-}
-@keyframes boss-fairy-hover {
-  0%, 100% { transform: translateY(0) rotate(-3deg); }
-  50% { transform: translateY(-6px) rotate(3deg); }
-}
-
-.cover-boss-normal img {
-  transform-origin: 50% 85%; /* 꼬리 쪽을 축으로 좌우로 살랑거림 */
-  animation: boss-mermaid-sway 1.8s ease-in-out infinite;
-}
-@keyframes boss-mermaid-sway {
-  0%, 100% { transform: rotate(-8deg); }
-  50% { transform: rotate(8deg); }
-}
-
-.cover-boss-hard img {
-  animation: boss-witch-wiggle 2s ease-in-out infinite;
-}
-@keyframes boss-witch-wiggle {
-  0%, 100% { transform: rotate(-4deg); }
-  50% { transform: rotate(4deg); }
-}
-.boss-sparkle {
+.chalk-icon-btn {
   position: absolute;
-  font-size: 0.9em;
-  pointer-events: none;
-  animation: boss-sparkle-twinkle 1.4s ease-in-out infinite;
+  width: 24%;
+  animation: chalk-pulse 1.8s ease-in-out infinite, chalk-icon-glow 1.8s ease-in-out infinite;
+  z-index: 1;
 }
-.boss-sparkle-a { top: -2px; right: -4px; animation-delay: 0s; }
-.boss-sparkle-b { bottom: 4px; right: -8px; font-size: 0.65em; animation-delay: 0.5s; }
-@keyframes boss-sparkle-twinkle {
-  0%, 100% { opacity: 0.2; transform: scale(0.6); }
-  50% { opacity: 1; transform: scale(1.15); }
-}
+.chalk-icon-btn img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.chalk-icon-kids { top: 40%; left: 15%; }
+.chalk-icon-challenge { bottom: 35%; right: 13%; }
 
-.cover-boss-veryhard img {
-  animation: boss-hero-idle 1.6s ease-in-out infinite;
-}
-@keyframes boss-hero-idle {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-}
-/* 2026-08-11: "입체감 있는 모양으로" 요청 — 평평한 단색 대신 위는 밝고 아래는 어두운 그라디언트 +
-   버튼 아래쪽에 두툼한 "테두리"처럼 보이는 진한 그림자를 깔아서 눌러지는 물리 버튼처럼 보이게 함.
-   실제로 누르면(:active) 그 두께만큼 아래로 눌리는 애니메이션까지 줘서 촉감 있는 느낌을 살림. */
-.cover-start-btn {
-  background: linear-gradient(180deg, #8f82f2 0%, var(--brand) 55%, #5645c9 100%);
-  color: #fff;
+/* 2026-08-23(16): "액자 윗변 나무에 컬러풀하게 Coloring Fun" 요청 — 액자를 두껍게 하진 않고
+   (요청대로) 그 얇은 윗변 띠 안에 들어가게, 한 글자씩 무지개색으로.
+   2026-08-23(19): "칠판 검은 부분에 안 겹치게 + 나무 윗부분까지 최대한 크게" 요청 — 박스를
+   top(트리포드 쪽 빈 공간)부터 bottom(칠판 실측 상단 39.5%, 여유 1%↑ 두고 38.5%)까지 넉넉히
+   잡고 글자를 박스 "아래쪽 끝에 붙여서(align-items:flex-end)" 그리면, 글자가 커질수록 위로만
+   자라서 아무리 크게 키워도 절대 칠판 검은 부분과 안 겹친다. */
+.chalk-board-title {
+  position: absolute;
+  top: 4%;
+  bottom: 60.5%;
+  left: 6%;
+  right: 6%;
+  margin: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  font-family: 'Fredoka', sans-serif;
   font-weight: 800;
-  font-size: 1.3rem;
-  padding: 16px 48px;
-  border-radius: 999px;
-  border: none;
-  box-shadow: 0 6px 0 #4834a8, 0 10px 20px rgba(0, 0, 0, 0.25);
-  transition: transform 0.08s ease, box-shadow 0.08s ease;
+  font-size: clamp(1rem, 7.5vw, 2rem);
+  line-height: 1;
+  white-space: nowrap;
+  z-index: 1;
 }
-.cover-start-btn:active {
-  transform: translateY(5px);
-  box-shadow: 0 1px 0 #4834a8, 0 3px 8px rgba(0, 0, 0, 0.2);
+.chalk-board-title span:nth-child(6n+1) { color: #FF6B6B; }
+.chalk-board-title span:nth-child(6n+2) { color: #FF9F43; }
+.chalk-board-title span:nth-child(6n+3) { color: #FFD93D; }
+.chalk-board-title span:nth-child(6n+4) { color: #2ECC71; }
+.chalk-board-title span:nth-child(6n+5) { color: #4ECDC4; }
+.chalk-board-title span:nth-child(6n+6) { color: #A78BFA; }
+
+/* 2026-08-23(16): "액자 아래 나무에 여러 색깔 분필" 요청 — 이모지에 없는 소품이라 작은 막대를
+   CSS로 직접 그림. 액자 밑 트레이(다리 시작 전 튀어나온 나무판) 위에 살짝씩 다른 각도로. */
+.chalk-tray {
+  position: absolute;
+  top: 71.5%;
+  left: 34%;
+  right: 34%;
+  height: 3%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4%;
+}
+.chalk-stick {
+  width: 14%;
+  height: 100%;
+  border-radius: 2px 2px 1px 1px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+}
+.chalk-stick:nth-child(1) { background: #FF6B6B; transform: rotate(-6deg); }
+.chalk-stick:nth-child(2) { background: #4ECDC4; transform: rotate(3deg); }
+.chalk-stick:nth-child(3) { background: #FFD93D; transform: rotate(-2deg); }
+.chalk-stick:nth-child(4) { background: #A78BFA; transform: rotate(5deg); }
+.chalk-stick:nth-child(5) { background: #FF9F43; transform: rotate(-4deg); }
+
+/* 장식 이모지 — 원본 사진의 말린 꽃/분필 낙서 느낌을 재현.
+   2026-08-23(18): "칠판 전체를 렌덤하게, 안 겹치게" 요청 — 고정 좌표+작은 흔들림 대신 JS가
+   위치를 직접 관리(app.js의 initChalkDecoRoaming).
+   2026-08-23(22): "이동 중 서로 겹친다, 만나면 튕겨나가게" 요청으로 CSS transition 기반 목적지
+   이동 방식을 버리고 매 프레임(requestAnimationFrame) 직접 좌표를 갱신하는 당구공 튕김 물리로
+   교체 — transition을 걸어두면 물리 갱신과 서로 어긋나 밀리는 느낌이 나서 제거함(위치는 JS가
+   매 프레임 즉시 반영, 회전만 순수 CSS로 계속 살랑거리게 역할 분리는 그대로 유지). */
+.chalk-deco {
+  position: absolute;
+  width: 5%;
+  pointer-events: none;
+}
+.chalk-deco-wobble-a { animation: chalk-rotate-wobble 4.5s ease-in-out infinite; }
+.chalk-deco-wobble-b { animation: chalk-rotate-wobble 5.5s ease-in-out infinite reverse; }
+.chalk-deco-wobble-c { animation: chalk-rotate-wobble 6.5s ease-in-out infinite; }
+@keyframes chalk-rotate-wobble {
+  0%, 100% { transform: rotate(-10deg); }
+  50% { transform: rotate(10deg); }
+}
+@keyframes chalk-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+@keyframes chalk-icon-glow {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.5)); }
+  50% { filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 22px rgba(255, 255, 255, 0.5)); }
 }
 
-/* 2026-08-14: 표지에서 유아모드/챌린지모드로 갈라짐 — 버튼 2개를 세로로 쌓고,
-   챌린지 쪽은 색만 달리해서(주황 계열) 구분한다. */
-.cover-mode-row {
+/* ---------- 하단 탭바(나의 스코어/일일/Home/상점/더보기) — 2026-08-23 신규.
+   "허브" 화면(표지 + 아래 3개 신규 화면)에서만 보이고, 실제 색칠/챌린지 플레이 중엔
+   숨긴다(showTabBar/hideTabBar, app.js). ---------- */
+.tab-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  background: var(--card-bg);
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.08);
+  padding-bottom: var(--safe-bottom);
+}
+/* 2026-08-23(10): "윗 외각선을 0.5mm 내려" 요청 — border-top 대신 top 오프셋을 줄 수 있는
+   ::before 선으로 바꿔서, 다른 요소는 그대로 두고 선 위치만 0.5mm 아래로 내림. */
+.tab-bar::before {
+  content: '';
+  position: absolute;
+  top: 0.5mm;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--brand-soft);
+}
+/* 2026-08-23(3): "터치 애니메이션도 있으면" 요청 — 활성 탭 위에 뜨는 슬라이딩 인디케이터. 폭을
+   탭 하나와 똑같이(100%/5) 잡아서 translateX(N * 100%)가 항상 정확히 N칸 이동 — 픽셀 계산 없이
+   화면 크기와 무관하게 항상 맞음. 기본 위치(N=2, 5개 중 세 번째)는 Home. */
+.tab-bar-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(100% / 5);
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: linear-gradient(90deg, var(--brand), #9b8cf0);
+  transform: translateX(200%);
+  transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+}
+.tab-bar-btn {
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 2px;
+  padding: 6px 4px 6px;
+  color: var(--muted);
+  overflow: visible; /* 아이콘이 탭바 위 테두리 밖으로 튀어나와 보이게(아래 margin-top 참고) */
+}
+/* 2026-08-23(2)~(8) 여러 차례 시도(그라디언트 배지+바운스 → Lucide 라인 아이콘 → 배지 없는
+   Twemoji) 끝에 "배경이 아이콘과 겹치게" 다시 요청 — 배지(::before)를 아이콘보다 작고 낮게
+   (하단 anchored) 둬서 아이콘 위쪽이 배지 밖으로 튀어나와 보이게 복원. z-index로 아이콘을
+   배지 위에 그린다. */
+.tab-bar-icon-wrap {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  margin-top: -14px; /* "탭바 위로 아이콘이 튀어나와 보인다" 요청 — 탭바 테두리 위로 살짝 걸침 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.tab-bar-icon-wrap::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 58px;
+  height: 30px;
+  border-radius: 16px 16px 22px 22px;
+  transform: translateX(-50%);
+  background: linear-gradient(155deg, #b8a5f0 0%, var(--brand) 100%);
+  box-shadow: 0 3px 0 #4834a8, 0 5px 9px rgba(0, 0, 0, 0.22);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  z-index: 0;
+}
+.tab-bar-btn.is-active .tab-bar-icon-wrap::before { opacity: 1; }
+.tab-bar-icon {
+  position: relative;
+  z-index: 1;
+  width: 51px; /* 34px 대비 1.5배 확대 요청 반영 */
+  height: 51px;
+  object-fit: contain;
+  transition: transform 0.18s ease;
+}
+/* "더보기"만 매칭되는 Twemoji가 없어 이모지(⋯) 유지 — 위 .tab-bar-icon의 width/height는
+   <img> 전용이라 이 텍스트 아이콘엔 안 먹으니 font-size로 같은 시각 크기를 맞춘다. */
+.tab-bar-icon-emoji { font-size: 2.85rem; width: auto; height: auto; }
+/* "일일" 탭 전용 — 오늘 날짜를 보여주는 미니 달력 카드(월 약자는 app.js가 채움). */
+.tab-bar-calendar-icon {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  background: #fff;
+}
+.tab-bar-calendar-month {
+  background: #F4483F;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 0.02em;
+  padding: 2px 0;
+  line-height: 1.2;
+}
+.tab-bar-calendar-day {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+.tab-bar-label { font-size: 0.68rem; font-weight: 700; }
+.tab-bar-btn.is-active { color: var(--brand); }
+.tab-bar-btn.is-active .tab-bar-icon-wrap {
+  animation: tab-bounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes tab-bounce {
+  0% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-8px) scale(1.18); }
+  70% { transform: translateY(-2px) scale(0.96); }
+  100% { transform: translateY(0) scale(1); }
+}
+.tab-bar-btn.is-active .tab-bar-icon-wrap {
+  transform: translateY(-4px);
+}
+
+/* 탭바가 떠 있는 허브 화면은 콘텐츠가 탭바 밑에 가려지지 않게 그만큼 아래 여백을 더 둔다. */
+.hub-screen { padding-bottom: calc(var(--safe-bottom) + 96px); }
+
+/* ---------- 나의 스코어/일일/상점 — 아직 스펙 미정, 가운데 정렬 플레이스홀더 ---------- */
+.hub-placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  padding: 20px;
+}
+.hub-placeholder-emoji { font-size: 3rem; margin: 0; }
+.hub-placeholder-title { margin: 0; font-size: 1.6rem; color: var(--brand); }
+.hub-placeholder-sub { margin: 0; color: var(--muted); }
+/* 더보기 화면은 위에 붙이고 그 아래로 메뉴 목록이 이어진다. */
+.hub-placeholder-top { flex: 0 0 auto; padding: 32px 20px 12px; }
+
+/* ---------- 더보기 — 설정/개인정보/문의 목록 ---------- */
+.more-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 20px;
+}
+.more-menu-item {
+  display: flex;
+  align-items: center;
   gap: 12px;
-  width: 100%;
+  padding: 14px 16px;
+  background: var(--card-bg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--ink);
+  text-decoration: none;
 }
-.cover-start-btn-challenge {
-  background: linear-gradient(180deg, #ff9d6b 0%, #ff6b6b 55%, #d1483f 100%);
-  box-shadow: 0 6px 0 #a83a32, 0 10px 20px rgba(0, 0, 0, 0.25);
-}
-.cover-start-btn-challenge:active {
-  box-shadow: 0 1px 0 #a83a32, 0 3px 8px rgba(0, 0, 0, 0.2);
-}
+.more-menu-icon { font-size: 1.3rem; }
 
 /* ---------- 난이도(타이머) 모드 선택 — 2x2, 칸 크기 전부 동일(고정 폭 그리드) ---------- */
 /* 2026-08-11: "coloring fun 삭제" 요청으로 제목(h1)이 없어져서 이 자리를 잡아주던 title-row
@@ -1879,6 +2074,15 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 .modal-card h2 { margin: 0 0 4px; font-size: 1.4rem; color: var(--brand); }
 .modal-sub { margin: 0 0 16px; color: var(--muted); }
 
+/* 2026-08-23: 설정 모달(음악/진동/소리) 아이콘 3개를 가로로 나열 — 참고 영상의 SETTINGS 창과
+   같은 구성. 버튼 자체는 기존 .icon-btn(키캡 스타일) 그대로 재사용. */
+.settings-icon-row {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin: 20px 0 24px;
+}
+
 /* ---------- goal 이미지 확대 모달(2026-08-11) — 탭하면 열림/탭하면 닫힘, 텍스트 없이 그림만 ---------- */
 .goal-zoom-modal {
   position: fixed;
@@ -1985,11 +2189,6 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   transform: translateY(2px);
   box-shadow: 0 1px 0 var(--brand), 0 2px 4px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
-.map-header-sound-group {
-  display: flex;
-  gap: 6px;
-}
-
 .ranking-entry-form {
   display: flex;
   flex-direction: column;

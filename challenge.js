@@ -32,6 +32,7 @@
 
   function openSelectScreen() {
     coverScreen.hidden = true;
+    window.TabBar.hide();
     selectScreen.hidden = false;
     tierCarousels.forEach((c) => c.render());
   }
@@ -39,6 +40,7 @@
   function closeSelectScreen() {
     selectScreen.hidden = true;
     coverScreen.hidden = false;
+    window.TabBar.show();
   }
 
   // 2026-08-23(2): "화면 위/중간/아래 = 쉬움/보통/어려움, 셋이 항상 동시에 보이고 구역마다 따로
