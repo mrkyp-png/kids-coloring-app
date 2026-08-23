@@ -1987,7 +1987,10 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
      flex-start로 바꾸고, 남는 공간이 전부 아래쪽에만 생기게 했다 — 이때 goal-panel 자체의
      padding(2px×위아래)이 flex-start 기준점을 아래로 2px 밀어 넣는 만큼 그대로 여유가 줄어드니,
      17px가 아니라 19px를 빼야 실측 아래쪽 여유가 정확히 17px(도로선9+간격8)로 나온다(헤드리스
-     브라우저로 실측 확인, .canvas-square도 동일 공식 — "같은 크기" 불변식 유지). */
+     브라우저로 실측 확인, .canvas-square도 동일 공식 — "같은 크기" 불변식 유지).
+     2026-08-23(36-5): "음각/볼록 박스만 흰색" 요청 — .canvas-square와 짝을 맞춰 이 박스도 고정
+     흰색/크림 배경을 준다(바깥 .goal-panel은 화면과 같은 검은색 그대로 둠). */
+  background: #FFF8ED;
   width: min(calc(var(--ring-square, 280px) - 19px), 420px);
   aspect-ratio: 1;
   display: flex;
@@ -2019,8 +2022,9 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 .canvas-wrap {
   /* 2026-08-10: "캔버스를 지우고 물체만 나오게" 요청으로 흰 배경 카드 완전히 제거(wrap도,
      #fill-canvas 자체도) — 안 칠한 영역은 페이지 배경이 그대로 비쳐 보임.
-     2026-08-23(36-3): "색칠창은 검은색이 좋아보이니 통일" 요청 — 고정 크림색 대신 다시
-     var(--bg)를 써서 #coloring-screen 자체 배경(다크)을 그대로 따라가게 함. */
+     2026-08-23(36-5): "음각으로 들어간 부분(.canvas-square)만 흰색, 나머지(이 바깥 여백)는
+     검은색" 요청 — 여기는 var(--bg)로 화면과 같은 어두운 색을 쓰고, 흰색은 아래 .canvas-square
+     에만 따로 준다. */
   background: var(--bg);
   position: relative;
   display: flex;
@@ -2043,7 +2047,10 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
      의해 미묘하게 어긋날 여지를 없애려고 여기도 통일함(같은 -19px도 그대로 맞춤, 위
      .goal-canvas-wrap 주석 참고 — 2026-08-21에 34px→19px로 축소). 캔버스 행(row 5) 높이는
      --ring-square 그대로 유지되므로(박스만 작아짐) 좌우 팔레트 열은 여전히 그 행 높이에 맞춰
-     늘어나 링 전체는 정사각형 그대로. */
+     늘어나 링 전체는 정사각형 그대로.
+     2026-08-23(36-5): "음각으로 들어간 부분만 흰색" 요청 — 실제로 색칠하는 이 오목한 박스에만
+     고정 흰색/크림 배경을 준다(바깥 .canvas-wrap은 화면과 같은 검은색). */
+  background: #FFF8ED;
   position: relative;
   width: min(calc(var(--ring-square, 280px) - 19px), 420px);
   aspect-ratio: 1;
