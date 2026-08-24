@@ -12,7 +12,7 @@
   const {
     goalCanvas, coloringScreen, openTemplate, computeCompletion, getChallengeTierTemplates,
     repaintGoalWithColors, paintRegionPixels, getChallengeRegionInfo, colorDistance, COLORS,
-    setWormProgress, setWormExit, resetWormForNewProblem,
+    setWormProgress, setWormExit, resetWormForNewProblem, vibrate,
   } = window.__challengeInternals;
   const goalCanvasWrap = document.getElementById('goal-canvas-wrap');
   const weatherLayer = document.getElementById('challenge-weather-layer');
@@ -258,6 +258,7 @@
 
   document.querySelectorAll('.challenge-tier-reset').forEach((btn) => {
     btn.addEventListener('click', () => {
+      vibrate(15);
       if (!window.confirm(I18N.t('confirm.resetMode'))) return;
       resetChallengeDifficulty(btn.dataset.diff);
     });
@@ -911,6 +912,9 @@
   document.getElementById('btn-save').addEventListener('click', (e) => {
     if (!hud.root.hidden) { // 챌린지 진행 중이면
       e.stopImmediatePropagation(); // app.js의 기존 핸들러(Child용 100%매치 로직) 실행 막기
+      // 2026-08-25(4): "버튼 눌렀는지 인지 안 됨" 요청으로 전 버튼에 진동 추가 — 여기서 막아버린
+      // app.js 쪽 vibrate(15)를 대신 호출(stopImmediatePropagation이라 app.js 핸들러는 아예 안 돈다).
+      vibrate(15);
       submitCurrentProblem();
     }
   }, true); // capture:true로 등록해 app.js의 버블 단계 리스너보다 먼저 가로챈다
@@ -937,6 +941,7 @@
   document.getElementById('btn-home').addEventListener('click', (e) => {
     if (!hud.root.hidden) {
       e.stopImmediatePropagation();
+      vibrate(15); // 2026-08-25(4): 위 btn-save와 같은 이유
       endRun();
       coloringScreen.hidden = true;
       selectScreen.hidden = false;

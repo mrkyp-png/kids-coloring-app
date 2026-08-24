@@ -230,7 +230,11 @@ button:active { transform: scale(0.94); }
 .cover-chalkboard-wrap {
   position: relative;
   width: min(460px, 100%);
-  aspect-ratio: 460 / 816;
+  /* 2026-08-24(2): GPT로 그린 고화질 통합 그림(1205×1305, 이젤+칠판+선반+물감통+붓통+흉상+공+책이
+     전부 하나로 합쳐짐)으로 교체 — object-fit:contain과 짝이 안 맞으면 레터박스가 생겨 SAFE 박스
+     (app.js) 좌표가 실제 화면과 어긋난다. 이 그림 하나가 예전의 chalkboard-wrap+shelf-wrap을 모두
+     대체하므로, 선반/물감통을 별도 블록으로 두던 CSS(cover-shelf-wrap 등)는 전부 삭제했다. */
+  aspect-ratio: 1205 / 1305;
   margin: 0 auto;
 }
 /* 2026-08-23(21): "외곽선 + 글로우" 요청 — 칠판 PNG가 투명배경 위 액자+다리 모양(사각형이
@@ -287,60 +291,16 @@ button:active { transform: scale(0.94); }
    app.js의 물리 시뮬레이션이 장식과 똑같이 이 둘의 left/top도 매 프레임 직접 갱신한다. */
 .chalk-icon-challenge { animation-duration: 1.8s, 6s; animation-direction: normal, reverse; }
 
-/* 2026-08-23(16): "액자 윗변 나무에 컬러풀하게 Coloring Fun" 요청 — 액자를 두껍게 하진 않고
-   (요청대로) 그 얇은 윗변 띠 안에 들어가게, 한 글자씩 무지개색으로.
-   2026-08-23(19): "칠판 검은 부분에 안 겹치게 + 나무 윗부분까지 최대한 크게" 요청 — 박스를
-   top(트리포드 쪽 빈 공간)부터 bottom(칠판 실측 상단 39.5%, 여유 1%↑ 두고 38.5%)까지 넉넉히
-   잡고 글자를 박스 "아래쪽 끝에 붙여서(align-items:flex-end)" 그리면, 글자가 커질수록 위로만
-   자라서 아무리 크게 키워도 절대 칠판 검은 부분과 안 겹친다. */
-.chalk-board-title {
-  position: absolute;
-  top: 4%;
-  bottom: 60.5%;
-  left: 6%;
-  right: 6%;
-  margin: 0;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  font-family: 'Fredoka', sans-serif;
-  font-weight: 800;
-  font-size: clamp(1rem, 7.5vw, 2rem);
-  line-height: 1;
-  white-space: nowrap;
-  z-index: 1;
-}
-.chalk-board-title span:nth-child(6n+1) { color: #FF6B6B; }
-.chalk-board-title span:nth-child(6n+2) { color: #FF9F43; }
-.chalk-board-title span:nth-child(6n+3) { color: #FFD93D; }
-.chalk-board-title span:nth-child(6n+4) { color: #2ECC71; }
-.chalk-board-title span:nth-child(6n+5) { color: #4ECDC4; }
-.chalk-board-title span:nth-child(6n+6) { color: #A78BFA; }
-
-/* 2026-08-23(16): "액자 아래 나무에 여러 색깔 분필" 요청 — 이모지에 없는 소품이라 작은 막대를
-   CSS로 직접 그림. 액자 밑 트레이(다리 시작 전 튀어나온 나무판) 위에 살짝씩 다른 각도로. */
-.chalk-tray {
-  position: absolute;
-  top: 71.5%;
-  left: 34%;
-  right: 34%;
-  height: 3%;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 4%;
-}
-.chalk-stick {
-  width: 14%;
-  height: 100%;
-  border-radius: 2px 2px 1px 1px;
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
-}
-.chalk-stick:nth-child(1) { background: #FF6B6B; transform: rotate(-6deg); }
-.chalk-stick:nth-child(2) { background: #4ECDC4; transform: rotate(3deg); }
-.chalk-stick:nth-child(3) { background: #FFD93D; transform: rotate(-2deg); }
-.chalk-stick:nth-child(4) { background: #A78BFA; transform: rotate(5deg); }
-.chalk-stick:nth-child(5) { background: #FF9F43; transform: rotate(-4deg); }
+/* 2026-08-24: "기존 이모지/글자 다 없애고 메인페이지 분리 파일에 있는 것으로만" 요청 — CSS
+   레인보우 텍스트(.chalk-board-title span들)와 분필 트레이(.chalk-tray/.chalk-stick, 새 그림
+   세트엔 대응 소품이 없음)를 전부 삭제.
+   2026-08-24(2): 로고 이미지 오버레이(.chalk-board-logo)로 한 번 교체했다가, 더 고화질인 통합
+   그림(이젤+로고+선반+물감통+붓통+흉상+공+책이 전부 하나로 합쳐진 GPT 그림)으로 chalkboard.png
+   자체를 바꾸면서 로고가 그림 안에 이미 있어 이 오버레이도 삭제. 같은 이유로 선반/물감통을
+   별도 블록(cover-shelf-wrap 등)으로 얹던 CSS와 물감통 개별 글로우+통통튀기 애니메이션
+   (cover-jar-wave), 선반 빛줄기 스윕(shelf-shine-sweep)도 전부 삭제 — 지금은 정적 그림의 일부.
+   물감통을 나중에 고화질로 따로 받으면(현재 토큰 소진으로 보류 중) 이 자리에 다시 레이어로
+   얹으면서 애니메이션도 복원할 예정. */
 
 /* 장식 이모지 — 원본 사진의 말린 꽃/분필 낙서 느낌을 재현.
    2026-08-23(18): "칠판 전체를 렌덤하게, 안 겹치게" 요청 — 고정 좌표+작은 흔들림 대신 JS가
@@ -349,14 +309,16 @@ button:active { transform: scale(0.94); }
    이동 방식을 버리고 매 프레임(requestAnimationFrame) 직접 좌표를 갱신하는 당구공 튕김 물리로
    교체 — transition을 걸어두면 물리 갱신과 서로 어긋나 밀리는 느낌이 나서 제거함(위치는 JS가
    매 프레임 즉시 반영, 회전만 순수 CSS로 계속 살랑거리게 역할 분리는 그대로 유지). */
+/* 2026-08-25: "장식 2배 크게, 랜덤하게 고정(더 이상 안 돌아다니게), 흔들림 효과도 제거" 요청 —
+   width 5%→10%로 키우고, 회전 흔들림(chalk-rotate-wobble) 적용을 지웠다(HTML의
+   chalk-deco-wobble-a/b/c 클래스 자체는 그대로 남아있지만 이 애니메이션이 없으니 비활성).
+   위치는 이제 app.js가 로드 시 한 번만 랜덤 배치하고 그 뒤로 안 움직인다(당구공 물리는 선택
+   아이콘 2개만). */
 .chalk-deco {
   position: absolute;
-  width: 5%;
+  width: 10%;
   pointer-events: none;
 }
-.chalk-deco-wobble-a { animation: chalk-rotate-wobble 4.5s ease-in-out infinite; }
-.chalk-deco-wobble-b { animation: chalk-rotate-wobble 5.5s ease-in-out infinite reverse; }
-.chalk-deco-wobble-c { animation: chalk-rotate-wobble 6.5s ease-in-out infinite; }
 @keyframes chalk-rotate-wobble {
   0%, 100% { transform: rotate(-10deg); }
   50% { transform: rotate(10deg); }
@@ -522,6 +484,51 @@ button:active { transform: scale(0.94); }
 }
 .tab-bar-btn.is-active .tab-bar-icon-wrap {
   transform: translateY(-4px);
+}
+
+/* 2026-08-25: "홈/상점/스코어 터치 애니메이션" 요청 — 세 아이콘이 공유하는 1회성 스프라이트
+   연출(app.js spawnTabFx()). .tab-bar-icon-wrap이 이미 position:relative + overflow:visible라
+   그 안에 절대좌표로 잠깐 얹었다 지운다. */
+.tab-fx-sprite {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  animation: tab-fx-float 0.75s ease-out forwards;
+  animation-delay: var(--fx-delay, 0ms);
+  z-index: 2;
+}
+@keyframes tab-fx-float {
+  0% { opacity: 0; transform: translate(-50%, -50%) translate(0, 0) scale(0.5); }
+  18% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) translate(var(--fx-x, 0px), -42px) scale(1.05); }
+}
+/* 홈 전용 — 문 열림 그래픽이 기본 아이콘(닫힌 문) 위, 실제 문이 있는 자리(오른쪽 아래쪽)에
+   잠깐 겹쳐 보였다 사라진다. 두 그림이 같은 캔버스에서 나온 게 아니라 좌표가 딱 안 맞을 수
+   있지만, 51px짜리 작은 아이콘이라 어긋나도 티가 거의 안 난다. */
+.tab-fx-door {
+  position: absolute;
+  left: 68%;
+  top: 58%;
+  width: 60%;
+  height: 60%;
+  object-fit: contain;
+  transform: translate(-50%, -50%) scale(0.85);
+  opacity: 0;
+  pointer-events: none;
+  animation: tab-fx-door-flash 0.6s ease-out forwards;
+  z-index: 2;
+}
+@keyframes tab-fx-door-flash {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+  30% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
 
 /* 탭바가 떠 있는 허브 화면은 콘텐츠가 탭바 밑에 가려지지 않게 그만큼 아래 여백을 더 둔다. */
@@ -1875,11 +1882,15 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 #frame-bottom { grid-column: 1 / -1; grid-row: 6; }
 .coloring-header {
   /* 2026-08-10: "이미지를 최대한 키워달라, 아이콘과 안 겹치는 조건" — 아이콘 크기(56px, 탭 타겟)는
-     그대로 두고 순수 여백만 줄여서 goal/canvas 행에 세로 공간을 더 돌려줌. */
+     그대로 두고 순수 여백만 줄여서 goal/canvas 행에 세로 공간을 더 돌려줌.
+     2026-08-25: "버튼 세로줄이 안 맞는다" 제보 — 좌우 padding 12px는 링 트랙이 88px였을 때
+     기준값이 그대로 남은 것(8/21에 60px로 줄었는데 여기는 안 따라감). 56px 버튼이 60px 트랙
+     칸 중앙에 오도록 (60-56)/2=2px로 맞춰서, 아래 .ring-corner-slot/.palette-col과 같은
+     세로줄에 서게 한다. */
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 12px;
+  padding: 4px 2px;
 }
 .coloring-title {
   margin: 0;
@@ -1922,6 +1933,44 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 .icon-btn img { width: 30px; height: 30px; }
 .icon-btn-sm img { width: 20px; height: 20px; }
 .ring-circle img { width: 20px; height: 20px; }
+
+/* 2026-08-24: "바탕화면 back/next/reset 이미지로 교체" 요청 — 자체 배지 디자인이 담긴 커스텀
+   이미지라 .icon-btn의 키캡 배경/그림자를 지우고, 대신 글로우로 우주 배경 위에서 도드라지게
+   한다(다른 .icon-btn 버튼들 — 홈🏠·지도🗺️ 등 — 은 이 선택자에 없으므로 그대로 키캡 유지). */
+#btn-map-back, #btn-home, #btn-level-next, #btn-reset-all, .challenge-tier-reset {
+  background: none;
+  box-shadow: none;
+}
+#btn-map-back img, #btn-home img, #btn-level-next img, #btn-reset-all img, .challenge-tier-reset img {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  transition: transform 0.08s ease, filter 0.08s ease;
+}
+#btn-map-back img, #btn-home img {
+  filter: drop-shadow(0 0 6px rgba(142, 197, 255, 0.9)) drop-shadow(0 0 12px rgba(142, 197, 255, 0.55));
+}
+#btn-level-next img {
+  filter: drop-shadow(0 0 6px rgba(124, 228, 149, 0.9)) drop-shadow(0 0 12px rgba(124, 228, 149, 0.55));
+}
+#btn-reset-all img, .challenge-tier-reset img {
+  filter: drop-shadow(0 0 6px rgba(245, 201, 93, 0.9)) drop-shadow(0 0 12px rgba(245, 201, 93, 0.55));
+}
+/* 2026-08-25: "버튼 누를 때 입체감을 못 느끼겠다" 제보 — 배경/그림자를 지운 자리라 .icon-btn:active의
+   눌림 box-shadow(0 1px 0 ...)가 나올 배경 자체가 없어서(대비할 "튀어나온" 그림자가 없음) 눌러도
+   티가 안 났다. img 자체를 눌렀을 때 작아지고 어두워지게 해서 눌리는 느낌을 img에 직접 준다. */
+#btn-map-back:active img, #btn-home:active img {
+  transform: scale(0.86);
+  filter: brightness(0.8) drop-shadow(0 0 4px rgba(142, 197, 255, 0.7));
+}
+#btn-level-next:active img {
+  transform: scale(0.86);
+  filter: brightness(0.8) drop-shadow(0 0 4px rgba(124, 228, 149, 0.7));
+}
+#btn-reset-all:active img, .challenge-tier-reset:active img {
+  transform: scale(0.86);
+  filter: brightness(0.8) drop-shadow(0 0 4px rgba(245, 201, 93, 0.7));
+}
 
 .panel-label {
   margin: 2px 0;
@@ -2199,6 +2248,9 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
    똑같이 나눠 채우는 직사각형 — 화면·색 개수가 달라져도 항상 빈틈 없이 꽉 차고, flex라서
    서로 겹칠 수도 없다). 공통 입체감(그림자/테두리)은 이 기반 클래스가 그대로 담당. */
 .ring-circle {
+  /* 2026-08-25: 아래 .active::after(선택 테두리)가 이 버튼 자신을 기준으로 자리잡게 하려면
+     position:relative가 있어야 한다(없으면 더 위쪽 조상인 #coloring-screen 기준으로 잘못 앉는다). */
+  position: relative;
   border: 3px solid #fff;
   border-radius: 14px;
   box-shadow:
@@ -2221,6 +2273,13 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
     inset 0 2px 3px rgba(255, 255, 255, 0.55),
     inset 0 -3px 4px rgba(0, 0, 0, 0.22);
 }
+/* 2026-08-25: "색칠버튼(색상 스와치)도 버튼 누를 때 입체감 효과 달라" 요청 — 뒤로가기 등 커스텀
+   이미지 버튼에 준 눌림 효과(살짝 작아지고 어두워짐)를 색상 스와치에도 같이 얹는다. 기존
+   .ring-circle:active의 눌림 그림자/이동은 그대로 유지, transform만 scale을 더해 대체. */
+.color-swatch:active {
+  transform: translateY(2px) scale(0.9);
+  filter: brightness(0.85);
+}
 /* 모서리(대각선) — 정사각형, 링 트랙 두께(60px)에서 패딩(4px×2)을 뺀 52px 고정. */
 .ring-corner { flex: 0 0 auto; width: 52px; height: 52px; }
 /* 위/아래 변 — 세로는 트랙 두께에 맞춘 52px 고정, 가로는 flex:1로 그 변의 남은 폭을 똑같이 나눠 채움. */
@@ -2234,9 +2293,51 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
   border-radius: 18px; /* 2026-08-23(26): 원형(50%)에서 사각/직사각 모양에 맞는 둥근 사각으로 */
   border: 2px solid var(--brand);
 }
-.ring-btn-back { background: #CFE3FF; }
+/* 2026-08-25(4): "글로우 효과 줄 수 있어?" 요청 — 바운스(scale)는 세로로 긴 스와치에서 옆 칸을
+   침범해 "bar"로 보이는 문제가 있었으니, 이번엔 크기를 안 바꾸고 box-shadow 글로우만 덧붙인다
+   (칠 자체는 그대로라 이웃 칸을 침범하지 않는다). 기존 .ring-circle:active의 눌림 그림자 위에
+   흰색 글로우 레이어 하나만 추가. */
+.color-swatch:active {
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.22),
+    0 2px 4px rgba(0, 0, 0, 0.12),
+    inset 0 2px 3px rgba(255, 255, 255, 0.55),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.22),
+    0 0 14px 2px rgba(255, 255, 255, 0.9);
+}
+/* 2026-08-25(4): "회색/빨강에 bar 또 생긴다" 실사용 재확인 — 바로 위에서 복원한 바운스
+   (scale 1.18배)가 세로로 긴 좌/우 열 스와치(52×82)에서 옆 칸을 침범해 그게 "bar"의 정체였다.
+   바운스도 다시 뺀다 — .active::after 테두리만 선택 표시로 남긴다. */
+/* 2026-08-24: "바탕화면 undo 이미지로 교체" 요청 — 자체 배지 디자인이 담긴 커스텀 이미지라
+   .ring-circle의 흰 테두리/그림자/배경을 지우고, 대신 글로우로 우주 배경 위에서 도드라지게 한다. */
+.ring-btn-back { background: none; border: none; box-shadow: none; }
+.ring-btn-back img {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  filter: drop-shadow(0 0 6px rgba(142, 197, 255, 0.9)) drop-shadow(0 0 12px rgba(142, 197, 255, 0.55));
+  transition: transform 0.08s ease, filter 0.08s ease;
+}
+/* 2026-08-25: 위 .icon-btn 계열과 같은 이유("배경/그림자 없는 자리라 .ring-circle:active 눌림
+   그림자가 안 보임") — img 자체에 눌리는 느낌을 직접 준다. */
+.ring-btn-back:active img {
+  transform: scale(0.86) !important;
+  filter: brightness(0.8) drop-shadow(0 0 4px rgba(142, 197, 255, 0.7));
+}
 .ring-btn-done { background: #C9F2D6; }
 .ring-btn-skill { background: #E4DBFF; }
+/* 2026-08-25(2): "우측상단/우측하단/좌측하단 버튼이 깊게 안눌러진다" 제보 — 되돌리기/다음/리셋
+   버튼(커스텀 이미지)엔 이미 scale+어둡게 눌림 효과를 줬는데, 이모지 텍스트인 스킬1/2·완료(🍀)
+   버튼 3개만 그 업그레이드에서 빠져있었다. 같은 강도의 눌림 효과를 준다(이 버튼들은 배경/테두리가
+   남아있어 img가 아니라 버튼 자신에 transform을 줘도 된다). 글자 크기도 키워 스와치 옆에서
+   존재감이 약해 보이던 것(특히 초록 배경 위 🍀)을 보완한다. */
+.ring-btn-skill, .ring-btn-done {
+  font-size: 1.5rem;
+}
+.ring-btn-skill:active, .ring-btn-done:active {
+  transform: translateY(2px) scale(0.86);
+  filter: brightness(0.85);
+}
 
 /* 2026-08-20: 캔버스 위/아래 면 — 스킬 자리(챌린지 전용) + 색상 스와치 일부 + 뒤로가기/완료.
    좌/우 열(.palette-col)과 합쳐 색상 스와치가 캔버스 네 면을 다 두르는 사각 링을 이룬다
@@ -2267,9 +2368,14 @@ html:lang(zh) .level-reward-praise { font-family: 'NotoSansSCBlack', "Microsoft 
 /* 2026-08-20: 모서리 칸 — 챌린지 모드에선 스킬 버튼, 유아모드에선 renderPalette()가 색상
    스와치를 대신 넣는다. 뒤로가기·완료도 이 클래스로 감싼다.
    2026-08-23(26): 예전엔 44px 원을 88px 슬롯 중앙에 놓고 margin으로 미세 보정했는데, 이제
-   .ring-corner 자체가 슬롯을 꽉 채우는 52px 정사각형이라 그 보정이 필요 없어져 지움. */
+   .ring-corner 자체가 슬롯을 꽉 채우는 52px 정사각형이라 그 보정이 필요 없어져 지움.
+   2026-08-25: "버튼 세로줄이 안 맞는다" 제보 — 위 설명은 트랙이 88px였을 때 얘기이고, 지금
+   트랙은 60px(.palette-col과 동일)인데 이 슬롯은 폭 지정이 없어 버튼(52px) 크기 그대로
+   flush(0부터 시작)라 팔레트 열(60px 칸 중앙)보다 왼쪽으로 치우쳐 있었다. width:60px를
+   명시해서 .palette-col과 같은 폭으로 맞추면 안쪽 52px 버튼도 같은 세로줄에 선다. */
 .ring-corner-slot {
   flex: 0 0 auto;
+  width: 60px;
   display: flex;
   align-items: center;
   justify-content: center;

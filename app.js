@@ -1391,6 +1391,7 @@
   });
 
   btnResetAll.addEventListener('click', () => {
+    vibrate(15); // 2026-08-25(4): "버튼 눌렀는지 인지 안 됨" 요청 — 진동 없던 버튼들에 추가
     const mode = getMode();
     if (!window.confirm(I18N.t('confirm.resetMode'))) return;
     resetModeProgress(mode);
@@ -1398,6 +1399,7 @@
   });
 
   btnLevelNext.addEventListener('click', () => {
+    vibrate(15); // 2026-08-25(4): 위 btnResetAll과 같은 이유
     playPop();
     const nextLevel = currentLevel + 1;
     if (nextLevel <= TOTAL_LEVELS && isLevelUnlocked(nextLevel)) {
@@ -4182,7 +4184,7 @@
           // (기존 vibrate() 헬퍼 재사용 — 진동 설정 꺼져있으면 자동으로 무시됨).
           vibrate(15);
           selectedColor = color;
-          getPaletteSwatches().forEach((el) => el.classList.remove('active'));
+          getPaletteSwatches().forEach((el) => { el.classList.remove('active'); });
           btn.classList.add('active');
         });
         container.appendChild(btn);
@@ -4489,6 +4491,7 @@
   // 예전엔 "Done!"을 누를 때마다 그림 파일이 자동으로 다운로드됐는데, 그림 하나 끝낼 때마다
   // 다운로드 창이 계속 뜨는 게 번거롭다는 피드백으로 자동 저장은 뺐다(채점/평가만 진행).
   btnSave.addEventListener('click', () => {
+    vibrate(15); // 2026-08-25(4): 위 btnResetAll과 같은 이유(챌린지 중엔 challenge.js가 대신 진동)
     const { matched, total } = computeCompletion();
     if (total > 0 && matched === total) {
       lastScore = 100;
@@ -4974,8 +4977,45 @@
     tabBarIndicator.style.transform = 'translateX(' + TAB_ORDER.indexOf(name) * 100 + '%)';
   }
 
+  // 2026-08-25: "홈/상점/스코어 아이콘 터치 애니메이션" 요청 — 세 탭이 공유하는 스프라이트
+  // 헬퍼. 아이콘 감싸개(.tab-bar-icon-wrap, 이미 position:relative) 안에 이미지 몇 개를 절대
+  // 좌표로 얹고, CSS 애니메이션(style.css .tab-fx-sprite)이 끝나면 스스로 지운다.
+  function spawnTabFx(wrap, srcs) {
+    srcs.forEach((src, i) => {
+      const img = document.createElement('img');
+      img.src = src;
+      img.className = 'tab-fx-sprite';
+      img.style.setProperty('--fx-delay', (i * 70) + 'ms');
+      img.style.setProperty('--fx-x', Math.round((Math.random() - 0.5) * 36) + 'px');
+      wrap.appendChild(img);
+      img.addEventListener('animationend', () => img.remove(), { once: true });
+    });
+  }
+  function playHomeTapEffect(wrap) {
+    const door = document.createElement('img');
+    door.src = 'assets/tabbar/home-door-open.png';
+    door.className = 'tab-fx-door';
+    wrap.appendChild(door);
+    door.addEventListener('animationend', () => door.remove(), { once: true });
+    spawnTabFx(wrap, ['assets/tabbar/home-smoke.png']);
+  }
+  function playShopTapEffect(wrap) {
+    spawnTabFx(wrap, ['assets/tabbar/shop-bag.png', 'assets/tabbar/shop-coin.png', 'assets/tabbar/shop-heart.png']);
+  }
+  function playScoreTapEffect(wrap) {
+    spawnTabFx(wrap, ['assets/tabbar/score-heart.png', 'assets/tabbar/score-sparkle.png']);
+  }
+
   tabBarButtons.forEach((btn) => {
-    btn.addEventListener('click', () => showHubScreen(btn.dataset.tab));
+    btn.addEventListener('click', () => {
+      showHubScreen(btn.dataset.tab);
+      const wrap = btn.querySelector('.tab-bar-icon-wrap');
+      // 2026-08-25(5): assets/tabbar/*.png 아직 미완성이라 임시로 꺼둠(깨진 이미지 방지).
+      // 이미지 준비되면 아래 3줄 다시 켤 것.
+      // if (btn.dataset.tab === 'home') playHomeTapEffect(wrap);
+      // else if (btn.dataset.tab === 'shop') playShopTapEffect(wrap);
+      // else if (btn.dataset.tab === 'score') playScoreTapEffect(wrap);
+    });
   });
 
   // challenge.js는 별도 IIFE라 이 스코프의 함수를 직접 못 부른다 — window.Challenge와 같은
@@ -5000,43 +5040,48 @@
   function initChalkDecoRoaming() {
     const decos = Array.from(document.querySelectorAll('.chalk-deco'));
     const icons = Array.from(document.querySelectorAll('.chalk-icon-btn'));
-    if (!decos.length) return;
     // 칠판 검은 면 안쪽 안전영역(%, wrap 기준) — chalkboard.png를 파이썬(Pillow)으로 픽셀
-    // 스캔한 실측값(top39.5~67.5%/left14~85.5%)에서 장식 반경만큼만 여유를 둔 값.
-    const SAFE = { top: 41, bottom: 66, left: 16, right: 84 };
-    const R = 2.5; // 장식 하나의 충돌 반경(%) — 실제 폭(5%)의 절반
-    // 2026-08-23(32): "아이콘이 커서 장식들이 갇힌다" 요청 — 장식과의 충돌 반경만 실제 시각
-    // 반경(12)보다 훨씬 작게(3) 줄여서 장식들이 훨씬 가까이 접근 가능하게 함(사용자 확인: 이
-    // 값에서는 장식이 아이콘 그림 위에 시각적으로 얹히는 순간이 생길 수 있음을 알고 진행).
-    // 2026-08-23(34): "아이콘이 칠판 밖으로 나간다" 버그 — 벽 튕김도 이 작은 반경(3)을 그대로
-    // 썼더니 아이콘 중심이 벽에서 3%까지만 떨어지면 튕겨서, 실제 그림(반경 12)의 대부분이
-    // 칠판 밖으로 삐져나갈 수 있었음. 벽 튕김 전용으로 실제 시각 반경(ICON_WALL_R)을 따로 둬서
-    // 화면(칠판) 밖으로는 절대 못 나가게 하고, 장식과의 충돌만 작은 반경(ICON_R)을 쓴다.
-    const ICON_R = 3;
+    // 스캔한 실측값에서 장식 반경만큼만 여유를 둔 값.
+    // 2026-08-24(2): GPT로 그린 고화질 통합 그림(1205×1305)으로 교체 — 실측 top16.09~51.88%/
+    // left18.84~81.16%. 로고가 이 그림 안에 이미 그려져 있고 보드 상단(16.09%)보다 약간 아래
+    // (~21%)까지 걸쳐 있어, top은 로고 아래부터 잡아야 장식/아이콘이 글자와 안 겹친다.
+    const SAFE = { top: 23, bottom: 50, left: 21, right: 79 };
+
+    // 2026-08-25: "장식은 2배 크게 + 랜덤하게 고정(더 이상 안 돌아다니게), 선택 아이콘 2개만
+    // 당구공처럼 계속 움직이게" 요청 — 장식은 물리 시뮬레이션에서 완전히 빼고, 로드 시 한 번만
+    // 격자 기반으로 안 겹치게 랜덤 배치한 뒤 그대로 고정(회전 흔들림도 CSS에서 같이 제거함).
+    if (decos.length) {
+      const DECO_R = 5; // 장식 폭이 5%→10%로 커진 만큼 배치 간격도 2배로.
+      const CELL = DECO_R * 2 + 1;
+      const cols = Math.max(1, Math.floor((SAFE.right - SAFE.left) / CELL));
+      const rows = Math.max(1, Math.floor((SAFE.bottom - SAFE.top) / CELL));
+      const cells = [];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          cells.push({ x: SAFE.left + CELL * (c + 0.5), y: SAFE.top + CELL * (r + 0.5) });
+        }
+      }
+      for (let i = cells.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [cells[i], cells[j]] = [cells[j], cells[i]];
+      }
+      decos.forEach((el, i) => {
+        const cell = cells[i % cells.length];
+        el.style.left = cell.x + '%';
+        el.style.top = cell.y + '%';
+      });
+    }
+
+    if (!icons.length) return;
+    // 2026-08-23(34): "아이콘이 칠판 밖으로 나간다" 버그 — 벽 튕김은 실제 시각 반경(ICON_WALL_R)을
+    // 써야 화면(칠판) 밖으로 안 나간다.
     const ICON_WALL_R = 12;
     const SPEED = 0.09; // 초기 속도 크기(%/frame, 60fps 기준 대략 5.4%/초)
 
-    // 2026-08-23(22): "이동 중에 서로 겹친다, 만나면 튕겨나가게" 요청 — 이전 버전(CSS
-    // transition으로 목적지만 주기적으로 새로 뽑음)은 도착 지점끼리만 안 겹치게 보장했을 뿐,
-    // 그 사이 지나가는 경로까지는 신경 안 써서 서로 스쳐 지나가며 겹쳐 보였다. 이번엔 진짜
-    // 당구공처럼 매 프레임(requestAnimationFrame) 위치를 갱신하고, 벽/서로 부딪히면 그 순간
-    // 반사(튕김)하는 실시간 물리 시뮬레이션으로 바꿨다 — 항상 움직이고, 항상 안 겹침.
-    // 초기 위치만 격자로 흩뿌려서 시작부터 겹치지 않게 하고, 이후는 물리 루프가 알아서 유지한다.
-    // 아이콘(반지름 12)은 격자 칸(5.5) 하나보다 훨씬 커서, 격자 칸을 4개(2x2)씩 묶어 그 중심에
-    // 배치하고 그 칸 4개는 장식용 후보에서 뺀다.
-    const CELL = 5.5;
-    const cols = Math.floor((SAFE.right - SAFE.left) / CELL);
-    const rows = Math.floor((SAFE.bottom - SAFE.top) / CELL);
-    const cells = [];
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        cells.push({ x: SAFE.left + CELL * (c + 0.5), y: SAFE.top + CELL * (r + 0.5) });
-      }
-    }
-
+    // 2026-08-23(22): 매 프레임(requestAnimationFrame) 위치를 갱신하고, 벽/서로 부딪히면 그
+    // 순간 반사(튕김)하는 당구공 물리. 2026-08-25: 장식이 빠지면서 이제 이 물리에는 선택 아이콘
+    // 2개만 참여한다.
     const balls = [];
-    // 아이콘 버튼 먼저 배치(기존 자리 근처에서 시작 — 왼쪽위/오른쪽아래) + 그 근방 칸은
-    // 장식 후보에서 제외.
     const iconStarts = [
       { x: SAFE.left + (SAFE.right - SAFE.left) * 0.3, y: SAFE.top + (SAFE.bottom - SAFE.top) * 0.32 },
       { x: SAFE.left + (SAFE.right - SAFE.left) * 0.7, y: SAFE.top + (SAFE.bottom - SAFE.top) * 0.68 },
@@ -5044,41 +5089,27 @@
     icons.forEach((el, i) => {
       const pos = iconStarts[i] || { x: (SAFE.left + SAFE.right) / 2, y: (SAFE.top + SAFE.bottom) / 2 };
       const angle = Math.random() * Math.PI * 2;
-      balls.push({ el, x: pos.x, y: pos.y, vx: Math.cos(angle) * SPEED, vy: Math.sin(angle) * SPEED, r: ICON_R, wallR: ICON_WALL_R });
-    });
-    const decoCells = cells.filter((cell) => balls.every((b) => Math.hypot(cell.x - b.x, cell.y - b.y) > b.r + R + 2));
-    for (let i = decoCells.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [decoCells[i], decoCells[j]] = [decoCells[j], decoCells[i]];
-    }
-    decos.forEach((el, i) => {
-      const cell = decoCells[i % decoCells.length];
-      const angle = Math.random() * Math.PI * 2;
-      balls.push({ el, x: cell.x, y: cell.y, vx: Math.cos(angle) * SPEED, vy: Math.sin(angle) * SPEED, r: R });
+      balls.push({ el, x: pos.x, y: pos.y, vx: Math.cos(angle) * SPEED, vy: Math.sin(angle) * SPEED, wallR: ICON_WALL_R });
     });
 
     function tick() {
       // 1) 이동
       for (const b of balls) { b.x += b.vx; b.y += b.vy; }
-      // 2) 안전영역 벽에 튕김 — 벽에서는 실제 그림 크기(wallR, 없으면 r)를 써서 진짜 시각적으로
-      // 칠판 밖을 못 나가게 한다(장식과의 충돌용 작은 반경 r과는 별개).
+      // 2) 안전영역 벽에 튕김
       for (const b of balls) {
-        const wr = b.wallR || b.r;
+        const wr = b.wallR;
         if (b.x - wr < SAFE.left) { b.x = SAFE.left + wr; b.vx = Math.abs(b.vx); }
         if (b.x + wr > SAFE.right) { b.x = SAFE.right - wr; b.vx = -Math.abs(b.vx); }
         if (b.y - wr < SAFE.top) { b.y = SAFE.top + wr; b.vy = Math.abs(b.vy); }
         if (b.y + wr > SAFE.bottom) { b.y = SAFE.bottom - wr; b.vy = -Math.abs(b.vy); }
       }
-      // 3) 서로 부딪히면(당구공 탄성충돌 근사, 반지름이 서로 다를 수 있음) 밀어내고 속도 반사
+      // 3) 서로 부딪히면(당구공 탄성충돌 근사) 밀어내고 속도 반사
       for (let i = 0; i < balls.length; i++) {
         for (let j = i + 1; j < balls.length; j++) {
           const a = balls[i], b = balls[j];
           const dx = b.x - a.x, dy = b.y - a.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
-          // 2026-08-23(35): "진입 아이콘끼리 중첩" 버그 — 아이콘끼리는 장식용 작은 반경(r=3) 대신
-          // 실제 시각 반경(wallR=12)으로 충돌시켜야 두 아이콘 그림이 서로 안 겹친다. 장식과의
-          // 충돌(아이콘-장식, 장식-장식)은 기존처럼 작은 반경을 그대로 쓴다.
-          const minDist = (a.wallR && b.wallR) ? (a.wallR + b.wallR) : (a.r + b.r);
+          const minDist = a.wallR + b.wallR;
           if (dist < minDist) {
             const nx = dx / dist, ny = dy / dist;
             const overlap = (minDist - dist) / 2;
@@ -5147,7 +5178,7 @@
   // ================= 네비게이션 =================
   // 2026-08-24: "헤더 홈버튼은 뒤로가기로, 링 버튼은 되돌리기(undo)로" 요청 — 아이콘도 index.html
   // 에서 함께 교체(🏠→⬅️, ⬅️→↩️).
-  btnHome.addEventListener('click', goHome);
+  btnHome.addEventListener('click', () => { vibrate(15); goHome(); }); // 2026-08-25(4): 진동 추가(챌린지 중엔 challenge.js가 대신 진동)
   btnBack.addEventListener('click', () => { vibrate(15); undoLastFill(); });
 
   // ================= 표지 화면 =================
@@ -5434,7 +5465,8 @@
     paintRegionPixels,
     getChallengeRegionInfo,
     colorDistance,
-    COLORS
+    COLORS,
+    vibrate
   };
 
   // 디버그/테스트용: 열려 있는 도안의 모든 영역을 정답색으로 채운 뒤 성공률 계산(검증용)
